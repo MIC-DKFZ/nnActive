@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nnactive_playground"
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pylint",
+  "black",
+  "debugpy",
+]
