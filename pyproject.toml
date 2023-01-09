@@ -8,6 +8,8 @@ dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
+    "batchgenerators",
+    "nnunetv2 @ git+ssh://git@phabricator.mitk.org:2222/source/nnunet.git@nnunet_remake"
 ]
 
 [project.optional-dependencies]
@@ -17,3 +19,6 @@ dev = [
   "black",
   "debugpy",
 ]
+
+[tool.setuptools.packages.find]
+include = ["nnactive_playground*"]
