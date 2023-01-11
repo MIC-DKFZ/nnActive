@@ -13,6 +13,7 @@ dependencies = [
     "acvl_utils @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/acvl_utils.git",
     "dynamic_network_architectures @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git",
     "SimpleITK",
+    "rich",
 ]
 
 [project.optional-dependencies]
