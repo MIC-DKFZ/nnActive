@@ -37,6 +37,13 @@ def add_ignore_label_to_dataset_json(dataset_json, dataset_name):
     return dataset_json
 
 def create_empty_mask(image_filename, ignore_label, save_filename):
+    """Create an empty label mask for a sitk readable image with ignore label.
+
+    Args:
+        image_filename (_type_): _description_
+        ignore_label (_type_): _description_
+        save_filename (_type_): _description_
+    """
     img_itk = sitk.ReadImage(image_filename)
     img_npy = sitk.GetArrayFromImage(img_itk)
     spacing = img_itk.GetSpacing()
