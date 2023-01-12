@@ -27,3 +27,6 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["nnactive_playground*"]
+
+[tool.setuptools_scm]
+write_to = "nnactive_playground/_version.py"
