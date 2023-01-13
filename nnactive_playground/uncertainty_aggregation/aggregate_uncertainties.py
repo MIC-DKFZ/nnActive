@@ -31,9 +31,7 @@ def save_aggregated_uncertainties(
     )
 
 
-def whole_patch_aggregation(
-    np_image, image_name, uncertainties_folder, patch_size, mean=True
-):
+def whole_patch_aggregation(np_image, patch_size, mean=True):
     """
     Simply sum all values inside a patch as aggregation value (and possibly take the mean)
 
@@ -43,6 +41,9 @@ def whole_patch_aggregation(
         uncertainties_folder : Folder with all the uncertainty images that is iterated
         patch_size : Patch size of an input patch that should be aggregated
         mean (bool, optional): If the mean of the patch should be scored, if False, the sum is stored. Defaults to True.
+    Returns:
+        patch_wise_aggragated: a numpy array containg the sum / mean of each patch.
+                               The index in the array corresponds to the starting coordinates of the patch in the input image.
     """
     # Kernel with ones of patch size corresponds to taking the sum
     kernel = np.ones(patch_size)
@@ -52,9 +53,27 @@ def whole_patch_aggregation(
     # Take mean of each patch score if desired
     if mean:
         patch_wise_aggragated = patch_wise_aggragated / (np.prod(patch_size))
+    return patch_wise_aggragated
+
+
+def aggregate_uncertainties_per_image(
+    np_image, image_name, uncertainties_folder, patch_size, mean=True
+):
+    """
+    Function that performs the different aggregation methods for one image and saves them to a .npz file in the end
+
+    Args:
+        np_image : Image to aggregate as numpy array
+        image_name : File name of the image that is aggregated
+        uncertainties_folder : Folder with all the uncertainty images that is iterated
+        patch_size : Patch size of an input patch that should be aggregated
+        mean (bool, optional): If the mean of the patch should be scored, if False, the sum is stored (specific for whole_patch_aggregation). Defaults to True.
+    """
+    # perform various aggregation methods
+    patch_score = whole_patch_aggregation(np_image, patch_size, mean)
     # save the aggregated uncertainties
     save_aggregated_uncertainties(
-        image_name, uncertainties_folder, patch_size, patch_score=patch_wise_aggragated
+        image_name, uncertainties_folder, patch_size, patch_score=patch_score
     )
 
 
@@ -89,7 +108,7 @@ def aggregate_uncertainties():
     read_images_to_numpy(
         dataset_json_path,
         uncertainty_input_folder,
-        whole_patch_aggregation,
+        aggregate_uncertainties_per_image,
         patch_size=(10, 10, 10),
     )
 
