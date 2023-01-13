@@ -30,3 +30,31 @@ include = ["nnactive_playground*"]
 
 [tool.setuptools_scm]
 write_to = "nnactive_playground/_version.py"
+
+[tool.pylint]
+extension-pkg-allow-list = [
+  "numpy",
+  "torch",
+]
+class-const-naming-style = "any"
+load-plugins = ["pylint.extensions.docparams"]
+
+disable = [
+  "raw-checker-failed",
+  "bad-inline-option",
+  "locally-disabled",
+  "file-ignored",
+  "suppressed-message",
+  "useless-suppression",
+  "deprecated-pragma",
+  "use-symbolic-message-instead",
+  "missing-module-docstring",
+]
+
+max-args = 10
+max-attributes = 20
+ignore-paths = [
+]
+
+[tool.isort]
+profile = "black"
