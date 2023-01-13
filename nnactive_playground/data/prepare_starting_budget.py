@@ -1,28 +1,108 @@
 import json
+import os
+from multiprocessing import Pool, set_start_method
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import SimpleITK as sitk
+from nnunetv2.experiment_planning.plan_and_preprocess import PlansManager
+from nnunetv2.preprocessing.preprocessors.default_preprocessor import \
+    DefaultPreprocessor
 from rich.pretty import pprint
-from rich.progress import track
+from rich.progress import Progress, track
 
-from .create_empty_masks import create_images_ignore_label
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
-base_path = Path("~/Data/nnUNet/raw/Dataset135_KiTS2021/").expanduser()
-gt_path = base_path / "gt_labelsTr"
-img_path = base_path / "imagesTr"
+raw_path = Path("~/Data/nnUNet/raw/Dataset135_KiTS2021/").expanduser()
+preprocessed_path = Path("~/Data/nnUNet/preprocessed/Dataset135_KiTS2021/").expanduser()
+gt_path = raw_path / "gt_labelsTr"
+img_path = raw_path / "imagesTr"
+rs_gt_path = raw_path / "rs_gt_labelsTr"
+rs_img_path = raw_path / "rs_imagesTr"
 
-with open(base_path / "dataset.json") as f:
+with open(raw_path / "dataset.json") as f:
     dataset_cfg = json.load(f)
+configuration = "3d_fullres"
+plans_file = preprocessed_path / "nnUNetPlans.json"
+with plans_file.open() as f:
+    plans_cfg = json.load(f)
 
-ignore_label = 3
+preprocessor = DefaultPreprocessor(False)
+
+plans_manager = PlansManager(plans_cfg)
+
+ignore_label = 4
 
 patch_size = 128
 n_samples = 32
 
 crop_min_size = 0.4
 crop_max_size = 0.9
+
+
+config_manager = plans_manager.get_configuration(configuration)
+
+
+def resample_to_target_spacing(name: str):
+    """Convert an image to target spacing"""
+    input_images = [str(rs_img_path / f"{name}_0000{dataset_cfg['file_ending']}")]
+    input_seg = str(rs_gt_path / f"{name}{dataset_cfg['file_ending']}")
+
+    data, seg, properties = preprocessor.run_case(
+        input_images,
+        seg_file=str(rs_gt_path / f"{name}{dataset_cfg['file_ending']}"),
+        plans_manager=plans_manager,
+        configuration_manager=config_manager,
+        dataset_json=dataset_cfg,
+    )
+    data = data.transpose(
+        [0, *[i + 1 for i in plans_manager.transpose_backward]]
+    ).squeeze()
+    seg = seg.transpose(
+        [0, *[i + 1 for i in plans_manager.transpose_backward]]
+    ).squeeze()
+
+    img_itk_new = sitk.GetImageFromArray(data)
+    img_itk_new.SetSpacing(
+        [config_manager.spacing[i] for i in plans_manager.transpose_backward]
+    )
+    img_itk_new.SetOrigin(properties["sitk_stuff"]["origin"])
+    img_itk_new.SetDirection(np.array(properties["sitk_stuff"]["direction"]))
+    sitk.WriteImage(
+        img_itk_new,
+        (img_path / name).with_suffix(dataset_cfg["file_ending"]),
+    )
+
+    img_itk_new = sitk.GetImageFromArray(seg)
+    img_itk_new.SetSpacing(
+        [config_manager.spacing[i] for i in plans_manager.transpose_backward]
+    )
+    img_itk_new.SetOrigin(properties["sitk_stuff"]["origin"])
+    img_itk_new.SetDirection(np.array(properties["sitk_stuff"]["direction"]))
+    sitk.WriteImage(
+        img_itk_new,
+        (gt_path / name).with_suffix(dataset_cfg["file_ending"]),
+    )
+
+
+def resample_all():
+    """Convert all images and labels to target spacing"""
+    gt_path.mkdir(exist_ok=True)
+    img_path.mkdir(exist_ok=True)
+    imgs = list((raw_path / "rs_gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}"))
+
+    names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
+    with Pool(processes=6, maxtasksperchild=1) as pool:
+        for _ in track(
+            pool.imap(resample_to_target_spacing, names, chunksize=8),
+            total=len(names),
+        ):
+            pass
 
 
 def patch_ids_to_image_coords(patch_ids: list[int] | npt.NDArray, bins, files, sizes):
@@ -60,8 +140,10 @@ def patch_ids_to_image_coords(patch_ids: list[int] | npt.NDArray, bins, files, s
 def compute_patch_mapping():
     img_sizes = {}
 
-    if not (base_path / "img_sizes.json").is_file():
-        imgs = list((base_path / "gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}"))
+    if not (raw_path / "img_sizes.json").is_file():
+        imgs = list(
+            (raw_path / "gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}")
+        )
 
         for path in track(imgs):
             img = sitk.ReadImage(path)
@@ -71,10 +153,10 @@ def compute_patch_mapping():
             print(f"{name}: {size}")
             img_sizes[name] = size
 
-        with open(base_path / "img_sizes.json", "w") as f:
+        with open(raw_path / "img_sizes.json", "w") as f:
             json.dump(img_sizes, f)
     else:
-        with open(base_path / "img_sizes.json") as f:
+        with open(raw_path / "img_sizes.json") as f:
             img_sizes = json.load(f)
 
     img_sizes = dict(sorted(img_sizes.items()))
@@ -132,11 +214,13 @@ def starting_budget_random_crop():
 
 
 def make_folder(patches):
-    output_dir = base_path / "labelsTr"
+    output_dir = raw_path / "labelsTr"
     output_dir.mkdir(exist_ok=True)
 
     for patch in track(patches):
-        img_itk = sitk.ReadImage((gt_path / patch["file"]).with_suffix(dataset_cfg["file_ending"]))
+        img_itk = sitk.ReadImage(
+            (gt_path / patch["file"]).with_suffix(dataset_cfg["file_ending"])
+        )
         img_npy = sitk.GetArrayFromImage(img_itk)
         spacing = img_itk.GetSpacing()
         origin = img_itk.GetOrigin()
@@ -148,19 +232,20 @@ def make_folder(patches):
         ys, ye = patch["coords"][1], patch["coords"][1] + patch["size"][1]
         zs, ze = patch["coords"][2], patch["coords"][2] + patch["size"][2]
 
-        # indices = np.array(np.meshgrid(xi, yi, zi)).T.reshape(-1,3)
-
         img_new[xs:xe, ys:ye, zs:ze] = img_npy[xs:xe, ys:ye, zs:ze]
 
         img_itk_new = sitk.GetImageFromArray(img_new)
         img_itk_new.SetSpacing(spacing)
         img_itk_new.SetOrigin(origin)
         img_itk_new.SetDirection(direction)
-        sitk.WriteImage(img_itk_new, (output_dir / patch["file"]).with_suffix(dataset_cfg["file_ending"]))
+        sitk.WriteImage(
+            img_itk_new,
+            (output_dir / patch["file"]).with_suffix(dataset_cfg["file_ending"]),
+        )
 
 
 def main():
-    # patches = starting_budget_random_grid()
+    resample_all()
     patches = starting_budget_random_crop()
     pprint(patches)
     make_folder(patches)
