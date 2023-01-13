@@ -1,7 +1,6 @@
-# TODO: Make this script based on argparse arguments
-# TODO: functional instead of pipeline workflow
-# TODO: Check new script based on function
 # TODO: make a script which creates a custom cross-validation file for splits!
+# TODO: how to test
+# TODO: Files
 import shutil
 import os
 from typing import Optional, Union, List
@@ -50,7 +49,8 @@ parser.add_argument("--seed", default=12345)
 
 parser.add_argument(
     "--full-labeled",
-    type=str,
+    type=float,
+    default = 0.1,
     help="0.X = percentage, int = full number of completely annotated images",
 )  # how to make float and integers
 parser.add_argument(
@@ -89,25 +89,29 @@ def convert_dataset_to_unannotated(
         target_id = id_offset + base_id
 
     # check if target_id already exists
+    exists_name = None
     already_exists = False
     try:
-        convert_id_to_dataset_name(target_id)
-        print("Dataset with ID {} already exists.".format(target_id))
+        # TODO: Add case for nnU-Net preprocessed etc. already exists!
+        exists_name = convert_id_to_dataset_name(target_id)
+        print("Dataset with ID {} already exists under name {}.".format(target_id, exists_name))
         already_exists = True
     except:
         pass
     # remove Folder if target_id dataset already exists and rewrite
+    if already_exists:
+        remove_folder = nnUNet_raw / exists_name
+        if not remove_folder.exists():
+            print("Found no folder: {}".format(remove_folder))
+            print("Proceed as if no ID conflict")
+            already_exists = False
+
     if already_exists and rewrite is True:
         target_folder:str = convert_id_to_dataset_name(target_id)
-        print("Dataset ID {} already in nnU-Net under name {}".format(target_id, target_folder))
         remove_folder = nnUNet_raw / target_folder
         if remove_folder.exists():
             print("Removing already existing target directory:\n{}".format(remove_folder))
             shutil.rmtree(remove_folder)
-        else:
-            print("Found no folder: {}".format(remove_folder))
-            print("Proceed as if no id conflict")
-            already_exists = False
     # logic for creating partially annotated dataset
     if not already_exists or (already_exists and rewrite is True):
         # load base_dataset_json
@@ -146,7 +150,7 @@ def convert_dataset_to_unannotated(
                 )
 
 
-        # Create imagesTr for target dataset
+        # Create labelstTr for target dataset
         imagesTr_dir = base_dir / "imagesTr"
         base_labelsTr_dir = base_dir / "labelsTr"
         target_labelsTr_dir = target_dir / "labelsTr"
@@ -196,8 +200,8 @@ def convert_dataset_to_unannotated(
                 )
 
         # TODO Put here logic for part_ano training images
-        image_names, label_area = placeholder_patch_anno(
-            image_names, patch_kwargs, label_area
+        image_names, label_json = placeholder_patch_anno(
+            image_names, patch_kwargs, label_json
         )
 
         # Create empty masks for the rest of the training images
