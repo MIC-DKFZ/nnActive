@@ -1,4 +1,7 @@
-before_script:
+pytest:
+  stage: test
+  image: "python:3.10"
+  before_script:
   ##
   ## Install ssh-agent if not already installed, it is required by Docker.
   ## (change apt-get to yum if you use an RPM-based image)
@@ -29,10 +32,6 @@ before_script:
   - ssh-keyscan codebase.helmholtz.cloud >> ~/.ssh/known_hosts
   - chmod 644 ~/.ssh/known_hosts
 
-pytest:
-  stage: test
-  image: "python:3.10"
-  before_script:
   - python --version
   - pip install .[dev]
   script:
