@@ -33,6 +33,7 @@ pytest:
   - chmod 644 ~/.ssh/known_hosts
 
   - python --version
+  - pip cache purge
   - pip install .[dev]
   script:
   - python -m pytest -W ignore
