@@ -4,89 +4,234 @@
 # TODO: make a script which creates a custom cross-validation file for splits!
 import shutil
 import os
+from typing import Optional, Union, List
 import json
 import numpy as np
+from argparse import ArgumentParser
 from nnunetv2.paths import nnUNet_raw
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
-import SimpleITK as sitk
+
+# import SimpleITK as sitk
 import random
+from pprint import pprint
+from copy import deepcopy
+from pathlib import Path
 
-from create_empty_masks import create_empty_mask,create_images_ignore_label,read_dataset_json, add_ignore_label_to_dataset_json
+from create_empty_masks import (
+    create_empty_mask,
+    read_dataset_json,
+    add_ignore_label_to_dataset_json,
+)
 
-image_percentage=0.2
-patch_percentage=0
-min_class=0
+parser = ArgumentParser()
+parser.add_argument(
+    "-d",
+    "--dataset-id",
+    type=int,
+    help="dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
+)
+parser.add_argument(
+    "-o",
+    "--output-id",
+    type=int,
+    default=None,
+    help="target dataset ID for nnU-Net, default base on offset",
+)
+parser.add_argument(
+    "-f",
+    "--force-override",
+    action="store_true",
+    help="Force overriding output dataset",
+)
+parser.add_argument(
+    "--offset", type=int, default=500, help="ouput_id = dataset_id + offset"
+)
+parser.add_argument("--seed", default=12345)
 
-base_dataset_id = 4
-id_offset=500
+parser.add_argument(
+    "--full-labeled",
+    type=str,
+    help="0.X = percentage, int = full number of completely annotated images",
+)  # how to make float and integers
+parser.add_argument(
+    "--minimal-example-per-class",
+    type=int,
+    default=None,
+    help="minimal amount of examples per class -- not implemented yet",
+)  # int
+parser.add_argument(
+    "--partial-labeled",
+    type=str,
+    default=None,
+    help="Labeling Scheme for partial annotation -- not implemented yet",
+)  # how to make float and integers
 
-random_seed= 1234
+NNUNET_RAW = Path(nnUNet_raw)
 
-random.seed(random_seed)
-np_state = np.random.RandomState(random_seed)
+def placeholder_patch_anno(
+    image_names: List[str], patch_kwargs: dict, label_area: List[dict]
+):
+    return image_names, label_area
 
 
+def convert_dataset_to_unannotated(
+    base_id: int,
+    id_offset: int,
+    full_images: Union[float, int],
+    target_id=None,
+    rewrite=False,
+    name_suffix: str = "partanno",
+    patch_kwargs: Optional[dict] = None,
+):
+    nnUNet_raw = NNUNET_RAW
+
+    if target_id is None:
+        target_id = id_offset + base_id
+
+    # check if target_id already exists
+    already_exists = False
+    try:
+        convert_id_to_dataset_name(target_id)
+        print("Dataset with ID {} already exists.".format(target_id))
+        already_exists = True
+    except:
+        pass
+    # remove Folder if target_id dataset already exists and rewrite
+    if already_exists and rewrite is True:
+        target_folder:str = convert_id_to_dataset_name(target_id)
+        print("Dataset ID {} already in nnU-Net under name {}".format(target_id, target_folder))
+        remove_folder = nnUNet_raw / target_folder
+        if remove_folder.exists():
+            print("Removing already existing target directory:\n{}".format(remove_folder))
+            shutil.rmtree(remove_folder)
+        else:
+            print("Found no folder: {}".format(remove_folder))
+            print("Proceed as if no id conflict")
+            already_exists = False
+    # logic for creating partially annotated dataset
+    if not already_exists or (already_exists and rewrite is True):
+        # load base_dataset_json
+        base_dataset: str = convert_id_to_dataset_name(base_id)
+        base_dataset_json: dict = read_dataset_json(base_dataset)
+        base_dir = nnUNet_raw / base_dataset
+
+        # rewrite target_dataset_json and save
+        target_dataset_json = deepcopy(base_dataset_json)
+        target_dataset_json["name"] = "{}-{}".format(
+            base_dataset_json["name"], name_suffix
+        )
+        target_dataset_json = add_ignore_label_to_dataset_json(
+            target_dataset_json, base_dataset
+        )
+        target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
+        target_dir = nnUNet_raw / target_dataset
+        os.makedirs(target_dir)
+        # Save target dataset.json
+        with open(target_dir / "dataset.json", "w") as file:
+            json.dump(target_dataset_json, file)
+        assert (
+            read_dataset_json(base_dataset) == base_dataset_json
+        )  # basedataset/dataset.json is not supposed to change!
+
+        # Copy all data except for labelsTr to target_dir and dataset.json
+        copy_folders = ["imagesTr", "imagesTs", "labelsTs"]
+        for copy_folder in copy_folders:
+            if copy_folder in os.listdir(base_dir):
+                shutil.copytree(base_dir / copy_folder, target_dir / copy_folder)
+            else:
+                print(
+                    "Skip Path for copying into target:\n{}".format(
+                        base_dir / copy_folder
+                    )
+                )
 
 
+        # Create imagesTr for target dataset
+        imagesTr_dir = base_dir / "imagesTr"
+        base_labelsTr_dir = base_dir / "labelsTr"
+        target_labelsTr_dir = target_dir / "labelsTr"
 
-def create_images_ignore_label(base_dataset_name:str, target_dataset_name:str, dataset_json:dict):
-    """Create a new dataset with partially annotated data from a base_dataset to target_dataset
+        os.makedirs(target_labelsTr_dir, exist_ok=True)
+        ignore_label = target_dataset_json["labels"]["ignore"]
 
-    Args:
-        base_dataset_name (str): _description_
-        target_dataset_name (str): _description_
-        dataset_json (dict): _description_
-    """
-    imagesTr_dir = os.path.join(nnUNet_raw, base_dataset_name, "imagesTr")
-    labelsTr_dir = os.path.join(nnUNet_raw, base_dataset_name, "labelsTr")
-    target_labelsTr_dir = os.path.join(nnUNet_raw, target_dataset_name, "labelsTr")
+        image_names = os.listdir(imagesTr_dir)
+        image_names = [
+            image_name
+            for image_name in image_names
+            if image_name.endswith(target_dataset_json["file_ending"])
+        ]
 
-    with open(os.path.join(nnUNet_raw, target_dataset_name, "dataset.json"), "w") as file:
-        json.dump(dataset_json, file)
-    
-    os.makedirs(labelsTr_dir, exist_ok=True)
-    ignore_label  = dataset_json["labels"]["ignore"]
+        seg_names = os.listdir(base_labelsTr_dir)
+        seg_names = [
+            seg_name
+            for seg_name in seg_names
+            if seg_name.endswith(target_dataset_json["file_ending"])
+        ]
 
-    image_paths = os.listdir(imagesTr_dir)
-    seg_paths = os.listdir(labelsTr_dir)
-    assert len(image_paths) == len(seg_paths)
-    random.shuffle(image_paths)
+        # Current implementation only works if all data has a corresponding lablesTr
+        assert len(image_names) == len(seg_names)
+        rand_np_state = np.random.RandomState(random_seed)
+        rand_np_state.shuffle(image_names)
 
-    num_full_ano = int(len(image_paths) * image_percentage)
-    full_ano = [image_paths.pop() for i in range(num_full_ano)]
+        if full_images < 1:
+            full_images = int(len(image_names) * full_images)
+        full_ano = [image_names.pop() for i in range(full_images)]
+        label_json = []
 
-    # Load labelsTr for full_ano training images
-    for image_path in full_ano:
-        if image_path.endswith(dataset_json["file_ending"]):
+        # Copyt labelsTr from base to target for full_ano training images
+        for image_name in full_ano:
             # Create savename for segmentation
-            data_name = "_".join(image_path.split('_')[:-1])
-            seg_name = data_name+dataset_json["file_ending"]
-            if seg_name in seg_paths:
-                shutil.copy(os.path.join(labelsTr_dir, seg_name), os.path.join(target_labelsTr_dir, seg_name))
+            data_name = "_".join(image_name.split("_")[:-1])
+            seg_name = data_name + target_dataset_json["file_ending"]
+            if seg_name in seg_names:
+                shutil.copy(
+                    base_labelsTr_dir / seg_name, target_labelsTr_dir / seg_name
+                )
+                label_json.append(
+                    {
+                        "file": seg_name,
+                        "coords": [0, 0, 0],
+                        "size": "whole",
+                    }
+                )
 
-    # TODO Put here logic for part_ano training images
-    
-            
+        # TODO Put here logic for part_ano training images
+        image_names, label_area = placeholder_patch_anno(
+            image_names, patch_kwargs, label_area
+        )
 
-    # Create empty masks for the rest of the training images
-    for image_path in image_paths:
-        if image_path.endswith(dataset_json["file_ending"]):
-            save_filename = f"{'_'.join(image_path.split('_')[:-1])}{dataset_json['file_ending']}"
-            create_empty_mask(os.path.join(imagesTr_dir, image_path), ignore_label, os.path.join(target_labelsTr_dir, save_filename))
+        # Create empty masks for the rest of the training images
+        for image_name in image_names:
+            save_filename = f"{'_'.join(image_name.split('_')[:-1])}{base_dataset_json['file_ending']}"
+            create_empty_mask(
+                imagesTr_dir / image_name,
+                ignore_label,
+                target_labelsTr_dir / save_filename,
+            )
+
+        with open(target_dir / "label_00.json", "w") as file:
+            json.dump(label_json, file)
+    else:
+        print("No Override")
 
 
 if __name__ == "__main__":
-    dataset_name = convert_id_to_dataset_name(base_dataset_id)
-    dj = read_dataset_json(dataset_name)
-    dj["name"] = "{}-partanno".format(dj["name"])
-    dj = add_ignore_label_to_dataset_json(dj, dataset_name)
+    args = parser.parse_args()
+    # TODO: rewrite arguements
+    full_images = args.full_labeled
 
-    target_dataset_name = f"Dataset{id_offset+base_dataset_id:03d}_"+dj["name"]
-    shutil.copytree(os.path.join(nnUNet_raw, dataset_name), os.path.join(nnUNet_raw, target_dataset_name))
+    partial_labeled = args.partial_labeled
+    minimal_example_per_class = args.minimal_example_per_class
+    assert partial_labeled is None  # partial labeling not implemented yet
+    assert (
+        minimal_example_per_class is None
+    )  # minimal examples per class not implemented yet
 
-    target_labelsTr_dir = os.path.join(nnUNet_raw, target_dataset_name, "labelsTr")
-    shutil.rmtree(target_labelsTr_dir)
-    os.makedirs(target_labelsTr_dir)
-
-    create_images_ignore_label(dataset_name, target_dataset_name,dj)
-    
+    base_dataset_id = args.dataset_id
+    target_id = args.output_id
+    id_offset = args.offset
+    random_seed = args.seed
+    rewrite = args.force_override
+    convert_dataset_to_unannotated(
+        base_dataset_id, id_offset, full_images, target_id=target_id, rewrite=rewrite
+    )
