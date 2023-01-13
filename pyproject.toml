@@ -55,3 +55,6 @@ max-args = 10
 max-attributes = 20
 ignore-paths = [
 ]
+
+[tool.isort]
+profile = "black"
