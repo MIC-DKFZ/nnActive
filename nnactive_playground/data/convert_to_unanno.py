@@ -1,25 +1,24 @@
 # TODO: make a script which creates a custom cross-validation file for splits!
 # TODO: how to test
 # TODO: Files
-import shutil
-import os
-from typing import Optional, Union, List
 import json
-import numpy as np
+import os
+import shutil
 from argparse import ArgumentParser
-from nnunetv2.paths import nnUNet_raw
-from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
 # import SimpleITK as sitk
-import random
-from pprint import pprint
 from copy import deepcopy
 from pathlib import Path
+from typing import List, Optional, Union
 
-from create_empty_masks import (
+import numpy as np
+from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
+from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
+
+from nnactive_playground.data.create_empty_masks import (
+    add_ignore_label_to_dataset_json,
     create_empty_mask,
     read_dataset_json,
-    add_ignore_label_to_dataset_json,
 )
 
 parser = ArgumentParser()
@@ -50,7 +49,7 @@ parser.add_argument("--seed", default=12345)
 parser.add_argument(
     "--full-labeled",
     type=float,
-    default = 0.1,
+    default=0.1,
     help="0.X = percentage, int = full number of completely annotated images",
 )  # how to make float and integers
 parser.add_argument(
@@ -67,6 +66,8 @@ parser.add_argument(
 )  # how to make float and integers
 
 NNUNET_RAW = Path(nnUNet_raw)
+NNUNET_PREPROCESSED = Path(nnUNet_preprocessed)
+
 
 def placeholder_patch_anno(
     image_names: List[str], patch_kwargs: dict, label_area: List[dict]
@@ -74,11 +75,14 @@ def placeholder_patch_anno(
     return image_names, label_area
 
 
+LOOP_NAME = "loop_000.json"
+
+
 def convert_dataset_to_unannotated(
     base_id: int,
     id_offset: int,
     full_images: Union[float, int],
-    target_id=None,
+    target_id: int = None,
     rewrite=False,
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
@@ -94,7 +98,7 @@ def convert_dataset_to_unannotated(
     try:
         # TODO: Add case for nnU-Net preprocessed etc. already exists!
         exists_name = convert_id_to_dataset_name(target_id)
-        print("Dataset with ID {} already exists under name {}.".format(target_id, exists_name))
+        print(f"Dataset with ID {target_id} already exists under name {exists_name}.")
         already_exists = True
     except:
         pass
@@ -102,15 +106,15 @@ def convert_dataset_to_unannotated(
     if already_exists:
         remove_folder = nnUNet_raw / exists_name
         if not remove_folder.exists():
-            print("Found no folder: {}".format(remove_folder))
+            print(f"Found no folder: {remove_folder}")
             print("Proceed as if no ID conflict")
             already_exists = False
 
     if already_exists and rewrite is True:
-        target_folder:str = convert_id_to_dataset_name(target_id)
+        target_folder: str = convert_id_to_dataset_name(target_id)
         remove_folder = nnUNet_raw / target_folder
         if remove_folder.exists():
-            print("Removing already existing target directory:\n{}".format(remove_folder))
+            print(f"Removing already existing target directory:\n{remove_folder}")
             shutil.rmtree(remove_folder)
     # logic for creating partially annotated dataset
     if not already_exists or (already_exists and rewrite is True):
@@ -149,7 +153,6 @@ def convert_dataset_to_unannotated(
                     )
                 )
 
-
         # Create labelstTr for target dataset
         imagesTr_dir = base_dir / "imagesTr"
         base_labelsTr_dir = base_dir / "labelsTr"
@@ -180,9 +183,9 @@ def convert_dataset_to_unannotated(
         if full_images < 1:
             full_images = int(len(image_names) * full_images)
         full_ano = [image_names.pop() for i in range(full_images)]
-        label_json = []
+        label_list = []
 
-        # Copyt labelsTr from base to target for full_ano training images
+        # Copy labelsTr from base to target for full_ano training images
         for image_name in full_ano:
             # Create savename for segmentation
             data_name = "_".join(image_name.split("_")[:-1])
@@ -191,17 +194,18 @@ def convert_dataset_to_unannotated(
                 shutil.copy(
                     base_labelsTr_dir / seg_name, target_labelsTr_dir / seg_name
                 )
-                label_json.append(
+                label_list.append(
                     {
                         "file": seg_name,
                         "coords": [0, 0, 0],
+                        # TODO: Read out Size
                         "size": "whole",
                     }
                 )
 
         # TODO Put here logic for part_ano training images
-        image_names, label_json = placeholder_patch_anno(
-            image_names, patch_kwargs, label_json
+        image_names, label_list = placeholder_patch_anno(
+            image_names, patch_kwargs, label_list
         )
 
         # Create empty masks for the rest of the training images
@@ -213,10 +217,69 @@ def convert_dataset_to_unannotated(
                 target_labelsTr_dir / save_filename,
             )
 
-        with open(target_dir / "label_00.json", "w") as file:
-            json.dump(label_json, file)
+        loop_json = {"patches": label_list}
+        with open(target_dir / LOOP_NAME, "w") as file:
+            json.dump(loop_json, file)
+        return target_id
     else:
         print("No Override")
+
+
+def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int = 5):
+    """Generates a custom split file in NNUNET_PREPROCESSED folder which only has labeled data.
+
+    Args:
+        target_id (int): dataset id
+        label_file (str): name of the file to be labeled
+        num_folds (int, optional): Folds vor KFoldCV. Defaults to 5.
+    """
+    # TODO: make this generalizable so that in label_file same name can be saved multiple times!
+    dataset: str = convert_id_to_dataset_name(target_id)
+    with open(NNUNET_RAW / dataset / label_file, "r") as file:
+        data = json.load(file)
+    patches = data["patches"]
+    labeled_images = [patch["file"].split(".")[0] for patch in patches]
+    folds = [[] for _ in range(num_folds)]
+    rand_np_state = np.random.RandomState(random_seed)
+    rand_np_state.shuffle(labeled_images)
+    for i in range(len(labeled_images)):
+        folds[i % num_folds].append(labeled_images.pop())
+
+    for fold in folds:
+        assert (
+            len(fold) > 0
+        )  # no fold is supposed to have a length of zero! set num_folds smaller
+
+    # folds = np.array(folds)
+    splits_final = []
+    for i in range(num_folds):
+        # train_select = np.ones(num_folds, dtype=bool)
+        # train_select[i] = 0
+        # val_select = ~train_select
+        train_select = [j for j in range(num_folds) if j != i]
+        val_select = [i]
+        train_set = []
+        for train_fold in train_select:
+            train_set = train_set + folds[train_fold]
+        val_set = []
+        for val_fold in val_select:
+            val_set = val_set + folds[val_fold]
+        splits_final.append(
+            {
+                "train": train_set,
+                "val": val_set,
+            }
+        )
+    # splits_final = [
+    #     {"train": np.array(folds)[np.ones(num_folds)].tolist(),
+    #     "val": folds[i],
+    #     }
+    #     for i in range(num_folds)
+    # ]
+    if not (NNUNET_PREPROCESSED / dataset).exists():
+        os.makedirs(NNUNET_PREPROCESSED / dataset)
+    with open(NNUNET_PREPROCESSED / dataset / "splits_final.json", "w") as file:
+        json.dump(splits_final, file)
 
 
 if __name__ == "__main__":
@@ -236,6 +299,7 @@ if __name__ == "__main__":
     id_offset = args.offset
     random_seed = args.seed
     rewrite = args.force_override
-    convert_dataset_to_unannotated(
+    target_id = convert_dataset_to_unannotated(
         base_dataset_id, id_offset, full_images, target_id=target_id, rewrite=rewrite
     )
+    generate_custom_splits_file(target_id, LOOP_NAME, 5)
