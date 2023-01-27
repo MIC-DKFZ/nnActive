@@ -83,8 +83,8 @@ def convert_dataset_to_partannotated(
     full_images: Union[float, int],
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
-    rewrite:bool=False,
-    force:bool=False
+    rewrite: bool = False,
+    force: bool = False,
 ):
 
     # check if target_id already exists
@@ -99,7 +99,10 @@ def convert_dataset_to_partannotated(
         pass
     # remove Folder if target_id dataset already exists and rewrite
     if already_exists:
-        remove_folders = [folder/ exists_name for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]]
+        remove_folders = [
+            folder / exists_name
+            for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]
+        ]
         for remove_folder in remove_folders:
             if remove_folder.exists():
                 print(f"Found folder: {remove_folder}")
@@ -109,14 +112,17 @@ def convert_dataset_to_partannotated(
                     val = input("Should this folder be deleted? [y/n]")
                     if val == "y":
                         shutil.rmtree(remove_folder)
-                
 
             else:
                 print(f"Found no folder: {remove_folder}")
                 print("Proceed as if no ID conflict")
 
     # logic for creating partially annotated dataset
-    if not already_exists or (already_exists and rewrite is True) or (already_exists and force):
+    if (
+        not already_exists
+        or (already_exists and rewrite is True)
+        or (already_exists and force)
+    ):
         # load base_dataset_json
         base_dataset: str = convert_id_to_dataset_name(base_id)
         base_dataset_json: dict = read_dataset_json(base_dataset)
@@ -197,7 +203,7 @@ def convert_dataset_to_partannotated(
                     {
                         "file": seg_name,
                         "coords": [0, 0, 0],
-                        # TODO: Read out Size
+                        # TODO: Read out Size?
                         "size": "whole",
                     }
                 )
@@ -228,33 +234,58 @@ def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int 
 
     Args:
         target_id (int): dataset id
-        label_file (str): name of the file to be labeled
+        label_file (str): loop_XXX.json file all smaller are also taken to get list of names
         num_folds (int, optional): Folds vor KFoldCV. Defaults to 5.
     """
-    # TODO: make this generalizable so that in label_file same name can be saved multiple times!
     dataset: str = convert_id_to_dataset_name(target_id)
-    with open(NNUNET_RAW / dataset / label_file, "r") as file:
-        data = json.load(file)
-    patches = data["patches"]
+    base_name = label_file.split("_")[0]
+    number = int(label_file.split("_")[1].split(".")[0])
+
+    patches = []
+    for i in range(number + 1):
+        fn = f"{base_name}_{i:03d}.json"
+        with open(NNUNET_RAW / dataset / fn, "r") as file:
+            data_file: dict = json.load(file)
+        patch_file: list = data_file["patches"]
+        patches = patches + patch_file
+
     labeled_images = [patch["file"].split(".")[0] for patch in patches]
-    folds = [[] for _ in range(num_folds)]
+    labeled_images = list(set(labeled_images))
+
+    splits_final = kfold_cv(num_folds, labeled_images)
+
+    # Create path if not exists
+    if not (NNUNET_PREPROCESSED / dataset).exists():
+        os.makedirs(NNUNET_PREPROCESSED / dataset)
+    # save splits_file
+    with open(NNUNET_PREPROCESSED / dataset / "splits_final.json", "w") as file:
+        json.dump(splits_final, file, indent=4)
+
+
+def kfold_cv(k: int, labeled_images: List[str]):
+    """Create K Fold CV splits
+
+    Args:
+        k (int): num_folds
+        labeled_images (List[str]): _description_
+
+    Returns:
+        List[dict]: dict={train:list, val:list}
+    """
+    folds = [[] for _ in range(k)]
     rand_np_state = np.random.RandomState(random_seed)
     rand_np_state.shuffle(labeled_images)
     for i in range(len(labeled_images)):
-        folds[i % num_folds].append(labeled_images.pop())
+        folds[i % k].append(labeled_images.pop())
 
     for fold in folds:
         assert (
             len(fold) > 0
         )  # no fold is supposed to have a length of zero! set num_folds smaller
 
-    # folds = np.array(folds)
     splits_final = []
-    for i in range(num_folds):
-        # train_select = np.ones(num_folds, dtype=bool)
-        # train_select[i] = 0
-        # val_select = ~train_select
-        train_select = [j for j in range(num_folds) if j != i]
+    for i in range(k):
+        train_select = [j for j in range(k) if j != i]
         val_select = [i]
         train_set = []
         for train_fold in train_select:
@@ -268,16 +299,8 @@ def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int 
                 "val": val_set,
             }
         )
-    # splits_final = [
-    #     {"train": np.array(folds)[np.ones(num_folds)].tolist(),
-    #     "val": folds[i],
-    #     }
-    #     for i in range(num_folds)
-    # ]
-    if not (NNUNET_PREPROCESSED / dataset).exists():
-        os.makedirs(NNUNET_PREPROCESSED / dataset)
-    with open(NNUNET_PREPROCESSED / dataset / "splits_final.json", "w") as file:
-        json.dump(splits_final, file, indent=4)
+
+    return splits_final
 
 
 if __name__ == "__main__":
