@@ -1,4 +1,3 @@
-# TODO: make a script which creates a custom cross-validation file for splits!
 # TODO: how to test
 # TODO: Files
 import json
@@ -6,13 +5,12 @@ import os
 import shutil
 from argparse import ArgumentParser
 
-# import SimpleITK as sitk
 from copy import deepcopy
 from pathlib import Path
 from typing import List, Optional, Union
 
 import numpy as np
-from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
+from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
 from nnactive_playground.data.create_empty_masks import (
@@ -67,6 +65,7 @@ parser.add_argument(
 
 NNUNET_RAW = Path(nnUNet_raw)
 NNUNET_PREPROCESSED = Path(nnUNet_preprocessed)
+NNUNET_RESULTS = Path(nnUNet_results)
 
 
 def placeholder_patch_anno(
@@ -78,19 +77,15 @@ def placeholder_patch_anno(
 LOOP_NAME = "loop_000.json"
 
 
-def convert_dataset_to_unannotated(
+def convert_dataset_to_partannotated(
     base_id: int,
-    id_offset: int,
+    target_id: int,
     full_images: Union[float, int],
-    target_id: int = None,
-    rewrite=False,
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
+    rewrite:bool=False,
+    force:bool=False
 ):
-    nnUNet_raw = NNUNET_RAW
-
-    if target_id is None:
-        target_id = id_offset + base_id
 
     # check if target_id already exists
     exists_name = None
@@ -104,24 +99,28 @@ def convert_dataset_to_unannotated(
         pass
     # remove Folder if target_id dataset already exists and rewrite
     if already_exists:
-        remove_folder = nnUNet_raw / exists_name
-        if not remove_folder.exists():
-            print(f"Found no folder: {remove_folder}")
-            print("Proceed as if no ID conflict")
-            already_exists = False
+        remove_folders = [folder/ exists_name for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]]
+        for remove_folder in remove_folders:
+            if remove_folder.exists():
+                print(f"Found folder: {remove_folder}")
+                if force:
+                    shutil.rmtree(remove_folder)
+                if rewrite:
+                    val = input("Should this folder be deleted? [y/n]")
+                    if val == "y":
+                        shutil.rmtree(remove_folder)
+                
 
-    if already_exists and rewrite is True:
-        target_folder: str = convert_id_to_dataset_name(target_id)
-        remove_folder = nnUNet_raw / target_folder
-        if remove_folder.exists():
-            print(f"Removing already existing target directory:\n{remove_folder}")
-            shutil.rmtree(remove_folder)
+            else:
+                print(f"Found no folder: {remove_folder}")
+                print("Proceed as if no ID conflict")
+
     # logic for creating partially annotated dataset
-    if not already_exists or (already_exists and rewrite is True):
+    if not already_exists or (already_exists and rewrite is True) or (already_exists and force):
         # load base_dataset_json
         base_dataset: str = convert_id_to_dataset_name(base_id)
         base_dataset_json: dict = read_dataset_json(base_dataset)
-        base_dir = nnUNet_raw / base_dataset
+        base_dir = NNUNET_RAW / base_dataset
 
         # rewrite target_dataset_json and save
         target_dataset_json = deepcopy(base_dataset_json)
@@ -132,11 +131,11 @@ def convert_dataset_to_unannotated(
             target_dataset_json, base_dataset
         )
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = nnUNet_raw / target_dataset
+        target_dir = NNUNET_RAW / target_dataset
         os.makedirs(target_dir)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
-            json.dump(target_dataset_json, file)
+            json.dump(target_dataset_json, file, indent=4)
         assert (
             read_dataset_json(base_dataset) == base_dataset_json
         )  # basedataset/dataset.json is not supposed to change!
@@ -219,8 +218,7 @@ def convert_dataset_to_unannotated(
 
         loop_json = {"patches": label_list}
         with open(target_dir / LOOP_NAME, "w") as file:
-            json.dump(loop_json, file)
-        return target_id
+            json.dump(loop_json, file, indent=4)
     else:
         print("No Override")
 
@@ -279,7 +277,7 @@ def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int 
     if not (NNUNET_PREPROCESSED / dataset).exists():
         os.makedirs(NNUNET_PREPROCESSED / dataset)
     with open(NNUNET_PREPROCESSED / dataset / "splits_final.json", "w") as file:
-        json.dump(splits_final, file)
+        json.dump(splits_final, file, indent=4)
 
 
 if __name__ == "__main__":
@@ -299,7 +297,10 @@ if __name__ == "__main__":
     id_offset = args.offset
     random_seed = args.seed
     rewrite = args.force_override
-    target_id = convert_dataset_to_unannotated(
-        base_dataset_id, id_offset, full_images, target_id=target_id, rewrite=rewrite
+    if not isinstance(target_id, int):
+        target_id = base_dataset_id + id_offset
+    print(f"output_id is {target_id}")
+    convert_dataset_to_partannotated(
+        base_dataset_id, target_id, full_images, rewrite=rewrite
     )
     generate_custom_splits_file(target_id, LOOP_NAME, 5)
