@@ -91,14 +91,14 @@ def aggregate_uncertainties():
         "--dataset_json",
         type=str,
         required=True,
-        help="Root folder containing the softmax predictions of each fold in subfolders /fold_<0-4>",
+        help="Path to the dataset.json file to read image information like file endings",
     )
     parser.add_argument(
         "-i",
         "--input",
         type=str,
         required=True,
-        help="Root folder containing the softmax predictions of each fold in subfolders /fold_<0-4>",
+        help="Folder containing the uncertainty maps",
     )
     args = parser.parse_args()
     dataset_json_path = args.dataset_json
