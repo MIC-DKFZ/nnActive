@@ -3,7 +3,8 @@ from __future__ import annotations
 import functools
 import json
 import os
-from multiprocessing import Pool, set_start_method
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import numpy as np
@@ -14,8 +15,7 @@ from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     DefaultPreprocessor,
 )
 from pydantic.dataclasses import dataclass
-from rich.pretty import pprint
-from rich.progress import Progress, track
+from rich.progress import track
 
 
 @dataclass
@@ -114,26 +114,28 @@ def resample_all(
     imgs = list((raw_path / "rs_gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}"))
 
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
-    set_start_method("spawn")
-    with Pool(processes=4) as pool:
-        for _ in track(
-            pool.imap_unordered(
-                functools.partial(
-                    resample_to_target_spacing,
-                    dataset_cfg=dataset_cfg,
-                    rs_img_path=rs_img_path,
-                    rs_gt_path=rs_gt_path,
-                    preprocessor=preprocessor,
-                    plans_manager=plans_manager,
-                    config_manager=config_manager,
-                    img_path=img_path,
-                    gt_path=gt_path,
-                ),
-                names,
-            ),
-            total=len(names),
-        ):
-            pass
+
+    worker_fn = functools.partial(
+        resample_to_target_spacing,
+        dataset_cfg=dataset_cfg,
+        rs_img_path=rs_img_path,
+        rs_gt_path=rs_gt_path,
+        preprocessor=preprocessor,
+        plans_manager=plans_manager,
+        config_manager=config_manager,
+        img_path=img_path,
+        gt_path=gt_path,
+    )
+    try:
+        with ProcessPoolExecutor(max_workers=3) as executor:
+            for _ in track(executor.map(worker_fn, names), total=len(names)):
+                pass
+    except BrokenProcessPool as exc:
+        raise MemoryError(
+            "One of the worker processes died. "
+            "This usually happens because you run out of memory. "
+            "Try running with less processes."
+        ) from exc
 
 
 def patch_ids_to_image_coords(
