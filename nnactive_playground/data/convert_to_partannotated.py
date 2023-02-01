@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 from argparse import ArgumentParser
-
 from copy import deepcopy
 from pathlib import Path
 from typing import List, Optional, Union
@@ -17,6 +16,10 @@ from nnactive_playground.data.create_empty_masks import (
     add_ignore_label_to_dataset_json,
     create_empty_mask,
     read_dataset_json,
+)
+from nnactive_playground.data.prepare_starting_budget import (
+    Patch,
+    make_patches_from_ground_truth,
 )
 
 parser = ArgumentParser()
@@ -82,7 +85,7 @@ def convert_dataset_to_partannotated(
     target_id: int,
     full_images: Union[float, int],
     name_suffix: str = "partanno",
-    patch_kwargs: Optional[dict] = None,
+    # patch_kwargs: Optional[dict] = None,
     rewrite: bool = False,
     force: bool = False,
 ):
@@ -208,13 +211,19 @@ def convert_dataset_to_partannotated(
                     }
                 )
 
-        # TODO Put here logic for part_ano training images
-        image_names, label_list = placeholder_patch_anno(
-            image_names, patch_kwargs, label_list
+        patches: list[Patch] = []  # TODO: Generate patches
+        make_patches_from_ground_truth(
+            patches=patches,
+            gt_path=base_labelsTr_dir,
+            target_path=target_labelsTr_dir,
+            dataset_cfg=target_dataset_json,
+            ignore_label=ignore_label,
         )
 
+        patched_images = set(map(lambda patch: patch.file, patches))
+
         # Create empty masks for the rest of the training images
-        for image_name in image_names:
+        for image_name in filter(lambda img: img not in patched_images, image_names):
             save_filename = f"{'_'.join(image_name.split('_')[:-1])}{base_dataset_json['file_ending']}"
             create_empty_mask(
                 imagesTr_dir / image_name,

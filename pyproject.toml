@@ -56,5 +56,8 @@ max-attributes = 20
 ignore-paths = [
 ]
 
+[tool.pylint.format]
+max-line-length = "88"
+
 [tool.isort]
 profile = "black"
