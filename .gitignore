@@ -1,4 +1,5 @@
 _version.py
+docs/source/_autosummary
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -14,6 +14,7 @@ dependencies = [
     "dynamic_network_architectures @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git@recycle_unet",
     "SimpleITK",
     "rich",
+    "pydantic",
 ]
 
 [project.optional-dependencies]
@@ -23,7 +24,8 @@ dev = [
   "pylint",
   "black",
   "debugpy",
-  "sphinx",
+  "sphinx<6",
+  "pydata-sphinx-theme",
 ]
 
 [tool.setuptools.packages.find]
