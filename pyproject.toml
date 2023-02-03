@@ -52,6 +52,7 @@ disable = [
   "deprecated-pragma",
   "use-symbolic-message-instead",
   "missing-module-docstring",
+  "unspecified-encoding",
 ]
 
 max-args = 10
