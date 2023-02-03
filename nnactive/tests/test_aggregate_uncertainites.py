@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from nnactive_playground.uncertainty_aggregation.aggregate_uncertainties import (
+from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
     whole_patch_aggregation,
 )
 

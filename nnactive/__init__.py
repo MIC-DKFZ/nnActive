@@ -5,10 +5,10 @@ def get_version() -> str:
     """Error handled wrapper around importlib's version
 
     Returns:
-        the installed version of nnactive_playground
+        the installed version of nnactive
     """
     try:
-        return version("nnactive_playground")
+        return version("nnactive")
     except PackageNotFoundError:
         # package is not installed
         import setuptools_scm

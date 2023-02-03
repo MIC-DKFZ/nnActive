@@ -12,12 +12,12 @@ import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
-from nnactive_playground.data.create_empty_masks import (
+from nnactive.data.create_empty_masks import (
     add_ignore_label_to_dataset_json,
     create_empty_mask,
     read_dataset_json,
 )
-from nnactive_playground.data.prepare_starting_budget import (
+from nnactive.data.prepare_starting_budget import (
     Patch,
     make_patches_from_ground_truth,
 )

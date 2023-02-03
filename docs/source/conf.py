@@ -11,7 +11,7 @@ copyright = "2023, IML @ DKFZ"
 author = "IML @ DKFZ"
 from importlib.metadata import version
 
-release = version("nnactive_playground")
+release = version("nnactive")
 version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
