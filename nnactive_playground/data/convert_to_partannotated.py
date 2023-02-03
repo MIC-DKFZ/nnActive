@@ -6,7 +6,7 @@ import shutil
 from argparse import ArgumentParser
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union, Callable
 
 import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
@@ -66,13 +66,13 @@ parser.add_argument(
     help="Labeling Scheme for partial annotation -- not implemented yet",
 )  # how to make float and integers
 
-NNUNET_RAW = Path(nnUNet_raw)
-NNUNET_PREPROCESSED = Path(nnUNet_preprocessed)
-NNUNET_RESULTS = Path(nnUNet_results)
+NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
+NNUNET_PREPROCESSED = Path(nnUNet_preprocessed) if nnUNet_preprocessed is not None else None
+NNUNET_RESULTS = Path(nnUNet_results) if nnUNet_results is not None else None
 
 
 def placeholder_patch_anno(
-    image_names: List[str], patch_kwargs: dict, label_area: List[dict]
+    image_names: list[str], patch_kwargs: dict, label_area: list[dict]
 ):
     return image_names, label_area
 
@@ -84,8 +84,9 @@ def convert_dataset_to_partannotated(
     base_id: int,
     target_id: int,
     full_images: Union[float, int],
+    patch_func: Callable,
     name_suffix: str = "partanno",
-    # patch_kwargs: Optional[dict] = None,
+    patch_kwargs: Optional[dict] = None,
     rewrite: bool = False,
     force: bool = False,
 ):
@@ -211,7 +212,7 @@ def convert_dataset_to_partannotated(
                     }
                 )
 
-        patches: list[Patch] = []  # TODO: Generate patches
+        patches: list[Patch] = patch_func()
         make_patches_from_ground_truth(
             patches=patches,
             gt_path=base_labelsTr_dir,
@@ -271,15 +272,15 @@ def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int 
         json.dump(splits_final, file, indent=4)
 
 
-def kfold_cv(k: int, labeled_images: List[str]):
+def kfold_cv(k: int, labeled_images: list[str]):
     """Create K Fold CV splits
 
     Args:
         k (int): num_folds
-        labeled_images (List[str]): _description_
+        labeled_images (list[str]): _description_
 
     Returns:
-        List[dict]: dict={train:list, val:list}
+        list[dict]: dict={train:list, val:list}
     """
     folds = [[] for _ in range(k)]
     rand_np_state = np.random.RandomState(random_seed)
