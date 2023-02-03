@@ -59,6 +59,14 @@ It is structured as follows:
 `"patches"` is used to save the annotated areas and in `loop_XXX.json` only the newly annotated areas are saved.
 To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_001.json` and `loop_000.json`.
 
+## Create Custom partially annotated dataset from fully annotated
+```bash
+python convert_to_partannotated.py -d 4 
+```
+Creates: 
+1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
+2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
+
 ## Active Learning Workflow
 nnUNet-Loop:
 for each fold X in (0, 1, 2, 3, 4):
@@ -88,6 +96,13 @@ Then two files are created in `${nnUNet_raw}/Dataset504_Hippocampus-partanno`:
 
 Now the dataset needs to be updated according to all `loop_XXX.json` files:
 ```bash
-python update_data.py -i /home/c817h/Documents/projects/nnActive/nnUNet_raw/Dataset004_Hippocampus -p /home/c817h/Documents/projects/nnActive/nnUNet_raw/Dataset504_Hippocampus-partanno
+python update_data.py -i ${nnUNet_raw}/Dataset004_Hippocampus -p ${nnUNet_raw}/Dataset504_Hippocampus-partanno --save_splits_file ${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json
 ```
 
+
+Preprocess the dataset again:
+```bash
+nnUNetv2_preprocess -d 504
+```
+
+Start with Training of all folds and repeat....

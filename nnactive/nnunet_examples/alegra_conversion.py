@@ -1,24 +1,21 @@
 # Code by Fabian Isensee
+import shutil
 from multiprocessing import Pool
 from typing import Tuple
 
 import numpy as np
-import shutil
-
+import SimpleITK as sitk
+import torch
 from acvl_utils.array_manipulation.resampling import maybe_resample_on_gpu
 from acvl_utils.morphology.gpu_binary_morphology import gpu_binary_erosion
-import torch
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.utilities.sitk_stuff import copy_geometry
-from torch.backends import cudnn
-from skimage.morphology import ball
-
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
-from nnunetv2.paths import nnUNet_raw, nnUNet_preprocessed
-import SimpleITK as sitk
-from torch.nn import functional as F
-
+from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
 from nnunetv2.preprocessing.resampling.default_resampling import compute_new_shape
+from skimage.morphology import ball
+from torch.backends import cudnn
+from torch.nn import functional as F
 
 
 def resample_save(

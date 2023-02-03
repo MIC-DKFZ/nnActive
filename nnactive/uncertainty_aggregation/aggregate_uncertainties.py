@@ -1,7 +1,9 @@
 import argparse
 import os
+
 import numpy as np
 from scipy.signal import convolve
+
 from nnactive.utils.image_reading import read_images_to_numpy
 
 

@@ -7,11 +7,12 @@ Creates folder containing uncertainties in:
 """
 
 import argparse
-import os
 import json
+import os
+
 import numpy as np
-import torch
 import SimpleITK as sitk
+import torch
 
 
 def get_predicted_image_names(pred_path):

@@ -6,21 +6,20 @@ import shutil
 from argparse import ArgumentParser
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Union, Callable
+from typing import Callable, Optional, Union
 
 import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
+from nnactive.data import Patch
+from nnactive.data.annotate import create_labels_from_patches
 from nnactive.data.create_empty_masks import (
     add_ignore_label_to_dataset_json,
-    create_empty_mask,
     read_dataset_json,
 )
-from nnactive.data.prepare_starting_budget import (
-    Patch,
-    make_patches_from_ground_truth,
-)
+from nnactive.loops.cross_validation import kfold_cv_from_patches
+from nnactive.loops.loading import get_patches_from_loop_files, save_loop
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -67,26 +66,10 @@ parser.add_argument(
 )  # how to make float and integers
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
-NNUNET_PREPROCESSED = Path(nnUNet_preprocessed) if nnUNet_preprocessed is not None else None
+NNUNET_PREPROCESSED = (
+    Path(nnUNet_preprocessed) if nnUNet_preprocessed is not None else None
+)
 NNUNET_RESULTS = Path(nnUNet_results) if nnUNet_results is not None else None
-
-
-def placeholder_patch_anno(
-    image_names: list[str], patch_kwargs: dict, label_area: list[dict]
-):
-    return image_names, label_area
-
-
-def make_whole_from_ground_truth(patches, gt_path, target_path):
-    """Copies over all files in patches from gt_path to target_path
-    """
-    for patch in patches:
-        seg_name = patch["file"]
-        shutil.copy(
-                    gt_path / seg_name, target_path / seg_name
-                )
-
-LOOP_NAME = "loop_000.json"
 
 
 def convert_dataset_to_partannotated(
@@ -172,107 +155,93 @@ def convert_dataset_to_partannotated(
                 )
 
         # Create labelstTr for target dataset
-        imagesTr_dir = base_dir / "imagesTr"
         base_labelsTr_dir = base_dir / "labelsTr"
         target_labelsTr_dir = target_dir / "labelsTr"
 
-        os.makedirs(target_labelsTr_dir, exist_ok=True)
         ignore_label = target_dataset_json["labels"]["ignore"]
+        file_ending = base_dataset_json["file_ending"]
 
-        image_names = os.listdir(imagesTr_dir)
-        image_names = [
-            image_name
-            for image_name in image_names
-            if image_name.endswith(target_dataset_json["file_ending"])
-        ]
-
-        seg_names = os.listdir(base_labelsTr_dir)
-        seg_names = [
-            seg_name
-            for seg_name in seg_names
-            if seg_name.endswith(target_dataset_json["file_ending"])
-        ]
-
-        # Current implementation only works if all data has a corresponding lablesTr
-        assert len(image_names) == len(seg_names)
-        rand_np_state = np.random.RandomState(random_seed)
-        rand_np_state.shuffle(image_names)
-
-        if full_images < 1:
-            full_images = int(len(image_names) * full_images)
-        full_ano = [image_names.pop() for i in range(full_images)]
-        label_list = []
-
-        # Copy labelsTr from base to target for full_ano training images
-        for image_name in full_ano:
-            # Create savename for segmentation
-            data_name = "_".join(image_name.split("_")[:-1])
-            seg_name = data_name + target_dataset_json["file_ending"]
-            if seg_name in seg_names:
-                shutil.copy(
-                    base_labelsTr_dir / seg_name, target_labelsTr_dir / seg_name
-                )
-                label_list.append(
-                    {
-                        "file": seg_name,
-                        "coords": [0, 0, 0],
-                        # TODO: Read out Size?
-                        "size": "whole",
-                    }
-                )
-
-        patches: list[Patch] = patch_func()
-        make_patches_from_ground_truth(
-            patches=patches,
-            gt_path=base_labelsTr_dir,
-            target_path=target_labelsTr_dir,
-            dataset_cfg=target_dataset_json,
-            ignore_label=ignore_label,
+        patches = get_patches_for_partannotation(
+            full_images,
+            patch_func,
+            file_ending,
+            base_labelsTr_dir,
+            target_labelsTr_dir,
+            patch_func_kwargs=patch_kwargs,
         )
 
-        patched_images = set(map(lambda patch: patch.file, patches))
+        # Create labels from patches
+        create_labels_from_patches(
+            patches, ignore_label, file_ending, base_labelsTr_dir, target_labelsTr_dir
+        )
 
-        empty_images = [ image_name for image_name in filter(lambda img: img not in patched_images, image_names)]
-        # Create empty masks for the rest of the training images
-        for image_name in empty_images:
-            save_filename = f"{'_'.join(image_name.split('_')[:-1])}{base_dataset_json['file_ending']}"
-            create_empty_mask(
-                imagesTr_dir / image_name,
-                ignore_label,
-                target_labelsTr_dir / save_filename,
-            )
-
-        loop_json = {"patches": label_list}
-        with open(target_dir / LOOP_NAME, "w") as file:
-            json.dump(loop_json, file, indent=4)
+        loop_json = {"patches": patches}
+        save_loop(target_dir, loop_json, 0)
     else:
         print("No Override")
 
 
-def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int = 5):
+def get_patches_for_partannotation(
+    full_images: Union[int, float],
+    patch_func: callable,
+    file_ending: str,
+    base_labelsTr_dir: Path,
+    target_labelsTr_dir: Path,
+    patch_func_kwargs: dict = None,
+) -> list[Patch]:
+    """Creates patches based on annotation strategies.
+
+    Args:
+        full_images (Union[int, float]): _description_
+        patch_func (callable): _description_
+        file_ending (str): _description_
+        base_labelsTr_dir (Path): _description_
+        target_labelsTr_dir (Path): _description_
+        patch_func_kwargs (dict, optional): _description_. Defaults to None.
+
+    Returns:
+        list[Patch]: annotated patches
+    """
+    if patch_func_kwargs is None:
+        patch_func_kwargs = {}
+    os.makedirs(target_labelsTr_dir, exist_ok=True)
+
+    seg_names = os.listdir(base_labelsTr_dir)
+    seg_names = [seg_name for seg_name in seg_names if seg_name.endswith(file_ending)]
+
+    # Current implementation only works if all data has a corresponding lablesTr
+
+    rand_np_state = np.random.RandomState(random_seed)
+    rand_np_state.shuffle(seg_names)
+
+    if full_images < 1:
+        full_images = int(len(seg_names) * full_images)
+    patches = [
+        Patch(file=seg_names.pop(), coords=[0, 0, 0], size="whole")
+        for i in range(full_images)
+    ]
+
+    patches: list[Patch] = (
+        patch_func(seg_names=seg_names, **patch_func_kwargs) + patches
+    )
+    return patches
+
+
+def generate_custom_splits_file(
+    target_id: int, loop_count: Optional[int] = None, num_folds: int = 5
+):
     """Generates a custom split file in NNUNET_PREPROCESSED folder which only has labeled data.
 
     Args:
         target_id (int): dataset id
-        label_file (str): loop_XXX.json file all smaller are also taken to get list of names
+        loop_count (int): X for loop_XXX.json file all smaller are also taken to get list of names
         num_folds (int, optional): Folds vor KFoldCV. Defaults to 5.
     """
     dataset: str = convert_id_to_dataset_name(target_id)
-    base_name = label_file.split("_")[0]
-    number = int(label_file.split("_")[1].split(".")[0])
 
-    patches = []
-    for i in range(number + 1):
-        fn = f"{base_name}_{i:03d}.json"
-        with open(NNUNET_RAW / dataset / fn, "r") as file:
-            data_file: dict = json.load(file)
-        patch_file: list = data_file["patches"]
-        patches = patches + patch_file
+    patches = get_patches_from_loop_files(NNUNET_RAW / dataset, loop_count)
 
-    labeled_images = [patch["file"].split(".")[0] for patch in patches]
-    labeled_images = list(set(labeled_images))
-
-    splits_final = kfold_cv(num_folds, labeled_images)
+    splits_final = kfold_cv_from_patches(num_folds, patches)
 
     # Create path if not exists
     if not (NNUNET_PREPROCESSED / dataset).exists():
@@ -282,45 +251,8 @@ def generate_custom_splits_file(target_id: int, label_file: str, num_folds: int 
         json.dump(splits_final, file, indent=4)
 
 
-def kfold_cv(k: int, labeled_images: list[str]):
-    """Create K Fold CV splits
-
-    Args:
-        k (int): num_folds
-        labeled_images (list[str]): _description_
-
-    Returns:
-        list[dict]: dict={train:list, val:list}
-    """
-    folds = [[] for _ in range(k)]
-    rand_np_state = np.random.RandomState(random_seed)
-    rand_np_state.shuffle(labeled_images)
-    for i in range(len(labeled_images)):
-        folds[i % k].append(labeled_images.pop())
-
-    for fold in folds:
-        assert (
-            len(fold) > 0
-        )  # no fold is supposed to have a length of zero! set num_folds smaller
-
-    splits_final = []
-    for i in range(k):
-        train_select = [j for j in range(k) if j != i]
-        val_select = [i]
-        train_set = []
-        for train_fold in train_select:
-            train_set = train_set + folds[train_fold]
-        val_set = []
-        for val_fold in val_select:
-            val_set = val_set + folds[val_fold]
-        splits_final.append(
-            {
-                "train": train_set,
-                "val": val_set,
-            }
-        )
-
-    return splits_final
+def dummy_patch_func(*args, **kwargs) -> list[Patch]:
+    return []
 
 
 if __name__ == "__main__":
@@ -344,6 +276,10 @@ if __name__ == "__main__":
         target_id = base_dataset_id + id_offset
     print(f"output_id is {target_id}")
     convert_dataset_to_partannotated(
-        base_dataset_id, target_id, full_images, rewrite=rewrite
+        base_dataset_id,
+        target_id,
+        full_images,
+        rewrite=rewrite,
+        patch_func=dummy_patch_func,
     )
-    generate_custom_splits_file(target_id, LOOP_NAME, 5)
+    generate_custom_splits_file(target_id, 0, 5)

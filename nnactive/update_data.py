@@ -1,89 +1,37 @@
-from argparse import ArgumentParser
-import os
-from pathlib import Path
 import json
+from argparse import ArgumentParser
+from pathlib import Path
 
-from typing import List
-
-from nnactive.data.prepare_starting_budget import (
-    make_patches_from_ground_truth,
-    make_whole_from_ground_truth,
-    make_empty_from_ground_truth,
-    Patch,
-)
-
-LOOP_PATTERN = "loop_"
-
-# def label_patches(patches:List[dict], dataset_dir:Path, input_dir:Path):
-
+from nnactive.data.annotate import create_labels_from_patches
+from nnactive.loops.cross_validation import kfold_cv_from_patches
+from nnactive.loops.loading import get_patches_from_loop_files
 
 if __name__ == "__main__":
-    # 1. load all loop_XXX.json files
     parser = ArgumentParser()
     parser.add_argument("-p", "--dataset_path")
     parser.add_argument("-i", "--input_data")
     parser.add_argument("-l", "--loop", default=None, type=int)
+    parser.add_argument("--save_splits_file")
 
     args = parser.parse_args()
     labeled_path = Path(args.input_data)
     data_path = Path(args.dataset_path)
+    save_splits_file = Path(args.save_splits_file)
     loop_val = args.loop
 
-    loop_files = []
-    for file in os.listdir(data_path):
-        if file[: len(LOOP_PATTERN)] == LOOP_PATTERN:
-            loop_files.append(file)
-
-    loop_files.sort(key=lambda x: int(x.split(LOOP_PATTERN)[1].split(".json")[0]))
-
-    # Take only loop_files up to a certain loop_{loop_val}.json
-    if loop_val is not None:
-        loop_files = [loop_files[i] for i in range(loop_val + 1)]
-
-    # load info
-    patches = []
-    for loop_file in loop_files:
-        with open(data_path / loop_file, "r") as file:
-            patches_loop: List[dict] = json.load(file)["patches"]
-        patches.extend(patches_loop)
+    patches = get_patches_from_loop_files(data_path, loop_val)
 
     with open(data_path / "dataset.json", "r") as file:
         data_json = json.load(file)
+    ignore_label: int = data_json["labels"]["ignore"]
+    file_ending = data_json["file_ending"]
 
-    whole_label = []
-    patch_label = []
-    for patch in patches:
-        if patch["size"] == "whole":
-            whole_label.append(patch)
-        else:
-            patch_label.append(patch)
+    base_dir = labeled_path / "labelsTr"
+    target_dir = data_path / "labelsTr"
 
-    labeled_files = set([patch["file"] for patch in (patch_label + whole_label)])
-    empty_segs = [
-        file
-        for file in os.listdir(labeled_path / "labelsTr")
-        if file.endswith(data_json["file_ending"])
-    ]
-    empty_segs = [file for file in empty_segs if file not in labeled_files]
+    create_labels_from_patches(patches, ignore_label, file_ending, base_dir, target_dir)
 
-    make_whole_from_ground_truth(
-        whole_label, labeled_path / "labelsTr", data_path / "labelsTr"
-    )
+    splits_final = kfold_cv_from_patches(5, patches)
 
-    patch_label = Patch.from_json()
-    make_patches_from_ground_truth(
-        patch_label,
-        labeled_path / "labelsTr",
-        data_path / "labelsTr",
-        data_json,
-        data_json["labels"]["ignore"],
-    )
-
-    # import IPython
-    # IPython.embed()
-    make_empty_from_ground_truth(
-        empty_segs,
-        labeled_path / "labelsTr",
-        data_path / "labelsTr",
-        data_json["labels"]["ignore"],
-    )
+    with open(save_splits_file, "w") as file:
+        json.dump(splits_final, file, indent=4)

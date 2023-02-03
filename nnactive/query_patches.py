@@ -1,11 +1,13 @@
 import argparse
+import json
 import os
 from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
-import json
 
+from nnactive.data import Patch
+from nnactive.loops.loading import save_loop
 
 # from nnunetv2.paths import nnUNet_raw
 
@@ -271,17 +273,8 @@ def query_patches():
             "[expected_entropy | predictive_entropy | mutual_information]"
         )
 
-    # TODO: this is not correct yet (Dataset specification missing).
-    #  How to infere the origin of the input images? Store somehow as metadata in the uncertainties?
-    # if raw_image_folder is None:
-    #     raw_image_folder = Path(nnUNet_raw) / "imagesTr"
-    # else:
-    #     raw_image_folder = Path(raw_image_folder)
-
     raw_dataset_dir = Path(raw_dataset_dir)
 
-    # TODO: these most uncertain patches can then be stored in a patches.json file in the standard format
-    #  which can be used to create the input folders for the next cycle
     most_uncertain_patches = get_most_uncertain_patches(
         aggregated_uncertainty_dir, uncertainty_type, raw_dataset_dir, number_to_query
     )
@@ -312,9 +305,9 @@ def query_patches():
             for patch in most_uncertain_patches
         ]
     }
+    loop_json["patches"] = [Patch(**patch) for patch in loop_json["patches"]]
 
-    with open(output_path / f"loop_{loop:03d}.json", "w") as file:
-        json.dump(loop_json, file, indent=4)
+    save_loop(output_path, loop_json, loop)
 
 
 if __name__ == "__main__":
