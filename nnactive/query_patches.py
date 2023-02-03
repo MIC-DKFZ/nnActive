@@ -31,18 +31,20 @@ def does_overlap(start_indices, patch_size, selected_array):
     return False
 
 
-def image_id_from_aggregated_name(image_aggregated_name:str, uncertainty_type:str):
+def image_id_from_aggregated_name(image_aggregated_name: str, uncertainty_type: str):
     return image_aggregated_name.split(f"_{uncertainty_type}")[0]
 
 
-def get_label_map(image_id:str, raw_dataset_dir:np.ndarray, file_ending:str):
+def get_label_map(image_id: str, raw_dataset_dir: np.ndarray, file_ending: str):
     # TODO: get file ending from dataset.json
     image_path = raw_dataset_dir / "labelsTr" / f"{image_id}{file_ending}"
     sitk_image = sitk.ReadImage(image_path)
     return sitk.GetArrayFromImage(sitk_image)
 
 
-def mark_already_annotated_patches(selected_array:np.ndarray, labeled_array:np.ndarray, ignore_label:int):
+def mark_already_annotated_patches(
+    selected_array: np.ndarray, labeled_array: np.ndarray, ignore_label: int
+):
     """Returns array where annotated areas are set to in selected_array
 
     Args:
@@ -53,7 +55,7 @@ def mark_already_annotated_patches(selected_array:np.ndarray, labeled_array:np.n
     Returns:
         np.ndarrary: see description
     """
-    selected_array[labeled_array!=ignore_label] = 1
+    selected_array[labeled_array != ignore_label] = 1
     return selected_array
 
 
@@ -79,8 +81,14 @@ def mark_selected(selected_array, coords, patch_size, selected_idx=1):
 
 
 def get_top_n_non_overlapping_patches(
-    image_name:str, n:int, uncertainty_scores:np.ndarray, patch_size, raw_dataset_dir:Path, uncertainty_type:str,
-    ignore_label:int, file_ending:str
+    image_name: str,
+    n: int,
+    uncertainty_scores: np.ndarray,
+    patch_size,
+    raw_dataset_dir: Path,
+    uncertainty_type: str,
+    ignore_label: int,
+    file_ending: str,
 ):
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -103,7 +111,9 @@ def get_top_n_non_overlapping_patches(
     labeled_map = get_label_map(image_id, raw_dataset_dir, file_ending)
     selected_array = np.zeros_like(labeled_map)
     # Mark the patched as annotated that were annotated in previous loops
-    selected_array = mark_already_annotated_patches(selected_array, labeled_map, ignore_label)
+    selected_array = mark_already_annotated_patches(
+        selected_array, labeled_map, ignore_label
+    )
     sorted_uncertainty_scores = np.flip(np.sort(uncertainty_scores.flatten()))
     sorted_uncertainty_indices = np.flip(np.argsort(uncertainty_scores.flatten()))
     # This was just for visualization purposes in MITK
@@ -157,7 +167,7 @@ def get_most_uncertain_patches(
         Either the top n most uncertain patches if number_to_query is specified
         or all non-overlapping patches sorted by uncertainty
     """
-    with open(raw_dataset_dir/"dataset.json", "r") as file:
+    with open(raw_dataset_dir / "dataset.json", "r") as file:
         d_json = json.load(file)
         ignore_label = d_json["labels"]["ignore"]
         file_ending = d_json["file_ending"]
@@ -182,7 +192,7 @@ def get_most_uncertain_patches(
                     raw_dataset_dir,
                     uncertainty_type,
                     ignore_label,
-                    file_ending
+                    file_ending,
                 )
             )
     print(len(all_top_patches))
@@ -240,7 +250,7 @@ def query_patches():
         "--loop",
         type=int,
         default=1,
-        help="XXX specifier for loop_XXX.json of saved files."
+        help="XXX specifier for loop_XXX.json of saved files.",
     )
 
     args = parser.parse_args()
@@ -278,29 +288,33 @@ def query_patches():
 
     # bring most_uncertain_patches in a json write and readable format
     for i in range(len(most_uncertain_patches)):
-        most_uncertain_patches[i]["coords"] = [ x.item() for x in most_uncertain_patches[i]["coords"]]
+        most_uncertain_patches[i]["coords"] = [
+            x.item() for x in most_uncertain_patches[i]["coords"]
+        ]
         most_uncertain_patches[i]["size"] = most_uncertain_patches[i]["size"].tolist()
-    
+
     # Save the queries with uncertainty values
-    with open(output_path/ f"{uncertainty_type}_{loop:03d}.json", "w") as file:
+    with open(output_path / f"{uncertainty_type}_{loop:03d}.json", "w") as file:
         json.dump(most_uncertain_patches, file, indent=4)
 
-    with open(output_path/ "dataset.json", "r") as file:
+    with open(output_path / "dataset.json", "r") as file:
         dataset_json = json.load(file)
 
     # bring into loop_XXX.json format and save!
-    loop_json = [
-        {
-            "file": patch["file"].split(f"_{uncertainty_type}")[0]+dataset_json["file_ending"],
-            "coords" : patch["coords"],
-            "size" : patch["size"],
-        }
-        for patch in most_uncertain_patches
-    ]
+    loop_json = {
+        "patches": [
+            {
+                "file": patch["file"].split(f"_{uncertainty_type}")[0]
+                + dataset_json["file_ending"],
+                "coords": patch["coords"],
+                "size": patch["size"],
+            }
+            for patch in most_uncertain_patches
+        ]
+    }
 
-    with open(output_path/  f"loop_{loop:03d}.json", "w") as file:
+    with open(output_path / f"loop_{loop:03d}.json", "w") as file:
         json.dump(loop_json, file, indent=4)
-
 
 
 if __name__ == "__main__":
