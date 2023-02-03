@@ -1,57 +1,54 @@
+from __future__ import annotations
+
+import functools
 import json
 import os
-from multiprocessing import Pool, set_start_method
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import SimpleITK as sitk
 from nnunetv2.experiment_planning.plan_and_preprocess import PlansManager
-from nnunetv2.preprocessing.preprocessors.default_preprocessor import \
-    DefaultPreprocessor
-from rich.pretty import pprint
-from rich.progress import Progress, track
-
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-
-raw_path = Path("~/Data/nnUNet/raw/Dataset135_KiTS2021/").expanduser()
-preprocessed_path = Path("~/Data/nnUNet/preprocessed/Dataset135_KiTS2021/").expanduser()
-gt_path = raw_path / "gt_labelsTr"
-img_path = raw_path / "imagesTr"
-rs_gt_path = raw_path / "rs_gt_labelsTr"
-rs_img_path = raw_path / "rs_imagesTr"
-
-with open(raw_path / "dataset.json") as f:
-    dataset_cfg = json.load(f)
-configuration = "3d_fullres"
-plans_file = preprocessed_path / "nnUNetPlans.json"
-with plans_file.open() as f:
-    plans_cfg = json.load(f)
-
-preprocessor = DefaultPreprocessor(False)
-
-plans_manager = PlansManager(plans_cfg)
-
-ignore_label = 4
-
-patch_size = 128
-n_samples = 32
-
-crop_min_size = 0.4
-crop_max_size = 0.9
+from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
+    DefaultPreprocessor,
+)
+from pydantic.dataclasses import dataclass
+from rich.progress import track
 
 
-config_manager = plans_manager.get_configuration(configuration)
+@dataclass
+class Patch:
+    file: str
+    coords: tuple[int, int, int]
+    size: tuple[int, int, int]
+
+    @classmethod
+    def from_json(cls, data: str) -> Patch | list[Patch]:
+        parsed = json.loads(data)
+        match parsed:
+            case [*_]:
+                return [Patch(**item) for item in parsed]
+            case {}:
+                return Patch(**parsed)
+            case _:
+                raise NotImplementedError
 
 
-def resample_to_target_spacing(name: str):
+def resample_to_target_spacing(
+    name: str,
+    dataset_cfg,
+    rs_img_path,
+    rs_gt_path,
+    preprocessor,
+    plans_manager,
+    config_manager,
+    img_path,
+    gt_path,
+):
     """Convert an image to target spacing"""
     input_images = [str(rs_img_path / f"{name}_0000{dataset_cfg['file_ending']}")]
-    input_seg = str(rs_gt_path / f"{name}{dataset_cfg['file_ending']}")
 
     data, seg, properties = preprocessor.run_case(
         input_images,
@@ -90,22 +87,60 @@ def resample_to_target_spacing(name: str):
     )
 
 
-def resample_all():
+def resample_all(
+    dataset_cfg,
+    rs_img_path,
+    rs_gt_path,
+    raw_path,
+    img_path,
+    gt_path,
+    preprocessed_path,
+):
     """Convert all images and labels to target spacing"""
+
+    with open(raw_path / "dataset.json") as f:
+        dataset_cfg = json.load(f)
+    configuration = "3d_fullres"
+    plans_file = preprocessed_path / "nnUNetPlans.json"
+    with plans_file.open() as f:
+        plans_cfg = json.load(f)
+
+    preprocessor = DefaultPreprocessor(False)
+    plans_manager = PlansManager(plans_cfg)
+    config_manager = plans_manager.get_configuration(configuration)
+
     gt_path.mkdir(exist_ok=True)
     img_path.mkdir(exist_ok=True)
     imgs = list((raw_path / "rs_gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}"))
 
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
-    with Pool(processes=6, maxtasksperchild=1) as pool:
-        for _ in track(
-            pool.imap(resample_to_target_spacing, names, chunksize=8),
-            total=len(names),
-        ):
-            pass
+
+    worker_fn = functools.partial(
+        resample_to_target_spacing,
+        dataset_cfg=dataset_cfg,
+        rs_img_path=rs_img_path,
+        rs_gt_path=rs_gt_path,
+        preprocessor=preprocessor,
+        plans_manager=plans_manager,
+        config_manager=config_manager,
+        img_path=img_path,
+        gt_path=gt_path,
+    )
+    try:
+        with ProcessPoolExecutor(max_workers=3) as executor:
+            for _ in track(executor.map(worker_fn, names), total=len(names)):
+                pass
+    except BrokenProcessPool as exc:
+        raise MemoryError(
+            "One of the worker processes died. "
+            "This usually happens because you run out of memory. "
+            "Try running with less processes."
+        ) from exc
 
 
-def patch_ids_to_image_coords(patch_ids: list[int] | npt.NDArray, bins, files, sizes):
+def patch_ids_to_image_coords(
+    patch_ids: list[int] | npt.NDArray, bins, files, sizes, patch_size
+):
     # patch_id = x + y * xs + z * xs * ys
     # => z = patch_id // (xs * ys)
     # => temp = x + y * xs = patch_id % (xs * ys)
@@ -137,7 +172,10 @@ def patch_ids_to_image_coords(patch_ids: list[int] | npt.NDArray, bins, files, s
     return coords
 
 
-def compute_patch_mapping():
+def compute_patch_mapping(
+    dataset_cfg,
+    raw_path,
+):
     img_sizes = {}
 
     if not (raw_path / "img_sizes.json").is_file():
@@ -163,8 +201,16 @@ def compute_patch_mapping():
     return img_sizes
 
 
-def starting_budget_random_grid():
-    img_sizes = compute_patch_mapping()
+def starting_budget_random_grid(
+    patch_size,
+    dataset_cfg,
+    raw_path,
+    n_samples,
+):
+    img_sizes = compute_patch_mapping(
+        dataset_cfg,
+        raw_path,
+    )
     for k, (x, y, z) in img_sizes.items():
         img_sizes[k] = {
             "img_size": [x, y, z],
@@ -179,12 +225,12 @@ def starting_budget_random_grid():
     n_patches_total = np.sum(n_patches)
     patch_ids = np.random.choice(n_patches_total, n_samples, replace=False)
 
-    patches = patch_ids_to_image_coords(patch_ids, bins, files, sizes)
+    patches = patch_ids_to_image_coords(patch_ids, bins, files, sizes, patch_size)
 
     return patches
 
 
-def random_crop(xs, ys, zs):
+def random_crop(xs, ys, zs, crop_min_size: float = 0, crop_max_size: float = 1):
     xt = np.random.randint(crop_min_size * xs, crop_max_size * xs)
     yt = np.random.randint(crop_min_size * ys, crop_max_size * ys)
     zt = np.random.randint(crop_min_size * zs, crop_max_size * zs)
@@ -196,8 +242,8 @@ def random_crop(xs, ys, zs):
     return i, j, k, xt, yt, zt
 
 
-def starting_budget_random_crop():
-    img_sizes = compute_patch_mapping()
+def starting_budget_random_crop(dataset_cfg, raw_path):
+    img_sizes = compute_patch_mapping(dataset_cfg, raw_path)
 
     crops = []
     for file, (x, y, z) in img_sizes.items():
@@ -213,42 +259,91 @@ def starting_budget_random_crop():
     return crops
 
 
-def make_folder(patches):
-    output_dir = raw_path / "labelsTr"
-    output_dir.mkdir(exist_ok=True)
+def make_patches_from_ground_truth(
+    patches: list[Patch],
+    gt_path: Path,
+    target_path: Path,
+    dataset_cfg: dict[str, str],
+    ignore_label: int,
+) -> None:
+    """Create label files where only some patches are labeled from ground truth
+        and the rest are ignored.
+
+    Args:
+        patches: list of patches to label
+        gt_path: where the ground truth labels are stored
+        target_path: where the patched labels should be stored
+        dataset_cfg: nnUNet dataset json
+        ignore_label: the id for ignored labels
+    """
+    target_path.mkdir(exist_ok=True)
 
     for patch in track(patches):
-        img_itk = sitk.ReadImage(
-            (gt_path / patch["file"]).with_suffix(dataset_cfg["file_ending"])
+        img_gt = sitk.ReadImage(
+            (gt_path / patch.file).with_suffix(dataset_cfg["file_ending"])
         )
-        img_npy = sitk.GetArrayFromImage(img_itk)
-        spacing = img_itk.GetSpacing()
-        origin = img_itk.GetOrigin()
-        direction = np.array(img_itk.GetDirection())
+        spacing = img_gt.GetSpacing()
+        origin = img_gt.GetOrigin()
+        direction = np.array(img_gt.GetDirection())
+        img_gt = sitk.GetArrayFromImage(img_gt)
 
-        img_new = np.full_like(img_npy, ignore_label)
+        img_new = np.full_like(img_gt, ignore_label)
 
-        xs, xe = patch["coords"][0], patch["coords"][0] + patch["size"][0]
-        ys, ye = patch["coords"][1], patch["coords"][1] + patch["size"][1]
-        zs, ze = patch["coords"][2], patch["coords"][2] + patch["size"][2]
+        slice_x = slice(patch.coords[0], patch.coords[0] + patch.size[0])
+        slice_y = slice(patch.coords[1], patch.coords[1] + patch.size[1])
+        slice_z = slice(patch.coords[2], patch.coords[2] + patch.size[2])
 
-        img_new[xs:xe, ys:ye, zs:ze] = img_npy[xs:xe, ys:ye, zs:ze]
+        img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
 
-        img_itk_new = sitk.GetImageFromArray(img_new)
-        img_itk_new.SetSpacing(spacing)
-        img_itk_new.SetOrigin(origin)
-        img_itk_new.SetDirection(direction)
+        img_new = sitk.GetImageFromArray(img_new)
+        img_new.SetSpacing(spacing)
+        img_new.SetOrigin(origin)
+        img_new.SetDirection(direction)
         sitk.WriteImage(
-            img_itk_new,
-            (output_dir / patch["file"]).with_suffix(dataset_cfg["file_ending"]),
+            img_new,
+            (target_path / patch.file).with_suffix(dataset_cfg["file_ending"]),
         )
 
 
 def main():
-    resample_all()
-    patches = starting_budget_random_crop()
-    pprint(patches)
-    make_folder(patches)
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+    raw_path = Path("~/Data/nnUNet/raw/Dataset135_KiTS2021/").expanduser()
+    preprocessed_path = Path(
+        "~/Data/nnUNet/preprocessed/Dataset135_KiTS2021/"
+    ).expanduser()
+    gt_path = raw_path / "gt_labelsTr"
+    img_path = raw_path / "imagesTr"
+    rs_gt_path = raw_path / "rs_gt_labelsTr"
+    rs_img_path = raw_path / "rs_imagesTr"
+
+    with open(raw_path / "dataset.json") as f:
+        dataset_cfg = json.load(f)
+
+    ignore_label = 4
+
+    patch_size = 128
+    n_samples = 32
+
+    crop_min_size = 0.4
+    crop_max_size = 0.9
+
+    resample_all(
+        dataset_cfg=dataset_cfg,
+        rs_img_path=rs_img_path,
+        rs_gt_path=rs_gt_path,
+        raw_path=raw_path,
+        img_path=img_path,
+        gt_path=gt_path,
+        preprocessed_path=preprocessed_path,
+    )
+    # patches = starting_budget_random_crop(dataset_cfg, raw_path)
+    # pprint(patches)
+    # make_folder(patches, raw_path, dataset_cfg, ignore_label, gt_path)
 
 
 if __name__ == "__main__":
