@@ -14,26 +14,9 @@ from nnunetv2.experiment_planning.plan_and_preprocess import PlansManager
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     DefaultPreprocessor,
 )
-from pydantic.dataclasses import dataclass
 from rich.progress import track
 
-
-@dataclass
-class Patch:
-    file: str
-    coords: tuple[int, int, int]
-    size: tuple[int, int, int]
-
-    @classmethod
-    def from_json(cls, data: str) -> Patch | list[Patch]:
-        parsed = json.loads(data)
-        match parsed:
-            case [*_]:
-                return [Patch(**item) for item in parsed]
-            case {}:
-                return Patch(**parsed)
-            case _:
-                raise NotImplementedError
+from nnactive.data import Patch
 
 
 def resample_to_target_spacing(
