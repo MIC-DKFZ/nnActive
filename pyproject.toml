@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nnactive_playground"
+name = "nnactive"
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
@@ -14,6 +14,7 @@ dependencies = [
     "dynamic_network_architectures @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git@recycle_unet",
     "SimpleITK",
     "rich",
+    "pydantic",
 ]
 
 [project.optional-dependencies]
@@ -23,13 +24,15 @@ dev = [
   "pylint",
   "black",
   "debugpy",
+  "sphinx<6",
+  "pydata-sphinx-theme",
 ]
 
 [tool.setuptools.packages.find]
-include = ["nnactive_playground*"]
+include = ["nnactive*"]
 
 [tool.setuptools_scm]
-write_to = "nnactive_playground/_version.py"
+write_to = "nnactive/_version.py"
 
 [tool.pylint]
 extension-pkg-allow-list = [
