@@ -24,3 +24,37 @@ pip install -e '.[dev]'
             ...
         ]
         ```
+
+## Active Learning Integration
+
+The annotated data for each loop is saved in the `loop_XXX.json` file situated in $nnUNet_raw.
+These files are used for creating the validation splits for training.
+It is structured as follows:
+```json
+{
+    "patches": [
+        {
+            "file": "hippocampus_361.nii.gz",
+            "coords": [
+                0,
+                0,
+                0
+            ],
+            "size": "whole"
+        },
+        {
+            "file": "hippocampus_230.nii.gz",
+            "coords": [
+                0,
+                0,
+                0
+            ],
+            "size": "whole"
+        },...
+    ]
+    "metafile" : "xxx",
+    ...
+}
+```
+`"patches"` is used to save the annotated areas and in `loop_XXX.json` only the newly annotated areas are saved.
+To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_001.json` and `loop_000.json`.
