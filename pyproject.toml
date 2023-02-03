@@ -23,6 +23,7 @@ dev = [
   "pylint",
   "black",
   "debugpy",
+  "sphinx",
 ]
 
 [tool.setuptools.packages.find]
