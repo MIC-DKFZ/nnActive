@@ -88,6 +88,6 @@ Then two files are created in `${nnUNet_raw}/Dataset504_Hippocampus-partanno`:
 
 Now the dataset needs to be updated according to all `loop_XXX.json` files:
 ```bash
-
+python update_data.py -i /home/c817h/Documents/projects/nnActive/nnUNet_raw/Dataset004_Hippocampus -p /home/c817h/Documents/projects/nnActive/nnUNet_raw/Dataset504_Hippocampus-partanno
 ```
 

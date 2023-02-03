@@ -77,6 +77,15 @@ def placeholder_patch_anno(
     return image_names, label_area
 
 
+def make_whole_from_ground_truth(patches, gt_path, target_path):
+    """Copies over all files in patches from gt_path to target_path
+    """
+    for patch in patches:
+        seg_name = patch["file"]
+        shutil.copy(
+                    gt_path / seg_name, target_path / seg_name
+                )
+
 LOOP_NAME = "loop_000.json"
 
 
@@ -223,8 +232,9 @@ def convert_dataset_to_partannotated(
 
         patched_images = set(map(lambda patch: patch.file, patches))
 
+        empty_images = [ image_name for image_name in filter(lambda img: img not in patched_images, image_names)]
         # Create empty masks for the rest of the training images
-        for image_name in filter(lambda img: img not in patched_images, image_names):
+        for image_name in empty_images:
             save_filename = f"{'_'.join(image_name.split('_')[:-1])}{base_dataset_json['file_ending']}"
             create_empty_mask(
                 imagesTr_dir / image_name,

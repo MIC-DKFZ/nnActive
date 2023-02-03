@@ -10,6 +10,7 @@ import SimpleITK as sitk
 from rich.progress import track
 
 from nnactive.data import Patch
+from nnactive.data.create_empty_masks import create_empty_mask
 
 
 def _patch_ids_to_image_coords(
@@ -213,3 +214,20 @@ def make_patches_from_ground_truth(
             img_new,
             (target_path / patch.file).with_suffix(dataset_cfg["file_ending"]),
         )
+
+def make_whole_from_ground_truth(patches: list[Patch], gt_path:Path, target_path:Path):
+    """Copies over all files in patches from gt_path to target_path
+    """
+    for patch in patches:
+        seg_name = patch["file"]
+        shutil.copy(
+                    gt_path / seg_name, target_path / seg_name
+                )
+
+def make_empty_from_ground_truth(seg_names: list[str], gt_path:Path, target_path:Path, ignore_label:int):
+    """Creates empty segmentations for all filenames
+    """
+    for seg_name in seg_names:
+        create_empty_mask(gt_path/seg_name, ignore_label, target_path/seg_name)
+
+
