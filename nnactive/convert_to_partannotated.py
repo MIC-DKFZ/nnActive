@@ -161,6 +161,7 @@ def convert_dataset_to_partannotated(
         ignore_label = target_dataset_json["labels"]["ignore"]
         file_ending = base_dataset_json["file_ending"]
 
+        # create patches list for dataset creation
         patches = get_patches_for_partannotation(
             full_images,
             patch_func,

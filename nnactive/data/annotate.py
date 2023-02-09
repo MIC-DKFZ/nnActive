@@ -16,6 +16,16 @@ def create_labels_from_patches(
     base_dir: Path,
     target_dir: Path,
 ):
+    """Overwrites the labels files in target_dir base on labels in
+    base_dir.
+
+    Args:
+        patches (list[Patch]): Regions to annotate
+        ignore_label (int): Set Regions not mentioned in patches
+        file_ending (str): File Ending
+        base_dir (Path): Source Directory with labels
+        target_dir (Path): Target Directory for labels
+    """
     whole_label = []
     patch_label = []
     for patch in patches:

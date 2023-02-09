@@ -67,6 +67,33 @@ Creates:
 1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
 2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
 
+## Active Learning Setup
+1. Go into nnUNet_raw and copy imagesTr and labelsTr into other folders. e.g.
+```bash
+cp -r imagesTr imagesTr_original
+cp -r labelsTr labelsTr_original
+```
+2. Run nnUNetplan
+```bash
+```
+3. Resample images
+```bash
+python resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
+```
+4. Create Dataset
+```bash
+python convert_to_partannotated.py -d 4
+```
+5. Plan & Preprocess
+```bash
+nnUNetv2_plan_and_preprocess -d 504 
+```
+6. Train
+for each fold X in (0, 1, 2, 3, 4):
+```bash
+nnUNetv2_train 504 3d_fullres X -tr nnUNetDebugTrainer 
+```
+
 ## Active Learning Workflow
 nnUNet-Loop:
 for each fold X in (0, 1, 2, 3, 4):
