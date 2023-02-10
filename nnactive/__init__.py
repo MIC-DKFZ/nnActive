@@ -15,4 +15,5 @@ def get_version() -> str:
 
         return setuptools_scm.get_version(root="..", relative_to=__file__)
 
+
 __version__ = get_version()

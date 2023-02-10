@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Union
 
 from pydantic.dataclasses import dataclass
 
@@ -14,9 +15,10 @@ class Patch:
         coords: front lower left vertex of patch
         size: size in pixels in each direction
     """
+
     file: str
     coords: tuple[int, int, int]
-    size: tuple[int, int, int]
+    size: Union[tuple[int, int, int], str]
 
     @classmethod
     def from_json(cls, data: str) -> Patch | list[Patch]:

@@ -1,5 +1,6 @@
 import json
 import os
+
 import SimpleITK as sitk
 
 

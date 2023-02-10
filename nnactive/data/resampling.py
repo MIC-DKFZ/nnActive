@@ -41,7 +41,8 @@ def resample_to_target_spacing(
         plans_manager: nnUNet PlansManager object
         config_manager: nnUNet ConfigurationManager object
     """
-    input_images = [str(rs_img_path / f"{name}_0000{dataset_cfg['file_ending']}")]
+    input_names = [f"{name}_0000{dataset_cfg['file_ending']}"]
+    input_images = [str(rs_img_path / input_name) for input_name in input_names]
 
     data, seg, properties = preprocessor.run_case(
         input_images,
@@ -50,6 +51,7 @@ def resample_to_target_spacing(
         configuration_manager=config_manager,
         dataset_json=dataset_cfg,
     )
+    # generalizability, here no sweep but loop over first channel instead and save?
     data = data.transpose(
         [0, *[i + 1 for i in plans_manager.transpose_backward]]
     ).squeeze()
@@ -63,9 +65,11 @@ def resample_to_target_spacing(
     )
     img_itk_new.SetOrigin(properties["sitk_stuff"]["origin"])
     img_itk_new.SetDirection(np.array(properties["sitk_stuff"]["direction"]))
+
+    # TODO: Make Code generalizable for multiple input modalities
     sitk.WriteImage(
         img_itk_new,
-        (img_path / name).with_suffix(dataset_cfg["file_ending"]),
+        (img_path / input_names[0]).with_suffix(dataset_cfg["file_ending"]),
     )
 
     img_itk_new = sitk.GetImageFromArray(seg)
@@ -94,15 +98,18 @@ def resample_dataset(
 
     Args:
         dataset_cfg: nnUNet dataset json
-        rs_img_path: resampled images path
-        rs_gt_path: resampled gt labels path
+        rs_img_path: original images path
+        rs_gt_path: original gt labels path
         raw_path: nnUNet raw path
-        img_path: images path
-        gt_path: gt labels path
+        img_path: target images path
+        gt_path: target gt labels path
         preprocessed_path: nnUNet preprocessed path
         n_workers: number of parallel processes
     """
 
+    print("-"*8)
+    print("Test")
+    print("-"*8)
     with open(raw_path / "dataset.json") as file:
         dataset_cfg = json.load(file)
 
@@ -118,28 +125,45 @@ def resample_dataset(
 
     gt_path.mkdir(exist_ok=True)
     img_path.mkdir(exist_ok=True)
-    imgs = list((raw_path / "rs_gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}"))
+    imgs = list((rs_gt_path).glob(f"**/*{dataset_cfg['file_ending']}"))
 
+    print("-"*8)
+    print(imgs)
+    print("-"*8)
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
 
-    worker_fn = functools.partial(
-        resample_to_target_spacing,
-        dataset_cfg=dataset_cfg,
-        rs_img_path=rs_img_path,
-        rs_gt_path=rs_gt_path,
-        preprocessor=preprocessor,
-        plans_manager=plans_manager,
-        config_manager=config_manager,
-        img_path=img_path,
-        gt_path=gt_path,
-    )
-    try:
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
-            for _ in track(executor.map(worker_fn, names), total=len(names)):
-                pass
-    except BrokenProcessPool as exc:
-        raise MemoryError(
-            "One of the worker processes died. "
-            "This usually happens because you run out of memory. "
-            "Try running with less processes."
-        ) from exc
+    if n_workers == 0:
+        for name in names:
+            resample_to_target_spacing(
+                name=name,
+                dataset_cfg=dataset_cfg,
+                rs_img_path=rs_img_path,
+                rs_gt_path=rs_gt_path,
+                preprocessor=preprocessor,
+                plans_manager=plans_manager,
+                config_manager=config_manager,
+                img_path=img_path,
+                gt_path=gt_path,
+            )
+    else:
+        worker_fn = functools.partial(
+            resample_to_target_spacing,
+            dataset_cfg=dataset_cfg,
+            rs_img_path=rs_img_path,
+            rs_gt_path=rs_gt_path,
+            preprocessor=preprocessor,
+            plans_manager=plans_manager,
+            config_manager=config_manager,
+            img_path=img_path,
+            gt_path=gt_path,
+        )
+        try:
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                for _ in track(executor.map(worker_fn, names), total=len(names)):
+                    pass
+        except BrokenProcessPool as exc:
+            raise MemoryError(
+                "One of the worker processes died. "
+                "This usually happens because you run out of memory. "
+                "Try running with less processes."
+            ) from exc
