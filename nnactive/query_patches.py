@@ -83,14 +83,7 @@ def mark_selected(selected_array, coords, patch_size, selected_idx=1):
 
 
 def get_top_n_non_overlapping_patches(
-    image_name: str,
-    n: int,
-    uncertainty_scores: np.ndarray,
-    patch_size,
-    raw_dataset_dir: Path,
-    uncertainty_type: str,
-    ignore_label: int,
-    file_ending: str,
+    image_name: str, n: int, uncertainty_scores: np.ndarray, patch_size, selected_array
 ):
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -100,22 +93,12 @@ def get_top_n_non_overlapping_patches(
         n: number of non-overlapping patches that should be queried at most
         uncertainty_scores: the aggregated uncertainty map
         patch_size: patch size that was used to aggregate the uncertainties
-        raw_images_dir: the input directory with the raw image data that is used for training
-        uncertainty_type: uncertainty type that should be used for ranking
+        selected_array: array with already labeled patches
 
     Returns:
         the most n uncertain non-overlapping patches for one image
     """
-    # Get the image id to find the image in the original data folder of the training images
-    image_id = image_id_from_aggregated_name(image_name, uncertainty_type)
     selected_patches = []
-    # Selected array is an array of the raw input image size that is used to mark which areas have already been queried
-    labeled_map = get_label_map(image_id, raw_dataset_dir, file_ending)
-    selected_array = np.zeros_like(labeled_map)
-    # Mark the patched as annotated that were annotated in previous loops
-    selected_array = mark_already_annotated_patches(
-        selected_array, labeled_map, ignore_label
-    )
     sorted_uncertainty_scores = np.flip(np.sort(uncertainty_scores.flatten()))
     sorted_uncertainty_indices = np.flip(np.argsort(uncertainty_scores.flatten()))
     # This was just for visualization purposes in MITK
@@ -182,6 +165,15 @@ def get_most_uncertain_patches(
             image = np.load(aggregated_uncertainty_dir / image_name)
             uncertainty_scores = image["patch_score"]
             patch_size = image["patch_size"]
+            # Get the image id to find the image in the original data folder of the training images
+            image_id = image_id_from_aggregated_name(image_name, uncertainty_type)
+            # Selected array is an array of the raw input image size that is used to mark which areas have already been queried
+            labeled_map = get_label_map(image_id, raw_dataset_dir, file_ending)
+            selected_array = np.zeros_like(labeled_map)
+            # Mark the patched as annotated that were annotated in previous loops
+            selected_array = mark_already_annotated_patches(
+                selected_array, labeled_map, ignore_label
+            )
             # Extend the list of patches that can possibly be queried by number_to_query from the current image
             # TODO: this might be optimized, i.e. we don't need to query n uncertain patches from an image
             #  when we already have more uncertain patches from other images
@@ -191,10 +183,7 @@ def get_most_uncertain_patches(
                     number_to_query,
                     uncertainty_scores,
                     patch_size,
-                    raw_dataset_dir,
-                    uncertainty_type,
-                    ignore_label,
-                    file_ending,
+                    selected_array,
                 )
             )
     print(len(all_top_patches))
