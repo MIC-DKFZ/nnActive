@@ -84,18 +84,18 @@ python resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset0
 ```bash
 python convert_to_partannotated.py -d 4
 ```
-5. Plan & Preprocess
+
+## Active Learning Workflow
+Plan & Preprocess
 ```bash
 nnUNetv2_plan_and_preprocess -d 504 
 ```
-6. Train
+
 for each fold X in (0, 1, 2, 3, 4):
 ```bash
 nnUNetv2_train 504 3d_fullres X -tr nnUNetDebugTrainer 
 ```
 
-## Active Learning Workflow
-nnUNet-Loop:
 for each fold X in (0, 1, 2, 3, 4):
 ```bash
 nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-partanno/imagesTr -o ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/fold_X -tr nnUNetDebugTrainer --save_probabilities -f X
