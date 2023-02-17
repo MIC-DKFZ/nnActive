@@ -6,6 +6,39 @@ from nnactive.data.annotate import create_labels_from_patches
 from nnactive.loops.cross_validation import kfold_cv_from_patches
 from nnactive.loops.loading import get_patches_from_loop_files
 
+
+def update_data(
+    data_path: Path,
+    save_splits_file: Path,
+    ignore_label: int,
+    file_ending: str,
+    base_dir: Path,
+    target_dir: Path,
+    loop_val: int = None,
+    num_folds: int = 5,
+):
+    """Update Dataset Raw with a novel splits_file in Preprocessed
+
+    Args:
+        data_path (Path): raw dataset dir
+        save_splits_file (Path): path to save splits file
+        ignore_label (int): ignore label
+        file_ending (str): desc
+        base_dir (Path): path to annotated labels
+        target_dir (Path): path to labels to be updated
+        loop_val (int, optional): which loop val to use. Defaults to None.
+    """
+
+    patches = get_patches_from_loop_files(data_path, loop_val)
+    print(len(patches))
+    create_labels_from_patches(patches, ignore_label, file_ending, base_dir, target_dir)
+
+    splits_final = kfold_cv_from_patches(num_folds, patches)
+
+    with open(save_splits_file, "w") as file:
+        json.dump(splits_final, file, indent=4)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-p", "--dataset_path")
@@ -19,8 +52,6 @@ if __name__ == "__main__":
     save_splits_file = Path(args.save_splits_file)
     loop_val = args.loop
 
-    patches = get_patches_from_loop_files(data_path, loop_val)
-
     with open(data_path / "dataset.json", "r") as file:
         data_json = json.load(file)
     ignore_label: int = data_json["labels"]["ignore"]
@@ -29,9 +60,12 @@ if __name__ == "__main__":
     base_dir = labeled_path / "labelsTr"
     target_dir = data_path / "labelsTr"
 
-    create_labels_from_patches(patches, ignore_label, file_ending, base_dir, target_dir)
-
-    splits_final = kfold_cv_from_patches(5, patches)
-
-    with open(save_splits_file, "w") as file:
-        json.dump(splits_final, file, indent=4)
+    update_data(
+        data_path,
+        save_splits_file,
+        loop_val,
+        ignore_label,
+        file_ending,
+        base_dir,
+        target_dir,
+    )

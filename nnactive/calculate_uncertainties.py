@@ -9,6 +9,7 @@ Creates folder containing uncertainties in:
 import argparse
 import json
 import os
+from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
@@ -106,7 +107,7 @@ def get_pred_image_info(softmax_file_name, pred_path):
     return pred_origin, pred_spacing, pred_direction
 
 
-def calculate_uncertainties(softmax_file_names, pred_path):
+def calculate_uncertainties(softmax_file_names, pred_path: Path, target_path: Path):
     """
     Calculate the predictive entropy, expected entropy and the mutual information for all predicted images.
     Currently, one uncertainty map per uncertainty type is calculated for each prediction (no class-wise uncertainties)
@@ -158,32 +159,20 @@ def calculate_uncertainties(softmax_file_names, pred_path):
             image.SetDirection(pred_direction)
 
         # make an output directory to store the uncertainties
-        os.makedirs(os.path.join(pred_path, "uncertainties"), exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
 
         # save the uncertainty maps as images
         sitk.WriteImage(
             pred_entropy_image,
-            os.path.join(
-                pred_path,
-                "uncertainties",
-                f"{image_name.split('.')[0]}_pred_entropy.nii.gz",
-            ),
+            target_path / f"{image_name.split('.')[0]}_pred_entropy.nii.gz",
         )
         sitk.WriteImage(
             expected_entropy_image,
-            os.path.join(
-                pred_path,
-                "uncertainties",
-                f"{image_name.split('.')[0]}_expected_entropy.nii.gz",
-            ),
+            target_path / f"{image_name.split('.')[0]}_expected_entropy.nii.gz",
         )
         sitk.WriteImage(
             mutual_information_image,
-            os.path.join(
-                pred_path,
-                "uncertainties",
-                f"{image_name.split('.')[0]}_mutual_information.nii.gz",
-            ),
+            target_path / f"{image_name.split('.')[0]}_mutual_information.nii.gz",
         )
 
 
@@ -196,9 +185,14 @@ def calculate_uncertainties_from_softmax_preds():
         help="Root folder containing the softmax predictions of each fold in subfolders /fold_<0-4>",
     )
     args = parser.parse_args()
-    pred_folder = args.p
+    pred_folder = Path(args.p)
+    target_path = pred_folder / "uncertainties"
+    write_uncertainties_from_softmax_preds(pred_folder, target_path)
+
+
+def write_uncertainties_from_softmax_preds(pred_folder: Path, target_path: Path):
     image_names = get_predicted_image_names(pred_folder)
-    calculate_uncertainties(image_names, pred_folder)
+    calculate_uncertainties(image_names, pred_folder, target_path)
 
 
 if __name__ == "__main__":

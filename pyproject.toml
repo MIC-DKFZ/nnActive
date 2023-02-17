@@ -53,6 +53,7 @@ disable = [
   "use-symbolic-message-instead",
   "missing-module-docstring",
   "unspecified-encoding",
+  "line-too-long"
 ]
 
 max-args = 10

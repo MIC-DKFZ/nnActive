@@ -7,6 +7,10 @@ Install with
 pip install -e '.[dev]'
 ```
 
+## Set up nnActive
+1. set up nnUnetv2
+2. export nnActive_results=`path...`
+
 ## Contributing
 
 - Always run `black` (and ideally `isort`) before commiting
@@ -59,77 +63,146 @@ It is structured as follows:
 `"patches"` is used to save the annotated areas and in `loop_XXX.json` only the newly annotated areas are saved.
 To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_001.json` and `loop_000.json`.
 
+## Create a validation dataset from fully annotated data
+```bash
+python scripts/create_val_split.py -d 4
+```
+
 ## Create Custom partially annotated dataset from fully annotated
 ```bash
-python convert_to_partannotated.py -d 4 
+python scripts/convert_to_partannotated.py -d 4 
 ```
 Creates: 
 1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
 2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
 
 ## Active Learning Setup
+### Prepare Source Dataset (Fully Annotated)
 1. Go into nnUNet_raw and copy imagesTr and labelsTr into other folders. e.g.
 ```bash
 cp -r imagesTr imagesTr_original
 cp -r labelsTr labelsTr_original
 ```
-2. Run nnUNetplan
+2. Obtain nnU-Net preprocessing instructions
 ```bash
+nnUNetv2_extrac_fingerprint -d 4
+nnUnetv2_plan_experiment -d 4
 ```
 3. Resample images
 ```bash
-python resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
+python nnactive/resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
 ```
+Alternatively:
+```bash
+python scripts/resample_nnunet_dataset -d 4
+```
+### Create Partially annotated dataset
 4. Create Dataset
 ```bash
-python convert_to_partannotated.py -d 4
+python nnactive/convert_to_partannotated.py -d 4
+```
+
+5. Create Plans
+```bash
+nnUNetv2_plan_experiment -d 504 
 ```
 
 ## Active Learning Workflow
+### Training Step
 Plan & Preprocess
 ```bash
-nnUNetv2_plan_and_preprocess -d 504 
+nnUNetv2_preprocess -d 504 
 ```
-
+#### Manual
 for each fold X in (0, 1, 2, 3, 4):
 ```bash
 nnUNetv2_train 504 3d_fullres X -tr nnUNetDebugTrainer 
 ```
+#### nnUNet
+Alternative:
+```bash
+python scripts/train_nnUNet_ensemble.py -d 504
+```
 
+### Pool Prediction Step
+#### Manual
 for each fold X in (0, 1, 2, 3, 4):
 ```bash
 nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-partanno/imagesTr -o ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/fold_X -tr nnUNetDebugTrainer --save_probabilities -f X
 ```
-Then aggregate to uncertainties
+#### nnUNet
 ```bash
-python calculate_uncertainties.py -p ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr
+python scripts/predict_nnUNet_ensemble.py -d 504
+```
+
+
+### Query Step
+#### Manual
+Then calculate uncertainties from softmax outputs
+```bash
+python nnactive/calculate_uncertainties.py -p ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr
 ```
 Uncertainties are now in folder: `${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties` 
 
 These uncertainties are now aggregated:
 ```bash
-cd uncertainty_aggregation
-python aggregate_uncertainties.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties -d ${nnUNet_raw}/Dataset504_Hippocampus-partanno/dataset.json
+python nnactive/uncertainty_aggregation/aggregate_uncertainties.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties -o  ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated -d ${nnUNet_raw}/Dataset504_Hippocampus-partanno/dataset.json 
 ```
-These uncertainties are now aggregated in the folder: `${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties/aggregated_uncertainties`
+These uncertainties are now aggregated in the folder: `${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated`
 
 These are used to query patches for loop X:
 ```bash
-python query_patches.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties/aggregated_uncertainties -u mutual_information -n 20 -o ${nnUNet_raw}/Dataset504_Hippocampus-partanno -l X
+python nnactive/query_patches.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated -u mutual_information -n 20 -o ${nnUNet_raw}/Dataset504_Hippocampus-partanno -l X
 ```
+#### nnUNet
+```bash
+python scripts/query_step.py -d 504
+```
+
+#### Outcome
 Then two files are created in `${nnUNet_raw}/Dataset504_Hippocampus-partanno`:
 1. `loop_00X.json`
 2. `{uncertainty_type}_loop00X.json`
 
+### Update Dataset
+#### Manual
 Now the dataset needs to be updated according to all `loop_XXX.json` files:
 ```bash
-python update_data.py -i ${nnUNet_raw}/Dataset004_Hippocampus -p ${nnUNet_raw}/Dataset504_Hippocampus-partanno --save_splits_file ${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json
+python nnactive/update_data.py -i ${nnUNet_raw}/Dataset004_Hippocampus -p ${nnUNet_raw}/Dataset504_Hippocampus-partanno --save_splits_file ${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json
 ```
 
-
-Preprocess the dataset again:
+#### nnUNet
 ```bash
-nnUNetv2_preprocess -d 504
+python scripts/update_data.py -d 504
 ```
 
 Start with Training of all folds and repeat....
+
+
+
+## Requirements
+dataset.json in raw data
+```json
+{
+    "channel_names": {
+        "0": "MRI"
+    },
+    "description": "Left and right hippocampus segmentation",
+    "file_ending": ".nii.gz",
+    "labels": {
+        "Anterior": 1,
+        "Posterior": 2,
+        "background": 0,
+        "ignore": 3
+    },
+    "licence": "CC-BY-SA 4.0",
+    "name": "Hippocampus-partanno",
+    "numTest": 130,
+    "numTraining": 260,
+    "reference": " Vanderbilt University Medical Center",
+    "relase": "1.0 04/05/2018",
+    "tensorImageSize": "3D",
+    "annotated_id" : 4 
+    // id to annotated dataset or path?
+}
+```
