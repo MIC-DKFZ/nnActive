@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import Tuple, List, Dict
 
 import numpy as np
 import SimpleITK as sitk
@@ -12,16 +13,18 @@ from nnactive.loops.loading import save_loop
 # from nnunetv2.paths import nnUNet_raw
 
 
-def does_overlap(start_indices, patch_size, selected_array):
+def does_overlap(
+    start_indices: Tuple[np.ndarray], patch_size: np.ndarray, selected_array: np.ndarray
+) -> bool:
     """
     Check if a patch overlaps with an already annotated region
     Args:
-        start_indices: start indices of the patch
-        patch_size: patch size to determine end indices
-        selected_array: array containing the already annotated regions
+        start_indices (Tuple[str]): start indices of the patch
+        patch_size (np.ndarray): patch size to determine end indices
+        selected_array (np.ndarray): array containing the already annotated regions
 
     Returns:
-        True if the patch overlaps with an already annotated region, False if not
+        bool: True if the patch overlaps with an already annotated region, False if not
     """
     # Convert the indices to slices, makes indexing of selected_array possible without being dependent on dimensions
     slices = []
@@ -33,11 +36,13 @@ def does_overlap(start_indices, patch_size, selected_array):
     return False
 
 
-def image_id_from_aggregated_name(image_aggregated_name: str, uncertainty_type: str):
+def image_id_from_aggregated_name(
+    image_aggregated_name: str, uncertainty_type: str
+) -> str:
     return image_aggregated_name.split(f"_{uncertainty_type}")[0]
 
 
-def get_label_map(image_id: str, raw_dataset_dir: np.ndarray, file_ending: str):
+def get_label_map(image_id: str, raw_dataset_dir: Path, file_ending: str) -> np.ndarray:
     # TODO: get file ending from dataset.json
     image_path = raw_dataset_dir / "labelsTr" / f"{image_id}{file_ending}"
     sitk_image = sitk.ReadImage(image_path)
@@ -46,7 +51,7 @@ def get_label_map(image_id: str, raw_dataset_dir: np.ndarray, file_ending: str):
 
 def mark_already_annotated_patches(
     selected_array: np.ndarray, labeled_array: np.ndarray, ignore_label: int
-):
+) -> np.ndarray:
     """Returns array where annotated areas are set to in selected_array
 
     Args:
@@ -61,18 +66,23 @@ def mark_already_annotated_patches(
     return selected_array
 
 
-def mark_selected(selected_array, coords, patch_size, selected_idx=1):
+def mark_selected(
+    selected_array: np.ndarray,
+    coords: Tuple[np.ndarray],
+    patch_size: np.ndarray,
+    selected_idx: int = 1,
+) -> np.ndarray:
     """
     Mark a patch as selected that no area of this patch is queried multiple times
     Args:
-        selected_array: array with already queried regions that should be extended by the patch
-        coords: start coordinated of the patch
-        patch_size: patch size to determine end indices
-        selected_idx: int which should be used to mark the patch as annotated
+        selected_array (np.ndarray): array with already queried regions that should be extended by the patch
+        coords (Tuple[np.ndarray]): start coordinated of the patch
+        patch_size (np.ndarray): patch size to determine end indices
+        selected_idx (int): int which should be used to mark the patch as annotated
         (normally 1, can be changed for visualization)
 
     Returns:
-        array with queried region including the patch that was passed
+        np.ndarray: array with queried region including the patch that was passed
     """
     slices = []
     for start_index, size in zip(coords, patch_size):
@@ -83,20 +93,24 @@ def mark_selected(selected_array, coords, patch_size, selected_idx=1):
 
 
 def get_top_n_non_overlapping_patches(
-    image_name: str, n: int, uncertainty_scores: np.ndarray, patch_size, selected_array
-):
+    image_name: str,
+    n: int,
+    uncertainty_scores: np.ndarray,
+    patch_size: np.ndarray,
+    selected_array: np.ndarray,
+) -> List[Dict]:
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
 
     Args:
-        image_name: the name of the aggregated uncertainty map (npz file)
-        n: number of non-overlapping patches that should be queried at most
-        uncertainty_scores: the aggregated uncertainty map
-        patch_size: patch size that was used to aggregate the uncertainties
-        selected_array: array with already labeled patches
+        image_name (str): the name of the aggregated uncertainty map (npz file)
+        n (int): number of non-overlapping patches that should be queried at most
+        uncertainty_scores (np.ndarray): the aggregated uncertainty map
+        patch_size (np.ndarray): patch size that was used to aggregate the uncertainties
+        selected_array (np.ndarray): array with already labeled patches
 
     Returns:
-        the most n uncertain non-overlapping patches for one image
+        List[Dict]: the most n uncertain non-overlapping patches for one image
     """
     selected_patches = []
     sorted_uncertainty_scores = np.flip(np.sort(uncertainty_scores.flatten()))
@@ -144,17 +158,19 @@ def get_most_uncertain_patches(
     ignore_label: int,
     file_ending: str,
     number_to_query: int = None,
-):
+) -> List[Dict]:
     """
     Get the most uncertain patches across all predicted images.
     Args:
-        aggregated_uncertainty_dir: directory containing the aggregated uncertainties for ranking the patches
-        uncertainty_type: uncertainty type that should be used for ranking (specified in uncertainty file name)
-        raw_images_dir: directory with the raw input images
-        number_to_query: number of patches to query. If None, all patches from the input images will be ranked
+        aggregated_uncertainty_dir (Path): directory containing the aggregated uncertainties for ranking the patches
+        uncertainty_type (str): uncertainty type that should be used for ranking (specified in uncertainty file name)
+        raw_dataset_dir (Path): directory with the raw input images
+        ignore_label (int): label value signaling unlabeled regions
+        file_ending (str): file ending of the images
+        number_to_query (int): number of patches to query. If None, all patches from the input images will be ranked
 
     Returns:
-        Either the top n most uncertain patches if number_to_query is specified
+        List[Dict]: Either the top n most uncertain patches if number_to_query is specified
         or all non-overlapping patches sorted by uncertainty
     """
     all_top_patches = []
@@ -201,7 +217,7 @@ def get_most_uncertain_patches(
     return all_top_patches
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
@@ -291,7 +307,7 @@ def query_most_uncertain_patches(
     loop: int,
     file_ending: str,
     ignore_label: int,
-):
+) -> None:
     all_top_patches = get_most_uncertain_patches(
         aggregated_uncertainty_dir,
         uncertainty_type,
