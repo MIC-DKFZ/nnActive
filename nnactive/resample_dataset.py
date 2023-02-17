@@ -35,6 +35,15 @@ def main():
         preprocessed_path=target_preprocessed,
         n_workers=8,
     )
+    resample_dataset(
+        dataset_cfg=dataset_json,
+        rs_img_path=target_raw / "imagesVal_original",
+        rs_gt_path=target_raw / "labelsVal_original",
+        img_path=target_raw / "imagesVal",
+        gt_path=target_raw / "labelsVal",
+        preprocessed_path=target_preprocessed,
+        n_workers=8,
+    )
 
 
 if __name__ == "__main__":

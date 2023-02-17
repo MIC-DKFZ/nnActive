@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+from argparse import ArgumentParser
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -25,7 +26,11 @@ def load_results(filenames: list[Path]):
 
 nnActive_results = get_nnActive_results()
 if __name__ == "__main__":
-    dataset_id = 504
+    parser = ArgumentParser()
+    # TODO: help
+    parser.add_argument("-d", "--dataset_id", type=int)
+    args = parser.parse_args()
+    dataset_id = args.dataset_id
     experiment_results_path: Path = nnActive_results / convert_id_to_dataset_name(
         dataset_id
     )
@@ -38,6 +43,5 @@ if __name__ == "__main__":
     x = "Loop"
     y = "Mean Dice"
     sns.lineplot(data=df, x=x, y=y, ax=ax)
-    # ax.plot(x="Loop", y="Mean Dice", data=df)
     plt.savefig(experiment_results_path / "")
     plt.savefig("test.pdf")
