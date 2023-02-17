@@ -10,13 +10,14 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import List
 
 import numpy as np
 import SimpleITK as sitk
 import torch
 
 
-def get_predicted_image_names(pred_path):
+def get_predicted_image_names(pred_path: Path):
     """
     Get the names of the predicted images, checking if the image is predicted for all 5 folds
 
@@ -47,7 +48,7 @@ def get_predicted_image_names(pred_path):
     return softmax_files
 
 
-def load_softmax_predictions(softmax_file_name, pred_path):
+def load_softmax_predictions(softmax_file_name: str, pred_path: Path):
     """
     Load the softmax predictions of one image for all folds into one tensor
 
@@ -79,7 +80,7 @@ def load_softmax_predictions(softmax_file_name, pred_path):
     return softmax_preds
 
 
-def get_pred_image_info(softmax_file_name, pred_path):
+def get_pred_image_info(softmax_file_name: str, pred_path: Path):
     """
     Get the image information (origin, spacing, direction) from a predicted segmentation.
     Currently uses the predicted segmentation from the first fold to retrieve the information.
@@ -107,7 +108,9 @@ def get_pred_image_info(softmax_file_name, pred_path):
     return pred_origin, pred_spacing, pred_direction
 
 
-def calculate_uncertainties(softmax_file_names, pred_path: Path, target_path: Path):
+def calculate_uncertainties(
+    softmax_file_names: List[str], pred_path: Path, target_path: Path
+):
     """
     Calculate the predictive entropy, expected entropy and the mutual information for all predicted images.
     Currently, one uncertainty map per uncertainty type is calculated for each prediction (no class-wise uncertainties)
