@@ -85,7 +85,7 @@ cp -r labelsTr labelsTr_original
 ```
 2. Obtain nnU-Net preprocessing instructions
 ```bash
-nnUNetv2_extrac_fingerprint -d 4
+nnUNetv2_extract_fingerprint -d 4
 nnUnetv2_plan_experiment -d 4
 ```
 3. Resample images
@@ -96,13 +96,19 @@ Alternatively:
 ```bash
 python scripts/resample_nnunet_dataset -d 4
 ```
+resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_orgirinal` and `labelsTr_original`
+4. Create Validation Split
+```bash
+python scripts/create_val_split.py
+```
+Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
 ### Create Partially annotated dataset
-4. Create Dataset
+5. Create Dataset
 ```bash
 python nnactive/convert_to_partannotated.py -d 4
 ```
-
-5. Create Plans
+Creates dataset with offset of 500. In this case dataset 504.
+6. Create Plans
 ```bash
 nnUNetv2_plan_experiment -d 504 
 ```
@@ -134,6 +140,12 @@ nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-pa
 ```bash
 python scripts/predict_nnUNet_ensemble.py -d 504
 ```
+
+### Prediction on external Validation/Test Set
+```bash
+python scripts/get_performance.py
+```
+Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
 
 
 ### Query Step
