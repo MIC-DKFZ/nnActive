@@ -10,22 +10,22 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import List
+from typing import Set
 
 import numpy as np
 import SimpleITK as sitk
 import torch
 
 
-def get_predicted_image_names(pred_path: Path):
+def get_predicted_image_names(pred_path: Path) -> Set[str]:
     """
     Get the names of the predicted images, checking if the image is predicted for all 5 folds
 
     Args:
-        pred_path : base path of the predictions
+        pred_path (Path) : base path of the predictions
 
     Returns:
-        softmax_files: set containing the file names of the predicted images (.npz files with softmax probabilities)
+        Set[str]: set containing the file names of the predicted images (.npz files with softmax probabilities)
     """
     softmax_files = set()
 
@@ -48,16 +48,16 @@ def get_predicted_image_names(pred_path: Path):
     return softmax_files
 
 
-def load_softmax_predictions(softmax_file_name: str, pred_path: Path):
+def load_softmax_predictions(softmax_file_name: str, pred_path: Path) -> torch.Tensor:
     """
     Load the softmax predictions of one image for all folds into one tensor
 
     Args:
-        softmax_file_name : name of the softmax prediction file (.npz file)
-        pred_path : base path of the predictions
+        softmax_file_name (str): name of the softmax prediction file (.npz file)
+        pred_path (Path): base path of the predictions
 
     Returns:
-        softmax_preds: tensor containing the softmax predictions with the shape [n_folds, n_classes, image_shape]
+        torch.Tensor: tensor containing the softmax predictions with the shape [n_folds, n_classes, image_shape]
     """
     # use softmax prediction from first fold to determine size of the final tensor
     n_preds = 5
@@ -80,15 +80,17 @@ def load_softmax_predictions(softmax_file_name: str, pred_path: Path):
     return softmax_preds
 
 
-def get_pred_image_info(softmax_file_name: str, pred_path: Path):
+def get_pred_image_info(
+    softmax_file_name: str, pred_path: Path
+) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Get the image information (origin, spacing, direction) from a predicted segmentation.
     Currently uses the predicted segmentation from the first fold to retrieve the information.
     This information is needed to correctly convert the uncertainty map from an numpy array to an image.
 
     Args:
-        softmax_file_name : name of the softmax prediction file (.npz file)
-        pred_path : base path of the predictions
+        softmax_file_name (str): name of the softmax prediction file (.npz file)
+        pred_path (Path): base path of the predictions
 
     Returns:
         pred_origin, pred_spacing, pred_direction: origin, spacing and direction of the segmentation image
@@ -109,15 +111,15 @@ def get_pred_image_info(softmax_file_name: str, pred_path: Path):
 
 
 def calculate_uncertainties(
-    softmax_file_names: List[str], pred_path: Path, target_path: Path
-):
+    softmax_file_names: Set[str], pred_path: Path, target_path: Path
+) -> None:
     """
     Calculate the predictive entropy, expected entropy and the mutual information for all predicted images.
     Currently, one uncertainty map per uncertainty type is calculated for each prediction (no class-wise uncertainties)
 
     Args:
-        softmax_file_names : the file names from the images that were predicted
-        pred_path : the root path of the predictions
+        softmax_file_names (Set[str]): the file names from the images that were predicted
+        pred_path (Path): the root path of the predictions
     """
     for image_name in softmax_file_names:
         # load the softmax predictions and calculate the mean
@@ -179,7 +181,7 @@ def calculate_uncertainties(
         )
 
 
-def calculate_uncertainties_from_softmax_preds():
+def calculate_uncertainties_from_softmax_preds() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-p",
@@ -193,7 +195,9 @@ def calculate_uncertainties_from_softmax_preds():
     write_uncertainties_from_softmax_preds(pred_folder, target_path)
 
 
-def write_uncertainties_from_softmax_preds(pred_folder: Path, target_path: Path):
+def write_uncertainties_from_softmax_preds(
+    pred_folder: Path, target_path: Path
+) -> None:
     image_names = get_predicted_image_names(pred_folder)
     calculate_uncertainties(image_names, pred_folder, target_path)
 
