@@ -4,6 +4,7 @@ import os
 import SimpleITK as sitk
 
 
+# TODO: better to give file_ending than dataset_json_path
 def read_images_to_numpy(dataset_json_path, images_folder, func, *args, **kwargs):
     """
     Function that iterates through a directory of images with a file ending specified in a dataset.json,

@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 import numpy as np
 from scipy.signal import convolve
@@ -7,27 +8,25 @@ from scipy.signal import convolve
 from nnactive.utils.image_reading import read_images_to_numpy
 
 
-def save_aggregated_uncertainties(
-    image_name, uncertainties_folder, patch_size, **kwargs
-):
+def save_aggregated_uncertainties(image_name, target_folder, patch_size, **kwargs):
     """
     Save the aggregated uncertainties as .npz file
 
     Args:
         image_name : image name of the aggregated image. Used as basis for file name that is stored
-        uncertainties_folder : input folder with uncertainties to aggregate. Results are stored in <uncertainties_folder>/aggregated_uncertainties
+        target_folder : folder in which uncertainties get aggregated
         patch_size : patch size of an input patch that is aggregated. Stored in the .npz file to make patches reconstructable
         **kwargs: Should contain all types of aggregated uncertainties with descriptive variable names (variable names will be keys in .npz file)
     """
     patch_size = np.array(patch_size)
 
     # create aggregation folder
-    aggregation_folder = os.path.join(uncertainties_folder, "aggregated_uncertainties")
-    os.makedirs(aggregation_folder, exist_ok=True)
+    # aggregation_folder = os.path.join(uncertainties_folder, "aggregated_uncertainties")
+    os.makedirs(target_folder, exist_ok=True)
 
     # save patch size and all aggregation maps passed by kwargs
     np.savez(
-        os.path.join(aggregation_folder, f"{image_name.split('.')[0]}_aggregated.npz"),
+        os.path.join(target_folder, f"{image_name.split('.')[0]}_aggregated.npz"),
         patch_size=patch_size,
         **kwargs,
     )
@@ -59,7 +58,7 @@ def whole_patch_aggregation(np_image, patch_size, mean=True):
 
 
 def aggregate_uncertainties_per_image(
-    np_image, image_name, uncertainties_folder, patch_size, mean=True
+    np_image, image_name, uncertainties_folder, patch_size, target_folder, mean=True
 ):
     """
     Function that performs the different aggregation methods for one image and saves them to a .npz file in the end
@@ -75,7 +74,7 @@ def aggregate_uncertainties_per_image(
     patch_score = whole_patch_aggregation(np_image, patch_size, mean)
     # save the aggregated uncertainties
     save_aggregated_uncertainties(
-        image_name, uncertainties_folder, patch_size, patch_score=patch_score
+        image_name, target_folder, patch_size, patch_score=patch_score
     )
 
 
@@ -102,16 +101,26 @@ def aggregate_uncertainties():
         required=True,
         help="Folder containing the uncertainty maps",
     )
+    parser.add_argument(
+        "-0",
+        "--output",
+        type=str,
+        required=True,
+        help="Folder in which aggregated uncertainties are stored",
+    )
     args = parser.parse_args()
     dataset_json_path = args.dataset_json
-    uncertainty_input_folder = args.input
+    uncertainty_input_folder = Path(args.input)
+    patch_size = (10, 10, 10)
+    target_folder = Path(args.output)
 
     # read images to numpy and execute the aggregation function
     read_images_to_numpy(
         dataset_json_path,
         uncertainty_input_folder,
         aggregate_uncertainties_per_image,
-        patch_size=(10, 10, 10),
+        target_folder=target_folder,
+        patch_size=patch_size,
     )
 
 

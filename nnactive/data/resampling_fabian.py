@@ -9,6 +9,7 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunetv2.preprocessing.resampling.default_resampling import compute_new_shape
 from torch.nn import functional as F
 
+
 def resample_save(
     source_image: str,
     source_label: str,

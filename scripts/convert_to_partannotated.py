@@ -1,5 +1,4 @@
-# TODO: how to test
-# TODO: Files
+# TODO: Split this into two different files, s.a. in other folders
 import json
 import os
 import shutil
@@ -18,8 +17,8 @@ from nnactive.data.create_empty_masks import (
     add_ignore_label_to_dataset_json,
     read_dataset_json,
 )
-from nnactive.loops.cross_validation import kfold_cv_from_patches
-from nnactive.loops.loading import get_patches_from_loop_files, save_loop
+from nnactive.loops.loading import save_loop
+from nnactive.nnunet.io import generate_custom_splits_file
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -132,6 +131,7 @@ def convert_dataset_to_partannotated(
         target_dataset_json = add_ignore_label_to_dataset_json(
             target_dataset_json, base_dataset
         )
+        target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
         target_dir = NNUNET_RAW / target_dataset
         os.makedirs(target_dir)
@@ -227,29 +227,6 @@ def get_patches_for_partannotation(
     )
     return patches
 
-
-def generate_custom_splits_file(
-    target_id: int, loop_count: Optional[int] = None, num_folds: int = 5
-):
-    """Generates a custom split file in NNUNET_PREPROCESSED folder which only has labeled data.
-
-    Args:
-        target_id (int): dataset id
-        loop_count (int): X for loop_XXX.json file all smaller are also taken to get list of names
-        num_folds (int, optional): Folds vor KFoldCV. Defaults to 5.
-    """
-    dataset: str = convert_id_to_dataset_name(target_id)
-
-    patches = get_patches_from_loop_files(NNUNET_RAW / dataset, loop_count)
-
-    splits_final = kfold_cv_from_patches(num_folds, patches)
-
-    # Create path if not exists
-    if not (NNUNET_PREPROCESSED / dataset).exists():
-        os.makedirs(NNUNET_PREPROCESSED / dataset)
-    # save splits_file
-    with open(NNUNET_PREPROCESSED / dataset / "splits_final.json", "w") as file:
-        json.dump(splits_final, file, indent=4)
 
 
 def dummy_patch_func(*args, **kwargs) -> list[Patch]:

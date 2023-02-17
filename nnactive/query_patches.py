@@ -138,7 +138,12 @@ def get_top_n_non_overlapping_patches(
 
 
 def get_most_uncertain_patches(
-    aggregated_uncertainty_dir, uncertainty_type, raw_dataset_dir, number_to_query=None
+    aggregated_uncertainty_dir: Path,
+    uncertainty_type: str,
+    raw_dataset_dir: Path,
+    ignore_label: int,
+    file_ending: str,
+    number_to_query: int = None,
 ):
     """
     Get the most uncertain patches across all predicted images.
@@ -152,11 +157,6 @@ def get_most_uncertain_patches(
         Either the top n most uncertain patches if number_to_query is specified
         or all non-overlapping patches sorted by uncertainty
     """
-    with open(raw_dataset_dir / "dataset.json", "r") as file:
-        d_json = json.load(file)
-        ignore_label = d_json["labels"]["ignore"]
-        file_ending = d_json["file_ending"]
-
     all_top_patches = []
     for image_name in os.listdir(aggregated_uncertainty_dir):
         if image_name.endswith(".npz") and uncertainty_type in image_name:
@@ -193,10 +193,15 @@ def get_most_uncertain_patches(
         # Only return the top number_to_query patches
         all_top_patches = all_top_patches[:number_to_query]
     print(len(all_top_patches))
+    # bring all_top_patches in a json write and readable format
+
+    for i in range(len(all_top_patches)):
+        all_top_patches[i]["coords"] = [x.item() for x in all_top_patches[i]["coords"]]
+        all_top_patches[i]["size"] = all_top_patches[i]["size"].tolist()
     return all_top_patches
 
 
-def query_patches():
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
@@ -249,7 +254,6 @@ def query_patches():
     uncertainty_type = args.uncertainty_type
     number_to_query = args.number_to_query
     raw_dataset_dir = Path(args.output_path)
-    output_path = Path(args.output_path)
     loop = args.loop
 
     if uncertainty_type not in [
@@ -263,41 +267,59 @@ def query_patches():
         )
 
     raw_dataset_dir = Path(raw_dataset_dir)
+    with open(raw_dataset_dir / "dataset.json", "r") as file:
+        dataset_json = json.load(file)
+    file_ending = dataset_json["file_ending"]
+    ignore_label = dataset_json["labels"]["ignore"]
 
-    most_uncertain_patches = get_most_uncertain_patches(
-        aggregated_uncertainty_dir, uncertainty_type, raw_dataset_dir, number_to_query
+    query_most_uncertain_patches(
+        aggregated_uncertainty_dir,
+        uncertainty_type,
+        number_to_query,
+        raw_dataset_dir,
+        loop,
+        file_ending,
+        ignore_label,
     )
 
-    # bring most_uncertain_patches in a json write and readable format
-    for i in range(len(most_uncertain_patches)):
-        most_uncertain_patches[i]["coords"] = [
-            x.item() for x in most_uncertain_patches[i]["coords"]
-        ]
-        most_uncertain_patches[i]["size"] = most_uncertain_patches[i]["size"].tolist()
+
+def query_most_uncertain_patches(
+    aggregated_uncertainty_dir: Path,
+    uncertainty_type: str,
+    number_to_query: int,
+    raw_dataset_dir: Path,
+    loop: int,
+    file_ending: str,
+    ignore_label: int,
+):
+    all_top_patches = get_most_uncertain_patches(
+        aggregated_uncertainty_dir,
+        uncertainty_type,
+        raw_dataset_dir,
+        ignore_label,
+        file_ending,
+        number_to_query,
+    )
+
+    patches = [
+        {
+            "file": patch["file"].split(f"_{uncertainty_type}")[0] + file_ending,
+            "coords": patch["coords"],
+            "size": patch["size"],
+        }
+        for patch in all_top_patches
+    ]
+    patches = [Patch(**patch) for patch in patches]
 
     # Save the queries with uncertainty values
-    with open(output_path / f"{uncertainty_type}_{loop:03d}.json", "w") as file:
-        json.dump(most_uncertain_patches, file, indent=4)
-
-    with open(output_path / "dataset.json", "r") as file:
-        dataset_json = json.load(file)
+    with open(raw_dataset_dir / f"{uncertainty_type}_{loop:03d}.json", "w") as file:
+        json.dump(all_top_patches, file, indent=4)
 
     # bring into loop_XXX.json format and save!
-    loop_json = {
-        "patches": [
-            {
-                "file": patch["file"].split(f"_{uncertainty_type}")[0]
-                + dataset_json["file_ending"],
-                "coords": patch["coords"],
-                "size": patch["size"],
-            }
-            for patch in most_uncertain_patches
-        ]
-    }
-    loop_json["patches"] = [Patch(**patch) for patch in loop_json["patches"]]
+    loop_json = {"patches": patches}
 
-    save_loop(output_path, loop_json, loop)
+    save_loop(raw_dataset_dir, loop_json, loop)
 
 
 if __name__ == "__main__":
-    query_patches()
+    main()

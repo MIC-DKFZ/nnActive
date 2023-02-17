@@ -88,7 +88,6 @@ def resample_dataset(
     dataset_cfg: dict[str, Any],
     rs_img_path: Path,
     rs_gt_path: Path,
-    raw_path: Path,
     img_path: Path,
     gt_path: Path,
     preprocessed_path: Path,
@@ -107,12 +106,6 @@ def resample_dataset(
         n_workers: number of parallel processes
     """
 
-    print("-"*8)
-    print("Test")
-    print("-"*8)
-    with open(raw_path / "dataset.json") as file:
-        dataset_cfg = json.load(file)
-
     configuration = "3d_fullres"
     plans_file = preprocessed_path / "nnUNetPlans.json"
 
@@ -127,9 +120,9 @@ def resample_dataset(
     img_path.mkdir(exist_ok=True)
     imgs = list((rs_gt_path).glob(f"**/*{dataset_cfg['file_ending']}"))
 
-    print("-"*8)
+    print("-" * 8)
     print(imgs)
-    print("-"*8)
+    print("-" * 8)
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
 
     if n_workers == 0:
