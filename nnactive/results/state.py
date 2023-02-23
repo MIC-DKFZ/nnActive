@@ -5,13 +5,15 @@ from pydantic.dataclasses import dataclass
 from nnactive.results.utils import get_results_folder
 
 
+# TODO: This should/ could be redone to a more exhaustive list with all steps!
+# e.g. loop, update_data, trainings, uncertainty, query...
 @dataclass
 class State:
     loop: int
     last_step: str 
 
     @classmethod
-    def get_id_state(cls, id:int) ->State:
+    def get_id_state(cls, id:int) -> State:
         fn = get_results_folder(id)/"state.json"
         with open(fn, "r") as file:
             file = json.load(fn)

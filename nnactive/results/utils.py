@@ -21,7 +21,7 @@ def convert_id_to_dataset_name(id: int) -> str:
         return matching[0]
     elif len(matching) == 0:
         raise FileNotFoundError("No folder fitting ID")
-    raise NotImplementedError("Too many potential folder fitting ID")
+    raise NotImplementedError(f"Too many potential folders for ID {id}")
 
 
 def get_results_folder(id: int) -> Path:

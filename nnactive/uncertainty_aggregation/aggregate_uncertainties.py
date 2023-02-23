@@ -70,11 +70,15 @@ def aggregate_uncertainties_per_image(
         patch_size : Patch size of an input patch that should be aggregated
         mean (bool, optional): If the mean of the patch should be scored, if False, the sum is stored (specific for whole_patch_aggregation). Defaults to True.
     """
+    assert len(patch_size) == len(np_image.shape)
+    kernel_size = list(
+        max(patch_size[i], np_image.shape[i]) for i in range(len(patch_size))
+    )
     # perform various aggregation methods
-    patch_score = whole_patch_aggregation(np_image, patch_size, mean)
+    patch_score = whole_patch_aggregation(np_image, kernel_size, mean)
     # save the aggregated uncertainties
     save_aggregated_uncertainties(
-        image_name, target_folder, patch_size, patch_score=patch_score
+        image_name, target_folder, kernel_size, patch_score=patch_score
     )
 
 

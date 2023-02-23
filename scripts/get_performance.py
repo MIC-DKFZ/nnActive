@@ -3,6 +3,7 @@ import subprocess
 from argparse import ArgumentParser
 from pathlib import Path
 
+from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import (
     convert_id_to_dataset_name,
@@ -24,7 +25,8 @@ def main():
     args = parser.parse_args()
     dataset_id = args.dataset_id
 
-    trainer = "nnUNetDebugTrainer"
+    config = ActiveConfig.get_from_id(dataset_id)
+
     images_path = get_raw_path(dataset_id) / "imagesVal"
     labels_path = get_raw_path(dataset_id) / "labelsVal"
     loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
@@ -39,7 +41,7 @@ def main():
         / "summary.json"
     )
 
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c 3d_fullres -i {images_path} -o {pred_path} -tr {trainer}"
+    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model} -i {images_path} -o {pred_path} -tr {config.trainer}"
     subprocess.call(ex_command, shell=True)
 
     os.makedirs(loop_results_path.parent, exist_ok=True)

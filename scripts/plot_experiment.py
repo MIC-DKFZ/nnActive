@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 from argparse import ArgumentParser
@@ -43,5 +42,4 @@ if __name__ == "__main__":
     x = "Loop"
     y = "Mean Dice"
     sns.lineplot(data=df, x=x, y=y, ax=ax)
-    plt.savefig(experiment_results_path / "")
     plt.savefig("test.pdf")

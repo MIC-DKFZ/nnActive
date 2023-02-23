@@ -143,7 +143,7 @@ def convert_dataset_to_partannotated(
         )  # basedataset/dataset.json is not supposed to change!
 
         # Copy all data except for labelsTr to target_dir and dataset.json
-        copy_folders = ["imagesTr", "imagesTs", "labelsTs"]
+        copy_folders = ["imagesTr", "imagesTs", "labelsTs", "imagesVal", "labelsVal"]
         for copy_folder in copy_folders:
             if copy_folder in os.listdir(base_dir):
                 shutil.copytree(base_dir / copy_folder, target_dir / copy_folder)
@@ -226,7 +226,6 @@ def get_patches_for_partannotation(
         patch_func(seg_names=seg_names, **patch_func_kwargs) + patches
     )
     return patches
-
 
 
 def dummy_patch_func(*args, **kwargs) -> list[Patch]:

@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 
 from nnactive.calculate_uncertainties import write_uncertainties_from_softmax_preds
+from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import get_raw_path, get_results_path, read_dataset_json
 from nnactive.query_patches import query_most_uncertain_patches
@@ -15,17 +16,31 @@ def main():
     parser = ArgumentParser()
     # TODO: help
     parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("-u", "--uncertainty_type", type=str, default="pred_entropy")
-    parser.add_argument("-n", "--num_patches", type=int, default=10)
+    parser.add_argument(
+        "-u", "--uncertainty_type", type=str, default=None
+    )  # default="pred_entropy")
+    parser.add_argument("-n", "--num_patches", type=int, default=None)
+    parser.add_argument("-s", "--patch_size", type=int, default=None)
     parser.add_argument("--loop", type=int, default=None)
     args = parser.parse_args()
     dataset_id = args.dataset_id
-    uncertainty_type = args.uncertainty_type
-    num_patches = args.num_patches
+    patch_size = args.patch_size
     loop = args.loop
 
-    # patch_size: tuple[int] = nnUNetPlans.json["configurations"]["3d_fullres"]["patch_size"]
-    patch_size = (10, 10, 10)
+    # patch_size: tuple[int] = nnUNetPlans.json["configurations"]["3d_fullres"]["patch_size"
+
+    config = ActiveConfig.get_from_id(dataset_id)
+
+    uncertainty_type = args.uncertainty_type
+    if uncertainty_type is None:
+        uncertainty_type = config.uncertainty
+    num_patches = args.num_patches
+    if num_patches is None:
+        num_patches = config.query_size
+    if patch_size is not None:
+        patch_size = list([patch_size] * 3)
+    else:
+        patch_size = config.patch_size
 
     raw_dataset_path = get_raw_path(dataset_id)
     dataset_json_path = raw_dataset_path / "dataset.json"

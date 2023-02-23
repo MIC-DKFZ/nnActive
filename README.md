@@ -66,23 +66,21 @@ To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_00
 
 ## Active Learning Setup
 ### Prepare Source Dataset (Fully Annotated)
+Create Raw Data:
+```bash
+nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
+```
+
 1. Create Validation Split
 ```bash
-python scripts/create_val_split.py
+python scripts/create_val_split.py -d 4
 ```
-Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
+Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
 
-2. Go into nnUNet_raw and copy imagesTr and labelsTr into other folders. e.g.
-```bash
-mv -r imagesTr imagesTr_original
-mv -r labelsTr labelsTr_original
-mv -r imagesVal imagesVal_original
-mv -r labelsVal labelsVal_original
-```
 3. Obtain nnU-Net preprocessing instructions
 ```bash
 nnUNetv2_extract_fingerprint -d 4
-nnUnetv2_plan_experiment -d 4
+nnUNetv2_plan_experiment -d 4
 ```
 4. Resample images
 ```bash
@@ -95,16 +93,25 @@ python scripts/resample_nnunet_dataset -d 4
 resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
 Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
 ### Create Partially annotated dataset
-5. Create Dataset
+5. Create Config and Set Up AL experiment folder
+    - [ ] TODO: make this generalizable
 ```bash
-python nnactive/convert_to_partannotated.py -d 4
+python scripts/setup_al_experiment.py -d 504
+```
+
+6. Create Dataset
+```bash
+python scripts/convert_to_partannotated.py -d 4
 ```
 Creates dataset with offset of 500. In this case dataset 504.
 Creates: 
-1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
-2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
-6. Create Plans
+    1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
+    2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
+
+
+7. Create Plans
 ```bash
+nnUNetv2_extract_fingerprint -d 504
 nnUNetv2_plan_experiment -d 504 
 ```
 
@@ -125,6 +132,13 @@ Alternative:
 python scripts/train_nnUNet_ensemble.py -d 504
 ```
 
+### Prediction on external Validation/Test Set
+#### nnUNet
+```bash
+python scripts/get_performance.py -d 504
+```
+Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
+
 ### Pool Prediction Step
 #### Manual
 for each fold X in (0, 1, 2, 3, 4):
@@ -135,12 +149,6 @@ nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-pa
 ```bash
 python scripts/predict_nnUNet_ensemble.py -d 504
 ```
-
-### Prediction on external Validation/Test Set
-```bash
-python scripts/get_performance.py
-```
-Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
 
 
 ### Query Step
