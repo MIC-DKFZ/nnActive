@@ -19,6 +19,10 @@ from nnactive.data.create_empty_masks import (
 )
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
+from nnactive.query.random import generate_random_patches
+from nnactive.results.utils import (
+    convert_id_to_dataset_name as nnactive_id_to_dataset_name,
+)
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -81,43 +85,66 @@ def convert_dataset_to_partannotated(
     rewrite: bool = False,
     force: bool = False,
 ):
+    # All if this logic is suboptimal better delete if any conflict!
+    # # check if target_id already exists
+    # exists_name = None
+    # already_exists = False
+    # try:
+    #     # TODO: Add case for nnU-Net preprocessed etc. already exists!
+    #     exists_name = convert_id_to_dataset_name(target_id)
+    #     print(f"Dataset with ID {target_id} already exists under name {exists_name}.")
+    #     already_exists = True
+    # except:
+    #     pass
+    # # remove Folder if target_id dataset already exists and rewrite
+    # if already_exists:
+    #     remove_folders = [
+    #         folder / exists_name
+    #         for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]
+    #     ]
+    #     for remove_folder in remove_folders:
+    #         if remove_folder.exists():
+    #             print(f"Found folder: {remove_folder}")
+    #             if force:
+    #                 shutil.rmtree(remove_folder)
+    #             if rewrite:
+    #                 val = input("Should this folder be deleted? [y/n]")
+    #                 if val == "y":
+    #                     shutil.rmtree(remove_folder)
 
-    # check if target_id already exists
-    exists_name = None
-    already_exists = False
-    try:
-        # TODO: Add case for nnU-Net preprocessed etc. already exists!
-        exists_name = convert_id_to_dataset_name(target_id)
-        print(f"Dataset with ID {target_id} already exists under name {exists_name}.")
-        already_exists = True
-    except:
-        pass
-    # remove Folder if target_id dataset already exists and rewrite
-    if already_exists:
-        remove_folders = [
-            folder / exists_name
-            for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]
-        ]
-        for remove_folder in remove_folders:
-            if remove_folder.exists():
-                print(f"Found folder: {remove_folder}")
-                if force:
-                    shutil.rmtree(remove_folder)
-                if rewrite:
-                    val = input("Should this folder be deleted? [y/n]")
-                    if val == "y":
-                        shutil.rmtree(remove_folder)
-
-            else:
-                print(f"Found no folder: {remove_folder}")
-                print("Proceed as if no ID conflict")
+    #         else:
+    #             print(f"Found no folder: {remove_folder}")
+    #             print("Proceed as if no ID conflict")
 
     # logic for creating partially annotated dataset
-    if (
-        not already_exists
-        or (already_exists and rewrite is True)
-        or (already_exists and force)
-    ):
+    # if (
+    #     not already_exists
+    #     or (already_exists and rewrite is True)
+    #     or (already_exists and force)
+    # ):
+    already_exists = False
+    try:
+        exists_name = convert_id_to_dataset_name(target_id)
+        print(
+            f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
+        )
+        already_exists = True
+    except RuntimeError:
+        print("No naming conflict with nnU-Net")
+    try:
+        exists_name = nnactive_id_to_dataset_name(target_id)
+        print(
+            f"Dataset with ID {target_id} already exists in nnActive under name {exists_name}."
+        )
+        already_exists = True
+    except FileNotFoundError:
+        print("No naming conflict with nnActive")
+
+    if already_exists:
+        raise NotImplementedError(
+            "Dataset ID already exists, check corresponding folders."
+        )
+    if not already_exists:
         # load base_dataset_json
         base_dataset: str = convert_id_to_dataset_name(base_id)
         base_dataset_json: dict = read_dataset_json(base_dataset)
@@ -178,8 +205,6 @@ def convert_dataset_to_partannotated(
 
         loop_json = {"patches": patches}
         save_loop(target_dir, loop_json, 0)
-    else:
-        print("No Override")
 
 
 def get_patches_for_partannotation(
@@ -222,9 +247,15 @@ def get_patches_for_partannotation(
         for i in range(full_images)
     ]
 
-    patches: list[Patch] = (
-        patch_func(seg_names=seg_names, **patch_func_kwargs) + patches
+    patches_partial = generate_random_patches(
+        file_ending,
+        base_labelsTr_dir,
+        [48, 224, 224],
+        n_patches=32,
+        labeled_patches=patches,
+        seed=12345,
     )
+    patches = patches_partial + patches
     return patches
 
 

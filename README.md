@@ -93,13 +93,7 @@ python scripts/resample_nnunet_dataset -d 4
 resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
 Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
 ### Create Partially annotated dataset
-5. Create Config and Set Up AL experiment folder
-    - [ ] TODO: make this generalizable
-```bash
-python scripts/setup_al_experiment.py -d 504
-```
-
-6. Create Dataset
+5. Create Dataset
 ```bash
 python scripts/convert_to_partannotated.py -d 4
 ```
@@ -109,10 +103,16 @@ Creates:
     2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
 
 
-7. Create Plans
+6. Create Plans
 ```bash
 nnUNetv2_extract_fingerprint -d 504
 nnUNetv2_plan_experiment -d 504 
+```
+
+7. Create Config and Set Up AL experiment folder
+    - [ ] TODO: make this generalizable
+```bash
+python scripts/setup_al_experiment.py -d 504
 ```
 
 ## Active Learning Workflow

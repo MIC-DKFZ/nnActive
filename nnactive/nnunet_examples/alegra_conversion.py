@@ -226,8 +226,8 @@ def generate_dataset_with_only_patched(
 
 
 if __name__ == "__main__":
-    valset_predictions_dir = "/home/isensee/drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/HMGU_2021_MurineAirwaySegmentation/nnUNet_parameters/3d_fullres/Task145_LungAirwaySegmentation/nnUNetTrainerV2_airwayAug_new__AirwaySegPlanner/predictedValSet"
-    raw_dataset_old_dir = "/home/isensee/drives/E132-Rohdaten/nnUNet/nnUNet_raw_data_base/nnUNet_raw_data/Task145_LungAirwaySegmentation"
+    valset_predictions_dir = "/home/c817h/Documents/projects/nnActive/Raw-Data/Task145_LungAirwaySegmentation/predictedValSet"
+    raw_dataset_old_dir = "/home/c817h/Documents/projects/nnActive/Raw-Data/Task145_LungAirwaySegmentation"
     # need to be consistent with previous experiments
     target_spacing = (20.0, 10.318, 10.318)
     patch_size = (48, 224, 224)
