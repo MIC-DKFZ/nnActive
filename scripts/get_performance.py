@@ -41,7 +41,7 @@ def main():
         / "summary.json"
     )
 
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model} -i {images_path} -o {pred_path} -tr {config.trainer}"
+    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer}"
     subprocess.call(ex_command, shell=True)
 
     os.makedirs(loop_results_path.parent, exist_ok=True)

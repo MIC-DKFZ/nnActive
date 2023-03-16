@@ -45,7 +45,7 @@ def generate_random_patches(
     seed: int = None,
     trials_per_img: int = 6000,
 ) -> list[Patch]:
-    """_summary_
+    """Generates random patches based on randomly drawing starting indices fitting inside the dataset.
 
     Args:
         file_ending (str): _description_
@@ -100,7 +100,7 @@ def generate_random_patches(
                 # check if patch is valid
                 if not does_overlap(iter_patch_loc, iter_patch_size, selected_array):
                     patches.append(Patch(img_name, iter_patch_loc, iter_patch_size))
-                    print(f"Creating Patch with iteration: {num_tries}")
+                    # print(f"Creating Patch with iteration: {num_tries}")
                     labeled = True
                     break
 

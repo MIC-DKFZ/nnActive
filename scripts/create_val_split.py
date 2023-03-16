@@ -43,16 +43,23 @@ def create_test_datasets(
     ]
     image_names = _clean_file_ending(image_names)
 
-    def _return_true_if_string_in_list_set(string: str, list_set: list[str]):
+    # deprecated due to naming issues in general.
+    # def _return_true_if_string_in_list_set(string: str, list_set: list[str]):
+    #     for list_string in list_set:
+    #         if string[: len(list_string)] == list_string:
+    #             return True
+    #     return False
+
+    def _return_true_if_file_in_list_set(string: str, list_set: list[str]) -> bool:
         for list_string in list_set:
-            if string[: len(list_string)] == list_string:
+            if "_".join(string.split("_")[:-1]) == list_string:
                 return True
         return False
 
     val_images = [
         image_name
         for image_name in image_names
-        if _return_true_if_string_in_list_set(image_name, val_segs)
+        if _return_true_if_file_in_list_set(image_name, val_segs)
     ]
     print(
         f"Moving {len(val_segs)} out {len(val_segs)+len(seg_names)} Label Maps to Validation Data"

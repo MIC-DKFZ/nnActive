@@ -8,7 +8,7 @@ pip install -e '.[dev]'
 ```
 
 ## Set up nnActive
-1. set up nnUnetv2
+1. set up nnUNetv2
 2. export nnActive_results=`path...`
 
 ## Contributing
@@ -106,7 +106,10 @@ Creates:
 6. Create Plans
 ```bash
 nnUNetv2_extract_fingerprint -d 504
-nnUNetv2_plan_experiment -d 504 
+nnUNetv2_plan_experiment -d 504 -c 3d_fullres
+
+# Alternatively:
+nnUNetv2_plan_and_preprocess -d 504 -c 3d_fullres -np 4
 ```
 
 7. Create Config and Set Up AL experiment folder
@@ -119,7 +122,7 @@ python scripts/setup_al_experiment.py -d 504
 ### Training Step
 Plan & Preprocess
 ```bash
-nnUNetv2_preprocess -d 504 
+nnUNetv2_preprocess -d 504 -c 3d_fullres -np 4
 ```
 #### Manual
 for each fold X in (0, 1, 2, 3, 4):

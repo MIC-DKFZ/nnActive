@@ -25,3 +25,13 @@ def read_dataset_json(dataset_id: int):
     ) as file:
         dataset_json = json.load(file)
     return dataset_json
+
+
+def get_patch_size(dataset_id: int, config: str = "3d_fullres"):
+    with open(
+        NNUNET_PREPROCESSED
+        / convert_id_to_dataset_name(dataset_id)
+        / "nnUNetPlans.json"
+    ) as file:
+        plans = json.load(file)
+    return plans["configurations"][config]["patch_size"]

@@ -21,7 +21,7 @@ def main():
 
     for fold in range(num_folds):
         output_fold_path = output_path / f"fold_{fold}"
-        ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model} -i {images_path} -o {output_fold_path} -tr {config.trainer} -f {fold} --save_probabilities"
+        ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {output_fold_path} -tr {config.trainer} -f {fold} --save_probabilities"
         # print(ex_command)
         subprocess.call(ex_command, shell=True)
 

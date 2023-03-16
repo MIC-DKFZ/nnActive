@@ -13,13 +13,14 @@ FILENAME = "config.json"
 
 @dataclass
 class ActiveConfig:
-    starting_budget: str  # how was starting budget created?
-    trainer: str  # e.g. nnUNetDebugTrainer
-    model: str  # 3d_fullres
-    uncertainty: str  # mutual_information
-    aggregation: str  # patch Currently holds no meaning
-    query_size: int  # how many samples are queried
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
+    starting_budget: str = "standard"  # how was starting budget created?
+    trainer: str = "nnUNetTrainer_20epochs"  # e.g. nnUNetDebugTrainer
+    model_config: str = "3d_fullres"  # 3d_fullres
+    uncertainty: str = "random"  # mutual_information
+    aggregation: str = "patch"  # patch Currently holds no meaning
+    query_size: int = 20  # how many samples are queried
+    # patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:
@@ -34,5 +35,6 @@ class ActiveConfig:
 
     def save_id(self, id: int):
         save_path: Path = get_results_folder(id) / FILENAME
+        print(f"Saving Config File to {save_path}")
         with open(save_path, "w") as file:
             json.dump(self.__dict__, file)

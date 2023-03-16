@@ -19,6 +19,7 @@ from nnactive.data.create_empty_masks import (
 )
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
+from nnactive.nnunet.utils import get_patch_size
 from nnactive.query.random import generate_random_patches
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
@@ -29,6 +30,7 @@ parser.add_argument(
     "-d",
     "--dataset-id",
     type=int,
+    required=True,
     help="dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
 )
 parser.add_argument(
@@ -47,12 +49,14 @@ parser.add_argument(
 parser.add_argument(
     "--offset", type=int, default=500, help="ouput_id = dataset_id + offset"
 )
-parser.add_argument("--seed", default=12345)
+parser.add_argument(
+    "--seed", default=12345, type=int, help="Random seed for creation of datasets"
+)
 
 parser.add_argument(
     "--full-labeled",
     type=float,
-    default=0.1,
+    default=0,
     help="0.X = percentage, int = full number of completely annotated images",
 )  # how to make float and integers
 parser.add_argument(
@@ -62,11 +66,23 @@ parser.add_argument(
     help="minimal amount of examples per class -- not implemented yet",
 )  # int
 parser.add_argument(
-    "--partial-labeled",
-    type=str,
-    default=None,
-    help="Labeling Scheme for partial annotation -- not implemented yet",
+    "--num-patches",
+    type=int,
+    default=0,
+    help="Number of randomly drawn patches",
 )  # how to make float and integers
+parser.add_argument(
+    "--patch-size",
+    type=int,
+    default=None,
+    help="patch size of the object, default is nnU-Net Patch Size",
+)
+parser.add_argument(
+    "--name-suffix",
+    type=str,
+    default="partanno",
+    help="Suffix for the name of the output dataset",
+)
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
 NNUNET_PREPROCESSED = (
@@ -79,9 +95,11 @@ def convert_dataset_to_partannotated(
     base_id: int,
     target_id: int,
     full_images: Union[float, int],
-    patch_func: Callable,
+    num_patches: int,
+    patch_size: tuple[int],
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
+    seed: int = 12345,
     rewrite: bool = False,
     force: bool = False,
 ):
@@ -191,11 +209,13 @@ def convert_dataset_to_partannotated(
         # create patches list for dataset creation
         patches = get_patches_for_partannotation(
             full_images,
-            patch_func,
+            num_patches,
+            patch_size,
             file_ending,
             base_labelsTr_dir,
             target_labelsTr_dir,
             patch_func_kwargs=patch_kwargs,
+            seed=seed,
         )
 
         # Create labels from patches
@@ -209,11 +229,13 @@ def convert_dataset_to_partannotated(
 
 def get_patches_for_partannotation(
     full_images: Union[int, float],
-    patch_func: callable,
+    num_patches: int,
+    patch_size: tuple[int],
     file_ending: str,
     base_labelsTr_dir: Path,
     target_labelsTr_dir: Path,
     patch_func_kwargs: dict = None,
+    seed: int = 12345,
 ) -> list[Patch]:
     """Creates patches based on annotation strategies.
 
@@ -237,7 +259,7 @@ def get_patches_for_partannotation(
 
     # Current implementation only works if all data has a corresponding lablesTr
 
-    rand_np_state = np.random.RandomState(random_seed)
+    rand_np_state = np.random.RandomState(seed)
     rand_np_state.shuffle(seg_names)
 
     if full_images < 1:
@@ -246,21 +268,19 @@ def get_patches_for_partannotation(
         Patch(file=seg_names.pop(), coords=[0, 0, 0], size="whole")
         for i in range(full_images)
     ]
+    print(f"# whole image patches: {len(patches)}")
 
     patches_partial = generate_random_patches(
         file_ending,
         base_labelsTr_dir,
-        [48, 224, 224],
-        n_patches=32,
+        patch_size,
+        n_patches=num_patches,
         labeled_patches=patches,
-        seed=12345,
+        seed=seed,
     )
+    print(f"# patches: {len(patches)}")
     patches = patches_partial + patches
     return patches
-
-
-def dummy_patch_func(*args, **kwargs) -> list[Patch]:
-    return []
 
 
 if __name__ == "__main__":
@@ -268,9 +288,9 @@ if __name__ == "__main__":
     # TODO: rewrite arguements
     full_images = args.full_labeled
 
-    partial_labeled = args.partial_labeled
     minimal_example_per_class = args.minimal_example_per_class
-    assert partial_labeled is None  # partial labeling not implemented yet
+    num_patches = args.num_patches
+
     assert (
         minimal_example_per_class is None
     )  # minimal examples per class not implemented yet
@@ -278,16 +298,28 @@ if __name__ == "__main__":
     base_dataset_id = args.dataset_id
     target_id = args.output_id
     id_offset = args.offset
-    random_seed = args.seed
+    seed = args.seed
     rewrite = args.force_override
+    name_suffx = args.name_suffix
+
+    patch_size = (
+        [args.patch_size] * 3
+        if args.patch_size is not None
+        else get_patch_size(base_dataset_id)
+    )
+
     if not isinstance(target_id, int):
         target_id = base_dataset_id + id_offset
     print(f"output_id is {target_id}")
+    print(args)
     convert_dataset_to_partannotated(
         base_dataset_id,
         target_id,
         full_images,
+        name_suffix=name_suffx,
         rewrite=rewrite,
-        patch_func=dummy_patch_func,
+        patch_size=patch_size,
+        num_patches=num_patches,
+        seed=seed,
     )
     generate_custom_splits_file(target_id, 0, 5)

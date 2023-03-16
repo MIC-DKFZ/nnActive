@@ -12,11 +12,11 @@ def main():
     dataset_id = args.dataset_id
 
     num_folds = 5
-    
+
     config = ActiveConfig.get_from_id(dataset_id)
 
     for fold in range(num_folds):
-        ex_command = f"nnUNetv2_train {dataset_id} {config.model} {fold} -tr {config.trainer}"
+        ex_command = f"nnUNetv2_train {dataset_id} {config.model_config} {fold} -tr {config.trainer}"
         # print(ex_command)
         subprocess.call(ex_command, shell=True)
 
