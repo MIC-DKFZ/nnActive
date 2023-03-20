@@ -3,6 +3,8 @@ import os
 import subprocess
 from argparse import ArgumentParser
 from pathlib import Path
+
+import numpy as np
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.loops.loading import get_sorted_loop_files
@@ -17,6 +19,57 @@ from nnactive.nnunet.utils import (
 from nnactive.paths import get_nnActive_results
 
 nnActive_results = get_nnActive_results()
+
+
+def get_mean_foreground_cv(summary_cross_val_dict, n_folds):
+    """
+    Get the mean over the foreground means across folds.
+    Each fold has entry "foreground_mean" representing the mean over all foreground classes across images.
+    Args:
+        summary_cross_val_dict: Dictionary with the individual metrics per fold
+        n_folds: number of folds
+
+    Returns:
+        Dict: mean dict containing the mean foreground metrics across fold
+    """
+    all_foreground_mean = []
+    for fold in range(n_folds):
+        all_foreground_mean.append(
+            summary_cross_val_dict[f"fold_{fold}"]["foreground_mean"]
+        )
+    # Iterate over each metric (e.g. Dice, FN, FP, ...) and take the mean
+    mean_dict = {}
+    for key in all_foreground_mean[0].keys():
+        mean_dict[key] = np.array([d[key] for d in all_foreground_mean]).mean()
+    return mean_dict
+
+
+def get_mean_cv(summary_cross_val_dict, n_folds):
+    """
+    Get the mean of the individual classes across folds.
+    Each fold has entry "mean" representing the mean over the individual classes across images.
+    Structure "mean": {'1': Dice: .., FN ..., ... '2': Dice:..., ...}
+    Args:
+        summary_cross_val_dict: Dictionary with the individual metrics per fold
+        n_folds: number of folds
+
+    Returns:
+        Dict: per class dict containing the mean metrics per class across folds
+    """
+    mean_dicts_list = []
+    for fold in range(n_folds):
+        mean_dicts_list.append(summary_cross_val_dict[f"fold_{fold}"]["mean"])
+    class_dicts = {}
+
+    # First iterate over class indices
+    for class_idx in mean_dicts_list[0].keys():
+        class_dicts[class_idx] = {}
+        # Iterate over each metric (e.g. Dice, FN, FP, ...) and take the mean for each class
+        for key in mean_dicts_list[0][class_idx].keys():
+            class_dicts[class_idx][key] = np.array(
+                [d[class_idx][key] for d in mean_dicts_list]
+            ).mean()
+    return class_dicts
 
 
 def main():
@@ -35,6 +88,7 @@ def main():
     dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
     plans_identifier = "nnUNetPlans"
     plans_path = get_preprocessed_path(dataset_id) / f"{plans_identifier}.json"
+    splits_path = get_preprocessed_path(dataset_id) / "splits_final.json"
 
     loop_results_path: Path = (
         nnActive_results
@@ -52,9 +106,14 @@ def main():
     ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"
     subprocess.call(ex_command, shell=True)
 
+    # Summarize the cross validation performance as json. Might be interesting to track across loops
     print("Creating a summary of the cross validation results from training...")
+    with open(splits_path, "r") as f:
+        n_folds = len(json.load(f))
     summary_cross_val_dict = {}
-    for fold in [0, 1, 2, 3, 4]:
+
+    # first save the individual cross val dicts by simply appending them with key fold_X
+    for fold in range(n_folds):
         trained_model_path = get_output_folder(
             dataset_id, trainer, plans_identifier, configuration, fold
         )
@@ -62,6 +121,16 @@ def main():
         with open(summary_json_train, "r") as f:
             summary_dict_train = json.load(f)
         summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
+
+    # get foreground mean across folds
+    foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, n_folds)
+    # get the per class mean across folds
+    per_class_mean_cv = get_mean_cv(summary_cross_val_dict, n_folds)
+    summary_cross_val_dict["mean"] = {}
+    summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
+    summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv
+
+    # save the cv results
     with open(loop_summary_cross_val_json, "w") as f:
         json.dump(summary_cross_val_dict, f, indent=2)
 
