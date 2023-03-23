@@ -8,7 +8,7 @@ from nnactive.paths import get_nnActive_results
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset", type=int, required=True, help="Dataset ID")
-    parser.add_argument("--trainer", type=str, default="nnUNetTrainer_20epochs")
+    parser.add_argument("--trainer", type=str, default="nnUNetTrainer_200epochs")
     parser.add_argument("-p", "--patch-size", type=int, default=None, help="Patch Size")
     parser.add_argument(
         "--base_id",
@@ -16,13 +16,15 @@ if __name__ == "__main__":
         default=None,
         help="Dataset from which patch size is taken",
     )
-    parser.add_argument("-qs", "--query-size", type=int, default = 10)
+    parser.add_argument("-qs", "--query-size", type=int, default=10)
     parser.add_argument("--uncertainty", type=str, default="random")
+    parser.add_argument("--query-steps", type=int, default=10)
 
     args = parser.parse_args()
     trainer = args.trainer
     query_size = args.query_size
     uncertainty = args.uncertainty
+    query_steps = args.query_steps
 
     if args.patch_size is None and args.base_id is None:
         raise ValueError("Either patch_size or base_id have to be set")
@@ -39,7 +41,13 @@ if __name__ == "__main__":
 
     save_path = results_path / dataset_name
 
-    config = ActiveConfig(trainer=trainer, patch_size=patch_size, )
+    config = ActiveConfig(
+        trainer=trainer,
+        patch_size=patch_size,
+        trainer=trainer,
+        query_size=query_size,
+        query_steps=query_steps,
+    )
 
     os.makedirs(save_path, exist_ok=True)
 

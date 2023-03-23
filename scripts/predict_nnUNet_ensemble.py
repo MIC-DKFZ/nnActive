@@ -13,7 +13,10 @@ def main():
     dataset_id = args.dataset_id
 
     num_folds = 5
-    # trainer = "nnUNetDebugTrainer"
+    predict_nnUNet_ensemble(dataset_id, num_folds)
+
+
+def predict_nnUNet_ensemble(dataset_id, num_folds=5):
     config = ActiveConfig.get_from_id(dataset_id)
 
     images_path = get_raw_path(dataset_id) / "imagesTr"
@@ -22,7 +25,6 @@ def main():
     for fold in range(num_folds):
         output_fold_path = output_path / f"fold_{fold}"
         ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {output_fold_path} -tr {config.trainer} -f {fold} --save_probabilities"
-        # print(ex_command)
         subprocess.call(ex_command, shell=True)
 
 

@@ -11,9 +11,11 @@ def main():
 
     args = parser.parse_args()
     dataset_id = args.dataset_id
-    num_folds = 5
-    loop_val = None
 
+    update_step(dataset_id)
+
+
+def update_step(dataset_id, num_folds=5, loop_val=None):
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
     target_dir = data_path / "labelsTr"

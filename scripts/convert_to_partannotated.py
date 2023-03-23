@@ -41,12 +41,6 @@ parser.add_argument(
     help="target dataset ID for nnU-Net, default base on offset",
 )
 parser.add_argument(
-    "-f",
-    "--force-override",
-    action="store_true",
-    help="Force overriding output dataset",
-)
-parser.add_argument(
     "--offset", type=int, default=500, help="ouput_id = dataset_id + offset"
 )
 parser.add_argument(
@@ -100,46 +94,7 @@ def convert_dataset_to_partannotated(
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
     seed: int = 12345,
-    rewrite: bool = False,
-    force: bool = False,
 ):
-    # All if this logic is suboptimal better delete if any conflict!
-    # # check if target_id already exists
-    # exists_name = None
-    # already_exists = False
-    # try:
-    #     # TODO: Add case for nnU-Net preprocessed etc. already exists!
-    #     exists_name = convert_id_to_dataset_name(target_id)
-    #     print(f"Dataset with ID {target_id} already exists under name {exists_name}.")
-    #     already_exists = True
-    # except:
-    #     pass
-    # # remove Folder if target_id dataset already exists and rewrite
-    # if already_exists:
-    #     remove_folders = [
-    #         folder / exists_name
-    #         for folder in [NNUNET_RAW, NNUNET_PREPROCESSED, NNUNET_RESULTS]
-    #     ]
-    #     for remove_folder in remove_folders:
-    #         if remove_folder.exists():
-    #             print(f"Found folder: {remove_folder}")
-    #             if force:
-    #                 shutil.rmtree(remove_folder)
-    #             if rewrite:
-    #                 val = input("Should this folder be deleted? [y/n]")
-    #                 if val == "y":
-    #                     shutil.rmtree(remove_folder)
-
-    #         else:
-    #             print(f"Found no folder: {remove_folder}")
-    #             print("Proceed as if no ID conflict")
-
-    # logic for creating partially annotated dataset
-    # if (
-    #     not already_exists
-    #     or (already_exists and rewrite is True)
-    #     or (already_exists and force)
-    # ):
     already_exists = False
     try:
         exists_name = convert_id_to_dataset_name(target_id)
@@ -299,7 +254,6 @@ if __name__ == "__main__":
     target_id = args.output_id
     id_offset = args.offset
     seed = args.seed
-    rewrite = args.force_override
     name_suffx = args.name_suffix
 
     patch_size = (
@@ -317,7 +271,6 @@ if __name__ == "__main__":
         target_id,
         full_images,
         name_suffix=name_suffx,
-        rewrite=rewrite,
         patch_size=patch_size,
         num_patches=num_patches,
         seed=seed,

@@ -15,11 +15,12 @@ FILENAME = "config.json"
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
     starting_budget: str = "standard"  # how was starting budget created?
-    trainer: str = "nnUNetTrainer_20epochs"  # e.g. nnUNetDebugTrainer
+    trainer: str = "nnUNetTrainer_200epochs"  # e.g. nnUNetDebugTrainer
     model_config: str = "3d_fullres"  # 3d_fullres
     uncertainty: str = "random"  # mutual_information
     aggregation: str = "patch"  # patch Currently holds no meaning
     query_size: int = 20  # how many samples are queried
+    query_steps: int = 10
     # patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
 
     @classmethod

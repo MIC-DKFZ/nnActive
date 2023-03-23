@@ -25,6 +25,10 @@ def main():
     args = parser.parse_args()
     dataset_id = args.dataset_id
 
+    get_performance(dataset_id)
+
+
+def get_performance(dataset_id):
     config = ActiveConfig.get_from_id(dataset_id)
 
     images_path = get_raw_path(dataset_id) / "imagesVal"

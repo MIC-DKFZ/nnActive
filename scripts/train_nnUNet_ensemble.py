@@ -13,6 +13,10 @@ def main():
 
     num_folds = 5
 
+    train_nnUNet_ensemble(dataset_id, num_folds)
+
+
+def train_nnUNet_ensemble(dataset_id, num_folds=5):
     config = ActiveConfig.get_from_id(dataset_id)
 
     for fold in range(num_folds):
