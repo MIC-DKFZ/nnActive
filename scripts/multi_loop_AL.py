@@ -31,7 +31,7 @@ if __name__ == "__main__":
         train_nnUNet_ensemble(dataset_id)
         get_performance(dataset_id)
         predict_nnUNet_ensemble(dataset_id)
-        if al_iteration == config.query_steps - 1:
+        if al_iteration < config.query_steps - 1:
             query_step(
                 dataset_id, config.patch_size, config.uncertainty, config.query_size
             )

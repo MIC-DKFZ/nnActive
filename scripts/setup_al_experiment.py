@@ -9,7 +9,9 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset", type=int, required=True, help="Dataset ID")
     parser.add_argument("--trainer", type=str, default="nnUNetTrainer_200epochs")
-    parser.add_argument("-p", "--patch-size", type=int, default=None, help="Patch Size")
+    parser.add_argument(
+        "-p", "--patch-size", nargs="+", type=int, default=None, help="Patch Size"
+    )
     parser.add_argument(
         "--base_id",
         type=int,
@@ -44,7 +46,7 @@ if __name__ == "__main__":
     config = ActiveConfig(
         trainer=trainer,
         patch_size=patch_size,
-        trainer=trainer,
+        uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
     )

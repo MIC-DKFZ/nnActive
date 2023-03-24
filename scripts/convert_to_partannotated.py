@@ -233,7 +233,7 @@ def get_patches_for_partannotation(
         labeled_patches=patches,
         seed=seed,
     )
-    print(f"# patches: {len(patches)}")
+    print(f"# patches: {len(patches_partial)}")
     patches = patches_partial + patches
     return patches
 
