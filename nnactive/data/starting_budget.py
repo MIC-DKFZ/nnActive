@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import json
 import shutil
 from pathlib import Path
@@ -12,6 +13,8 @@ from rich.progress import track
 
 from nnactive.data import Patch
 from nnactive.data.create_empty_masks import create_empty_mask
+from nnactive.data.utils import get_geometry_sitk, set_geometry
+from nnactive.query_patches import does_overlap, get_label_map
 
 
 def _patch_ids_to_image_coords(
@@ -52,19 +55,17 @@ def _patch_ids_to_image_coords(
 
 
 def _compute_patch_mapping(
-    dataset_cfg: dict[str, Any],
+    file_ending: str,
     raw_path: Path,
 ) -> dict[str, tuple[int, int, int]]:
     img_sizes = {}
 
     if not (raw_path / "img_sizes.json").is_file():
-        imgs = list(
-            (raw_path / "gt_labelsTr").glob(f"**/*{dataset_cfg['file_ending']}")
-        )
+        imgs = list((raw_path / "gt_labelsTr").glob(f"**/*{file_ending}"))
 
         for path in track(imgs):
             img = sitk.ReadImage(path)
-            name = path.name.replace(dataset_cfg["file_ending"], "")
+            name = path.name.replace(file_ending, "")
             size = img.GetSize()
 
             print(f"{name}: {size}")
@@ -190,9 +191,7 @@ def make_patches_from_ground_truth(
 
     for patch in track(patches):
         img_gt = sitk.ReadImage((gt_path / patch.file))
-        spacing = img_gt.GetSpacing()
-        origin = img_gt.GetOrigin()
-        direction = np.array(img_gt.GetDirection())
+        geometry = get_geometry_sitk(img_gt)
         img_gt = sitk.GetArrayFromImage(img_gt)
 
         img_new = np.full_like(img_gt, ignore_label)
@@ -204,9 +203,7 @@ def make_patches_from_ground_truth(
         img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
 
         img_new = sitk.GetImageFromArray(img_new)
-        img_new.SetSpacing(spacing)
-        img_new.SetOrigin(origin)
-        img_new.SetDirection(direction)
+        img_new = set_geometry(img_new, **geometry)
         sitk.WriteImage(
             img_new,
             (target_path / patch.file),

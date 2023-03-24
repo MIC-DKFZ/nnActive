@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from nnunetv2.utilities.file_path_utilities import get_output_folder
+from nnactive.config import ActiveConfig
 
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import (
@@ -15,7 +16,6 @@ from nnactive.nnunet.utils import (
     get_results_path,
 )
 
-# from nnactive.paths import nnActive_results
 from nnactive.paths import get_nnActive_results
 
 nnActive_results = get_nnActive_results()
@@ -79,8 +79,11 @@ def main():
     args = parser.parse_args()
     dataset_id = args.dataset_id
 
-    trainer = "nnUNetDebugTrainer"
-    configuration = "3d_fullres"
+    get_performance(dataset_id)
+
+
+def get_performance(dataset_id):
+    config = ActiveConfig.get_from_id(dataset_id)
     images_path = get_raw_path(dataset_id) / "imagesVal"
     labels_path = get_raw_path(dataset_id) / "labelsVal"
     loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
@@ -98,8 +101,7 @@ def main():
 
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
-
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {configuration} -i {images_path} -o {pred_path} -tr {trainer}"
+    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer}"
     subprocess.call(ex_command, shell=True)
 
     os.makedirs(loop_results_path, exist_ok=True)
@@ -115,7 +117,7 @@ def main():
     # first save the individual cross val dicts by simply appending them with key fold_X
     for fold in range(n_folds):
         trained_model_path = get_output_folder(
-            dataset_id, trainer, plans_identifier, configuration, fold
+            dataset_id, config.trainer, plans_identifier, config.model_config, fold
         )
         summary_json_train = Path(trained_model_path) / "validation" / "summary.json"
         with open(summary_json_train, "r") as f:

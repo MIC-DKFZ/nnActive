@@ -8,7 +8,7 @@ pip install -e '.[dev]'
 ```
 
 ## Set up nnActive
-1. set up nnUnetv2
+1. set up nnUNetv2
 2. export nnActive_results=`path...`
 
 ## Contributing
@@ -63,32 +63,26 @@ It is structured as follows:
 `"patches"` is used to save the annotated areas and in `loop_XXX.json` only the newly annotated areas are saved.
 To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_001.json` and `loop_000.json`.
 
-## Create a validation dataset from fully annotated data
-```bash
-python scripts/create_val_split.py -d 4
-```
-
-## Create Custom partially annotated dataset from fully annotated
-```bash
-python scripts/convert_to_partannotated.py -d 4 
-```
-Creates: 
-1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
-2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
 
 ## Active Learning Setup
 ### Prepare Source Dataset (Fully Annotated)
-1. Go into nnUNet_raw and copy imagesTr and labelsTr into other folders. e.g.
+Create Raw Data:
 ```bash
-cp -r imagesTr imagesTr_original
-cp -r labelsTr labelsTr_original
+nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
 ```
-2. Obtain nnU-Net preprocessing instructions
+
+1. Create Validation Split
+```bash
+python scripts/create_val_split.py -d 4
+```
+Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
+
+3. Obtain nnU-Net preprocessing instructions
 ```bash
 nnUNetv2_extract_fingerprint -d 4
-nnUnetv2_plan_experiment -d 4
+nnUNetv2_plan_experiment -d 4
 ```
-3. Resample images
+4. Resample images
 ```bash
 python nnactive/resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
 ```
@@ -96,28 +90,39 @@ Alternatively:
 ```bash
 python scripts/resample_nnunet_dataset -d 4
 ```
-resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_orgirinal` and `labelsTr_original`
-4. Create Validation Split
-```bash
-python scripts/create_val_split.py
-```
+resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
 Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
 ### Create Partially annotated dataset
 5. Create Dataset
 ```bash
-python nnactive/convert_to_partannotated.py -d 4
+python scripts/convert_to_partannotated.py -d 4
 ```
 Creates dataset with offset of 500. In this case dataset 504.
+Creates: 
+    1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
+    2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
+
+
 6. Create Plans
 ```bash
-nnUNetv2_plan_experiment -d 504 
+nnUNetv2_extract_fingerprint -d 504
+nnUNetv2_plan_experiment -d 504 -c 3d_fullres
+
+# Alternatively:
+nnUNetv2_plan_and_preprocess -d 504 -c 3d_fullres -np 4
+```
+
+7. Create Config and Set Up AL experiment folder
+    - [ ] TODO: make this generalizable
+```bash
+python scripts/setup_al_experiment.py -d 504
 ```
 
 ## Active Learning Workflow
 ### Training Step
 Plan & Preprocess
 ```bash
-nnUNetv2_preprocess -d 504 
+nnUNetv2_preprocess -d 504 -c 3d_fullres -np 4
 ```
 #### Manual
 for each fold X in (0, 1, 2, 3, 4):
@@ -130,6 +135,13 @@ Alternative:
 python scripts/train_nnUNet_ensemble.py -d 504
 ```
 
+### Prediction on external Validation/Test Set
+#### nnUNet
+```bash
+python scripts/get_performance.py -d 504
+```
+Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
+
 ### Pool Prediction Step
 #### Manual
 for each fold X in (0, 1, 2, 3, 4):
@@ -140,12 +152,6 @@ nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-pa
 ```bash
 python scripts/predict_nnUNet_ensemble.py -d 504
 ```
-
-### Prediction on external Validation/Test Set
-```bash
-python scripts/get_performance.py
-```
-Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
 
 
 ### Query Step

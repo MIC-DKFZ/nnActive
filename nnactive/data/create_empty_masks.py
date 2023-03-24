@@ -11,6 +11,8 @@ import SimpleITK as sitk
 from nnunetv2.paths import nnUNet_raw
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
+from nnactive.data.utils import copy_geometry_sitk
+
 
 def read_dataset_json(dataset_name):
     raw_data_folder = os.path.join(nnUNet_raw, dataset_name)
@@ -50,14 +52,10 @@ def create_empty_mask(image_filename, ignore_label, save_filename):
     """
     img_itk = sitk.ReadImage(image_filename)
     img_npy = sitk.GetArrayFromImage(img_itk)
-    spacing = img_itk.GetSpacing()
-    origin = img_itk.GetOrigin()
-    direction = np.array(img_itk.GetDirection())
     img_npy.fill(ignore_label)
     img_itk_new = sitk.GetImageFromArray(img_npy)
-    img_itk_new.SetSpacing(spacing)
-    img_itk_new.SetOrigin(origin)
-    img_itk_new.SetDirection(direction)
+
+    img_itk_new = copy_geometry_sitk(img_itk_new, img_itk)
     sitk.WriteImage(img_itk_new, save_filename)
 
 

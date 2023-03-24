@@ -52,6 +52,7 @@ def save_loop(output_path: Path, loop_json: dict, loop_val: int):
     if len(loop_json["patches"]) > 0:
         assert isinstance(loop_json["patches"][0], Patch)
     save_json = loop_json.copy()
+    # TODO: SAVING DATACLASS Delete pydantic key value pairs here
     save_json["patches"] = [patch.__dict__ for patch in save_json["patches"]]
 
     with open(output_path / f"{LOOP_PATTERN}{loop_val:03d}.json", "w") as file:

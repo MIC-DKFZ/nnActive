@@ -82,7 +82,7 @@ def load_softmax_predictions(softmax_file_name: str, pred_path: Path) -> torch.T
 
 def get_pred_image_info(
     softmax_file_name: str, pred_path: Path
-) -> (np.ndarray, np.ndarray, np.ndarray):
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Get the image information (origin, spacing, direction) from a predicted segmentation.
     Currently uses the predicted segmentation from the first fold to retrieve the information.

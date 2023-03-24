@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Tuple, List, Dict
+from typing import Dict, List, Tuple
 
 import numpy as np
 import SimpleITK as sitk
@@ -308,6 +308,18 @@ def query_most_uncertain_patches(
     file_ending: str,
     ignore_label: int,
 ) -> None:
+    """Generates a list of most uncertain patches and saves them into the loop_xxx.json format.
+
+    Args:
+        aggregated_uncertainty_dir (Path): _description_
+        uncertainty_type (str): _description_
+        number_to_query (int): _description_
+        raw_dataset_dir (Path): _description_
+        loop (int): _description_
+        file_ending (str): _description_
+        ignore_label (int): _description_
+    """
+
     all_top_patches = get_most_uncertain_patches(
         aggregated_uncertainty_dir,
         uncertainty_type,
