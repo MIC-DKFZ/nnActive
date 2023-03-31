@@ -17,7 +17,7 @@ def create_test_datasets(
     target_labelsVal_dir: Path,
     target_imagesVal_dir: Path,
     file_ending: str,
-    test_size: Union[int, float] = 0.2,
+    test_size: Union[int, float] = 0.25,
     move: bool = True,
 ):
     seg_names = os.listdir(base_labelsTr_dir)
@@ -29,8 +29,8 @@ def create_test_datasets(
 
     seg_names = _clean_file_ending(seg_names)
 
-    rand_np_state = np.random.RandomState(random_seed)
-    rand_np_state.shuffle(seg_names)
+    rng = np.random.default_rng(random_seed)
+    rng.shuffle(seg_names)
     if test_size < 1:
         test_size = test_size * len(seg_names)
     test_size = int(test_size)
@@ -96,7 +96,7 @@ def copy_files(
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("--test_size", default=0.2, type=float)
+    parser.add_argument("--test_size", default=0.25, type=float)
 
     args = parser.parse_args()
     dataset_id = args.dataset_id

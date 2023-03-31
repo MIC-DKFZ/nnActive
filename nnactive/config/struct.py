@@ -20,7 +20,9 @@ class ActiveConfig:
     uncertainty: str = "random"  # mutual_information
     aggregation: str = "patch"  # patch Currently holds no meaning
     query_size: int = 20  # how many samples are queried
-    query_steps: int = 10
+    query_steps: int = 10  # how many query steps are supposed to be made
+    seed: int = 12345  # seed to be used for everything random in the experiment
+    num_processes: int = 4  # how many processes are used within nnU-Net
     # patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
 
     @classmethod

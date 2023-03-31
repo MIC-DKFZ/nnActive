@@ -7,7 +7,6 @@ from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.loops.cross_validation import kfold_cv_from_patches
 
 
-
 def generate_custom_splits_file(
     dataset_id: int, loop_count: Optional[int] = None, num_folds: int = 5
 ):
@@ -19,15 +18,12 @@ def generate_custom_splits_file(
         num_folds (int, optional): Folds vor KFoldCV. Defaults to 5.
     """
 
-
     patches = get_patches_from_loop_files(get_raw_path(dataset_id), loop_count)
 
     splits_final = kfold_cv_from_patches(num_folds, patches)
 
-    
-
     # Create path if not exists
-    prepocessed_path  =get_preprocessed_path(dataset_id)
+    prepocessed_path = get_preprocessed_path(dataset_id)
     if not (prepocessed_path).exists():
         os.makedirs(prepocessed_path)
     # save splits_file

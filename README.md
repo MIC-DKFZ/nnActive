@@ -118,6 +118,11 @@ nnUNetv2_plan_and_preprocess -d 504 -c 3d_fullres -np 4
 python scripts/setup_al_experiment.py -d 504
 ```
 
+## Active Learning whole loop
+```bash
+scripts/multi_loop_AL.py -d 504
+```
+
 ## Active Learning Workflow
 ### Training Step
 Plan & Preprocess

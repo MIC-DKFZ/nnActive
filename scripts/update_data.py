@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
+from nnactive.results.state import State
 from nnactive.update_data import update_data
 
 
@@ -36,6 +37,10 @@ def update_step(dataset_id, num_folds=5, loop_val=None):
         loop_val=loop_val,
         num_folds=num_folds,
     )
+    state = State.get_id_state(dataset_id)
+    state.update_data = True
+    state.new_loop()
+    state.save_state()
 
 
 if __name__ == "__main__":

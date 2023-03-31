@@ -9,8 +9,12 @@ from nnactive.loops.loading import (
     save_loop,
 )
 from nnactive.nnunet.utils import get_raw_path, get_results_path, read_dataset_json
-from nnactive.query.random import generate_random_patches
+from nnactive.query.random import (
+    generate_random_patches,
+    generate_random_patches_labels,
+)
 from nnactive.query_patches import query_most_uncertain_patches
+from nnactive.results.state import State
 from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
     aggregate_uncertainties_per_image,
     read_images_to_numpy,
@@ -45,11 +49,18 @@ def main():
         patch_size = list([patch_size] * 3)
     else:
         patch_size = config.patch_size
+    seed = config.seed
 
-    query_step(dataset_id, patch_size, uncertainty_type, num_patches)
+    query_step(dataset_id, patch_size, uncertainty_type, num_patches, seed)
 
 
-def query_step(dataset_id, patch_size, uncertainty_type, num_patches):
+def query_step(
+    dataset_id: int,
+    patch_size: tuple[int],
+    uncertainty_type: str,
+    num_patches: int,
+    seed: int = None,
+):
     raw_dataset_path = get_raw_path(dataset_id)
     dataset_json_path = raw_dataset_path / "dataset.json"
     base_softmax_path = get_results_path(dataset_id) / "predTr"
@@ -73,13 +84,31 @@ def query_step(dataset_id, patch_size, uncertainty_type, num_patches):
             patch_size=patch_size,
             n_patches=num_patches,
             labeled_patches=labeled_patches,
+            seed=seed + loop,
             trials_per_img=600,
         )
         # bring into loop_XXX.json format and save!
         loop_json = {"patches": patches}
 
         save_loop(raw_dataset_path, loop_json, loop)
+    elif uncertainty_type.lower() == "random-label":
+        labeled_patches = []
+        for i in range(loop):
+            labeled_patches.extend(get_patches_from_loop_files(raw_dataset_path, i))
 
+        base_path = get_raw_path(dataset_json["annotated_id"])
+
+        patches = generate_random_patches_labels(
+            file_ending,
+            seg_labels_path=base_path / "labelsTr",
+            patch_size=patch_size,
+            n_patches=num_patches,
+            labeled_patches=labeled_patches,
+            seed=seed + loop,
+            trials_per_img=600,
+        )
+        # bring into loop_XXX.json format and save!
+        loop_json = {"patches": patches}
     else:
         write_uncertainties_from_softmax_preds(base_softmax_path, uncertainty_path)
         read_images_to_numpy(
@@ -98,6 +127,9 @@ def query_step(dataset_id, patch_size, uncertainty_type, num_patches):
             file_ending,
             ignore_label,
         )
+    state = State.get_id_state(dataset_id)
+    state.query = True
+    state.save_state()
 
 
 if __name__ == "__main__":

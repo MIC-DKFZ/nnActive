@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 from nnunetv2.utilities.file_path_utilities import get_output_folder
-from nnactive.config import ActiveConfig
 
+from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import (
     convert_id_to_dataset_name,
@@ -15,8 +15,8 @@ from nnactive.nnunet.utils import (
     get_raw_path,
     get_results_path,
 )
-
 from nnactive.paths import get_nnActive_results
+from nnactive.results.state import State
 
 nnActive_results = get_nnActive_results()
 
@@ -135,6 +135,10 @@ def get_performance(dataset_id):
     # save the cv results
     with open(loop_summary_cross_val_json, "w") as f:
         json.dump(summary_cross_val_dict, f, indent=2)
+
+    state = State.get_id_state(dataset_id)
+    state.get_performance = True
+    state.save_state()
 
 
 if __name__ == "__main__":

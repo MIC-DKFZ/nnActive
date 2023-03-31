@@ -8,7 +8,9 @@ from nnactive.resample_dataset import resample_dataset
 def main():
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset_id", type=int)
+    parser.add_argument("-np", "--num-processes", type=int, default=4)
     args = parser.parse_args()
+    workers = args.num_processes
     dataset_id = args.dataset_id
     dataset_json = read_dataset_json(dataset_id)
     raw_path = get_raw_path(dataset_id)
@@ -27,7 +29,7 @@ def main():
         img_path=img_path,
         gt_path=gt_path,
         preprocessed_path=preprocessed_path,
-        n_workers=8,
+        n_workers=workers,
     )
 
     rs_img_path = raw_path / "imagesVal_original"
@@ -43,7 +45,7 @@ def main():
         img_path=img_path,
         gt_path=gt_path,
         preprocessed_path=preprocessed_path,
-        n_workers=8,
+        n_workers=workers,
     )
 
 

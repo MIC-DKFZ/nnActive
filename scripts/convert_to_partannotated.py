@@ -20,7 +20,10 @@ from nnactive.data.create_empty_masks import (
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_patch_size
-from nnactive.query.random import generate_random_patches
+from nnactive.query.random import (
+    generate_random_patches,
+    generate_random_patches_labels,
+)
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
@@ -54,11 +57,11 @@ parser.add_argument(
     help="0.X = percentage, int = full number of completely annotated images",
 )  # how to make float and integers
 parser.add_argument(
-    "--minimal-example-per-class",
-    type=int,
-    default=None,
-    help="minimal amount of examples per class -- not implemented yet",
-)  # int
+    "--strategy",
+    type=str,
+    default="random",
+    help="strategy employed to select random patches",
+)
 parser.add_argument(
     "--num-patches",
     type=int,
@@ -68,6 +71,7 @@ parser.add_argument(
 parser.add_argument(
     "--patch-size",
     type=int,
+    nargs="+",
     default=None,
     help="patch size of the object, default is nnU-Net Patch Size",
 )
@@ -93,6 +97,7 @@ def convert_dataset_to_partannotated(
     patch_size: tuple[int],
     name_suffix: str = "partanno",
     patch_kwargs: Optional[dict] = None,
+    strategy: str = "random",
     seed: int = 12345,
 ):
     already_exists = False
@@ -170,6 +175,7 @@ def convert_dataset_to_partannotated(
             base_labelsTr_dir,
             target_labelsTr_dir,
             patch_func_kwargs=patch_kwargs,
+            strategy=strategy,
             seed=seed,
         )
 
@@ -190,6 +196,7 @@ def get_patches_for_partannotation(
     base_labelsTr_dir: Path,
     target_labelsTr_dir: Path,
     patch_func_kwargs: dict = None,
+    strategy: str = "random",
     seed: int = 12345,
 ) -> list[Patch]:
     """Creates patches based on annotation strategies.
@@ -225,16 +232,29 @@ def get_patches_for_partannotation(
     ]
     print(f"# whole image patches: {len(patches)}")
 
-    patches_partial = generate_random_patches(
-        file_ending,
-        base_labelsTr_dir,
-        patch_size,
-        n_patches=num_patches,
-        labeled_patches=patches,
-        seed=seed,
-    )
-    print(f"# patches: {len(patches_partial)}")
+    if strategy == "random":
+        patches_partial = generate_random_patches(
+            file_ending,
+            base_labelsTr_dir,
+            patch_size,
+            n_patches=num_patches,
+            labeled_patches=patches,
+            seed=seed,
+        )
+    elif strategy == "random-label":
+        patches_partial = generate_random_patches_labels(
+            file_ending,
+            base_labelsTr_dir,
+            patch_size,
+            n_patches=num_patches,
+            labeled_patches=patches,
+            seed=seed,  # change seed here so that list is not identical
+        )
+    else:
+        raise NotImplementedError(f"strategy `{strategy}` is not implemented")
+    print(f"#{strategy} based patches: {patches_partial}")
     patches = patches_partial + patches
+
     return patches
 
 
@@ -243,12 +263,8 @@ if __name__ == "__main__":
     # TODO: rewrite arguements
     full_images = args.full_labeled
 
-    minimal_example_per_class = args.minimal_example_per_class
     num_patches = args.num_patches
-
-    assert (
-        minimal_example_per_class is None
-    )  # minimal examples per class not implemented yet
+    strategy = args.strategy
 
     base_dataset_id = args.dataset_id
     target_id = args.output_id
@@ -256,11 +272,16 @@ if __name__ == "__main__":
     seed = args.seed
     name_suffx = args.name_suffix
 
-    patch_size = (
-        [args.patch_size] * 3
-        if args.patch_size is not None
-        else get_patch_size(base_dataset_id)
-    )
+    if args.patch_size is not None:
+        if len(args.patch_size) == 1:
+            # todo make it possible for other input sizes as well
+            patch_size = [args.patch_size] * 3
+        else:
+            patch_size = args.patch_size
+    elif base_dataset_id is not None:
+        patch_size = get_patch_size(base_dataset_id)
+    else:
+        raise AttributeError("Either base_dataset or patch-size has to be set.")
 
     if not isinstance(target_id, int):
         target_id = base_dataset_id + id_offset
@@ -274,5 +295,6 @@ if __name__ == "__main__":
         patch_size=patch_size,
         num_patches=num_patches,
         seed=seed,
+        strategy=strategy,
     )
     generate_custom_splits_file(target_id, 0, 5)

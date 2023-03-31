@@ -116,7 +116,7 @@ def resample_dataset(
     plans_manager = PlansManager(plans_cfg)
     config_manager = plans_manager.get_configuration(configuration)
     # Overwrite the normalization used in this step so that nnUNet_preprocess can be used safely in further steps!
-    config_manager.configuration["normalization_schemes"] = "NoNormalization"
+    config_manager.configuration["normalization_schemes"] = ["NoNormalization"]
 
     gt_path.mkdir(exist_ok=True)
     img_path.mkdir(exist_ok=True)
