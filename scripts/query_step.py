@@ -73,11 +73,12 @@ def query_step(
     dataset_json = read_dataset_json(dataset_id)
     file_ending = dataset_json["file_ending"]
     ignore_label = dataset_json["labels"]["ignore"]
+    state = State.get_id_state(dataset_id)
 
     if uncertainty_type.lower() == "random":
-        labeled_patches = []
-        for i in range(loop):
-            labeled_patches.extend(get_patches_from_loop_files(raw_dataset_path, i))
+        labeled_patches = get_patches_from_loop_files(raw_dataset_path, loop - 1)
+        # for i in range(loop):
+        #     labeled_patches.extend(get_patches_from_loop_files(raw_dataset_path, i))
         patches = generate_random_patches(
             file_ending,
             raw_labels_path=raw_dataset_path / "labelsTr",
@@ -92,9 +93,7 @@ def query_step(
 
         save_loop(raw_dataset_path, loop_json, loop)
     elif uncertainty_type.lower() == "random-label":
-        labeled_patches = []
-        for i in range(loop):
-            labeled_patches.extend(get_patches_from_loop_files(raw_dataset_path, i))
+        labeled_patches = get_patches_from_loop_files(raw_dataset_path, loop - 1)
 
         base_path = get_raw_path(dataset_json["annotated_id"])
 
@@ -109,6 +108,7 @@ def query_step(
         )
         # bring into loop_XXX.json format and save!
         loop_json = {"patches": patches}
+        save_loop(raw_dataset_path, loop_json, loop)
     else:
         write_uncertainties_from_softmax_preds(base_softmax_path, uncertainty_path)
         read_images_to_numpy(
@@ -127,7 +127,6 @@ def query_step(
             file_ending,
             ignore_label,
         )
-    state = State.get_id_state(dataset_id)
     state.query = True
     state.save_state()
 

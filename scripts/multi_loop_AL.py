@@ -20,10 +20,13 @@ if __name__ == "__main__":
     state = State.get_id_state(dataset_id)
 
     print(config)
+    # print(state)
 
     for al_iteration in range(config.query_steps):
         if al_iteration < state.loop:
             continue
+        if al_iteration > state.loop:
+            raise ValueError("A loop has not been executed!")
         if state.training is False:
             subprocess.call(
                 f"nnUNetv2_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
@@ -35,8 +38,11 @@ if __name__ == "__main__":
             get_performance(dataset_id)
             state = State.get_id_state(dataset_id)
         if state.query is False:
+            # This might be the place where multiprocessing fails us!
             predict_nnUNet_ensemble(dataset_id)
-            if al_iteration < config.query_steps - 1:
+            state = State.get_id_state(dataset_id)
+        if al_iteration < config.query_steps - 1:
+            if state.query is False:
                 query_step(
                     dataset_id,
                     config.patch_size,
@@ -45,6 +51,7 @@ if __name__ == "__main__":
                     seed=config.seed,
                 )
                 state = State.get_id_state(dataset_id)
+        if al_iteration < config.query_steps - 1:
             if state.update_data is False:
                 update_step(dataset_id)
                 state = State.get_id_state(dataset_id)
