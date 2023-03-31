@@ -19,6 +19,7 @@ FILENAME = "state.json"
 class State:
     dataset_id: int
     loop: int = 0
+    preprocess: bool = False
     training: bool = False
     get_performance: bool = False
     query: bool = False
@@ -44,6 +45,9 @@ class State:
             assert loop_val == self.loop + 1
         else:
             assert loop_val == self.loop
+
+        if self.training:
+            assert self.preprocess  # preprocessing before training is required
 
         # further we may want validation results
         if self.get_performance:

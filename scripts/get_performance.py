@@ -19,6 +19,7 @@ from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
 
 nnActive_results = get_nnActive_results()
+TIMEOUT_S = 60 * 60
 
 
 def get_mean_foreground_cv(summary_cross_val_dict, n_folds):
@@ -102,7 +103,7 @@ def get_performance(dataset_id):
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
     ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer}"
-    subprocess.call(ex_command, shell=True)
+    subprocess.call(ex_command, shell=True, timeout=TIMEOUT_S)
 
     os.makedirs(loop_results_path, exist_ok=True)
     ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"

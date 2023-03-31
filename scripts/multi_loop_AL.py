@@ -27,11 +27,17 @@ if __name__ == "__main__":
             continue
         if al_iteration > state.loop:
             raise ValueError("A loop has not been executed!")
-        if state.training is False:
+        if state.preprocess is False:
+            # Preprocessing can require a lot of time
             subprocess.call(
                 f"nnUNetv2_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
                 shell=True,
             )
+            state = State.get_id_state(dataset_id)
+            state.preprocess = True
+            state.save_state()
+
+        if state.training is False:
             train_nnUNet_ensemble(dataset_id)
             state = State.get_id_state(dataset_id)
         if state.get_performance is False:
