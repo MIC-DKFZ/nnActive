@@ -2,7 +2,7 @@ import shutil
 from argparse import ArgumentParser
 
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
-from nnactive.resample_dataset import resample_dataset
+from nnactive.data.resampling import resample_dataset
 
 
 def main():

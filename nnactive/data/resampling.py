@@ -12,6 +12,7 @@ import SimpleITK as sitk
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     ConfigurationManager,
     DefaultPreprocessor,
+    PlansManager,
 )
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 from rich.progress import track
