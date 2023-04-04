@@ -27,6 +27,7 @@ class State:
 
     def new_loop(self):
         self.loop += 1
+        self.preprocess = False
         self.training = False
         self.get_performance = False
         self.query = False
@@ -64,10 +65,15 @@ class State:
         with open(path, "r") as file:
             parsed = json.load(file)
         state = State(**parsed)
-        state.verify()
         return state
 
     @classmethod
     def get_id_state(cls, id: int) -> State:
         fn = get_results_folder(id) / "state.json"
-        return State.from_json(fn)
+        state = State.from_json(fn)
+        state.verify()
+        return state
+
+    @staticmethod
+    def filename():
+        return FILENAME

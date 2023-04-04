@@ -41,3 +41,7 @@ class ActiveConfig:
         print(f"Saving Config File to {save_path}")
         with open(save_path, "w") as file:
             json.dump(self.__dict__, file)
+
+    @staticmethod
+    def filename():
+        return FILENAME
