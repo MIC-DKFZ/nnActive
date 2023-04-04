@@ -30,6 +30,7 @@ pytest:
   - ssh-keyscan -p 2222 phabricator.mitk.org >> ~/.ssh/known_hosts
   - ssh-keyscan phabricator.mitk.org >> ~/.ssh/known_hosts
   - ssh-keyscan codebase.helmholtz.cloud >> ~/.ssh/known_hosts
+  - ssh-keyscan git.dkfz.de >> ~/.ssh/known_hosts
   - chmod 644 ~/.ssh/known_hosts
 
   - python --version
