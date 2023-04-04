@@ -1,12 +1,13 @@
 import json
 import os
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import convert_id_to_dataset_name
 from nnactive.paths import get_nnActive_results
 
@@ -24,11 +25,10 @@ def load_results(filenames: list[Path]):
 
 
 nnActive_results = get_nnActive_results()
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-    args = parser.parse_args()
+
+
+@register_subcommand("plot-experiment", [(("-d", "--dataset_id"), {"type": int})])
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     experiment_results_path: Path = nnActive_results / convert_id_to_dataset_name(
         dataset_id

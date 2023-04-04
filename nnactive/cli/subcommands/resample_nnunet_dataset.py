@@ -1,15 +1,19 @@
 import shutil
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
-from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
+from nnactive.cli.registry import register_subcommand
 from nnactive.data.resampling import resample_dataset
+from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 
 
-def main():
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("-np", "--num-processes", type=int, default=4)
-    args = parser.parse_args()
+@register_subcommand(
+    "resample_nnunet_dataset",
+    [
+        (("-d", "--dataset_id"), {"type": int}),
+        (("-np", "--num-processes"), {"type": int, "default": 4}),
+    ],
+)
+def main(args: Namespace) -> None:
     workers = args.num_processes
     dataset_id = args.dataset_id
     dataset_json = read_dataset_json(dataset_id)
@@ -47,7 +51,3 @@ def main():
         preprocessed_path=preprocessed_path,
         n_workers=workers,
     )
-
-
-if __name__ == "__main__":
-    main()

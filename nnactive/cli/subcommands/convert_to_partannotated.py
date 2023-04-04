@@ -2,7 +2,7 @@
 import json
 import os
 import shutil
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional, Union
@@ -11,6 +11,7 @@ import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
 from nnactive.data.annotate import create_labels_from_patches
 from nnactive.data.create_empty_masks import (
@@ -26,60 +27,6 @@ from nnactive.query.random import (
 )
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
-)
-
-parser = ArgumentParser()
-parser.add_argument(
-    "-d",
-    "--dataset-id",
-    type=int,
-    required=True,
-    help="dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
-)
-parser.add_argument(
-    "-o",
-    "--output-id",
-    type=int,
-    default=None,
-    help="target dataset ID for nnU-Net, default base on offset",
-)
-parser.add_argument(
-    "--offset", type=int, default=500, help="ouput_id = dataset_id + offset"
-)
-parser.add_argument(
-    "--seed", default=12345, type=int, help="Random seed for creation of datasets"
-)
-
-parser.add_argument(
-    "--full-labeled",
-    type=float,
-    default=0,
-    help="0.X = percentage, int = full number of completely annotated images",
-)  # how to make float and integers
-parser.add_argument(
-    "--strategy",
-    type=str,
-    default="random",
-    help="strategy employed to select random patches",
-)
-parser.add_argument(
-    "--num-patches",
-    type=int,
-    default=0,
-    help="Number of randomly drawn patches",
-)  # how to make float and integers
-parser.add_argument(
-    "--patch-size",
-    type=int,
-    nargs="+",
-    default=None,
-    help="patch size of the object, default is nnU-Net Patch Size",
-)
-parser.add_argument(
-    "--name-suffix",
-    type=str,
-    default="partanno",
-    help="Suffix for the name of the output dataset",
 )
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
@@ -258,9 +205,81 @@ def get_patches_for_partannotation(
     return patches
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    # TODO: rewrite arguements
+@register_subcommand(
+    "convert",
+    [
+        (
+            ("-d", "--dataset-id"),
+            {
+                "type": int,
+                "required": True,
+                "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
+            },
+        ),
+        (
+            ("-o", "--output-id"),
+            {
+                "type": int,
+                "default": None,
+                "help": "target dataset ID for nnU-Net, default base on offset",
+            },
+        ),
+        (
+            "--offset",
+            {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
+        ),
+        (
+            "--seed",
+            {
+                "default": 12345,
+                "type": int,
+                "help": "Random seed for creation of datasets",
+            },
+        ),
+        (
+            "--full-labeled",
+            {
+                "type": float,
+                "default": 0,
+                "help": "0.X = percentage, int = full number of completely annotated images",
+            },
+        ),  # how to make float and integers
+        (
+            "--strategy",
+            {
+                "type": str,
+                "default": "random",
+                "help": "strategy employed to select random patches",
+            },
+        ),
+        (
+            "--num-patches",
+            {
+                "type": int,
+                "default": 0,
+                "help": "Number of randomly drawn patches",
+            },
+        ),  # how to make float and integers
+        (
+            "--patch-size",
+            {
+                "type": int,
+                "nargs": "+",
+                "default": None,
+                "help": "patch size of the object, default is nnU-Net Patch Size",
+            },
+        ),
+        (
+            "--name-suffix",
+            {
+                "type": str,
+                "default": "partanno",
+                "help": "Suffix for the name of the output dataset",
+            },
+        ),
+    ],
+)
+def main(args: Namespace) -> None:
     full_images = args.full_labeled
 
     num_patches = args.num_patches

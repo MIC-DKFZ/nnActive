@@ -1,17 +1,17 @@
 import subprocess
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import get_raw_path, get_results_path
 
 TIMEOUT_S = 60 * 60
 
 
-def main():
-    parser = ArgumentParser()
-    # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-    args = parser.parse_args()
+@register_subcommand(
+    "predict_nnUNet_ensemble", [(("-d", "--dataset_id"), {"type": int})]
+)
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
 
     num_folds = 5

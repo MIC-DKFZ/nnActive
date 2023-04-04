@@ -1,32 +1,39 @@
 import os
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import convert_id_to_dataset_name, get_patch_size
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset", type=int, required=True, help="Dataset ID")
-    parser.add_argument("--trainer", type=str, default="nnActiveTrainer_5epochs")
-    parser.add_argument(
-        "-p", "--patch-size", nargs="+", type=int, default=None, help="Patch Size"
-    )
-    parser.add_argument(
-        "--base_id",
-        type=int,
-        default=None,
-        help="Dataset from which patch size is taken",
-    )
-    parser.add_argument("-qs", "--query-size", type=int, default=10)
-    parser.add_argument("--uncertainty", type=str, default="random")
-    parser.add_argument("--query-steps", type=int, default=10)
-    parser.add_argument("--starting-budget", type=str, default="standard")
-    parser.add_argument("--seed", type=int, default=12345)
-    parser.add_argument("-np", "--num-processes", type=int, default=4)
 
-    args = parser.parse_args()
+@register_subcommand(
+    "setup_al_experiment",
+    [
+        (("-d", "--dataset"), {"type": int, "required": True, "help": "Dataset ID"}),
+        ("--trainer", {"type": str, "default": "nnActiveTrainer_5epochs"}),
+        (
+            ("-p", "--patch-size"),
+            {"nargs": "+", "type": int, "default": None, "help": "Patch Size"},
+        ),
+        (
+            "--base_id",
+            {
+                "type": int,
+                "default": None,
+                "help": "Dataset from which patch size is taken",
+            },
+        ),
+        (("-qs", "--query-size"), {"type": int, "default": 10}),
+        ("--uncertainty", {"type": str, "default": "random"}),
+        ("--query-steps", {"type": int, "default": 10}),
+        ("--starting-budget", {"type": str, "default": "standard"}),
+        ("--seed", {"type": int, "default": 12345}),
+        (("-np", "--num-processes"), {"type": int, "default": 4}),
+    ],
+)
+def main(args: Namespace) -> None:
     trainer = args.trainer
     query_size = args.query_size
     uncertainty = args.uncertainty

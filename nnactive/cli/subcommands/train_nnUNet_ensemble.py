@@ -1,15 +1,14 @@
 import subprocess
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.results.state import State
 
 
-def main():
-    parser = ArgumentParser()
+@register_subcommand("train_nnUNet_ensemble", [(("-d", "--dataset_id"), {"type": int})])
+def main(args: Namespace) -> None:
     # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-    args = parser.parse_args()
     dataset_id = args.dataset_id
 
     num_folds = 5
@@ -28,7 +27,3 @@ def train_nnUNet_ensemble(dataset_id, num_folds=5):
     state = State.get_id_state(dataset_id)
     state.training = True
     state.save_state()
-
-
-if __name__ == "__main__":
-    main()

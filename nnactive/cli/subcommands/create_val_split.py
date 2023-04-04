@@ -1,11 +1,12 @@
 import os
 import shutil
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 
 random_seed = 12345
@@ -93,12 +94,14 @@ def copy_files(
         shutil.copy(source_dir / file_name, target_dir / file_name)
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("--test_size", default=0.25, type=float)
-
-    args = parser.parse_args()
+@register_subcommand(
+    "create_val_split",
+    [
+        (("-d", "--dataset_id"), {"type": int}),
+        ("--test_size", {"default": 0.25, "type": float}),
+    ],
+)
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     test_size = args.test_size
     # TODO: here the config would be useful!
