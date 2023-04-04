@@ -9,9 +9,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "batchgenerators",
-    "nnunetv2 @ git+ssh://git@phabricator.mitk.org:2222/source/nnunet.git@nnunet_remake",
-    "acvl_utils @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/acvl_utils.git",
-    "dynamic_network_architectures @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git@recycle_unet",
+    "nnunetv2",
     "SimpleITK",
     "rich",
     "pydantic",
