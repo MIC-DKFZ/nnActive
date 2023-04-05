@@ -1,12 +1,13 @@
 import json
 import os
 import subprocess
-from argparse import ArgumentParser
+from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import (
@@ -73,13 +74,9 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-def main():
-    parser = ArgumentParser()
-    # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-    args = parser.parse_args()
+@register_subcommand("get_performance", [(("-d", "--dataset_id"), {"type": int})])
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
-
     get_performance(dataset_id)
 
 

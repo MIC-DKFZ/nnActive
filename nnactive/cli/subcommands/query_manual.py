@@ -1,20 +1,19 @@
 import os
-from argparse import ArgumentParser
+from argparse import Namespace
 
 import SimpleITK as sitk
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.query.random import create_patch_mask_for_image, get_label_map
 
 
-def main():
-    parser = ArgumentParser()
-    # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-
-    args = parser.parse_args()
+@register_subcommand(
+    "query_manual", [(("-d", "--dataset_id"), {"type": int, "required": True})]
+)
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
 
     data_path = get_raw_path(dataset_id)
@@ -55,7 +54,3 @@ def main():
             mask_save,
             (save_path / img_name),
         )
-
-
-if __name__ == "__main__":
-    main()

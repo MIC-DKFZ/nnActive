@@ -1,19 +1,21 @@
 import subprocess
-from argparse import ArgumentParser
+from argparse import Namespace
 
-from get_performance import get_performance
-from predict_nnUNet_ensemble import predict_nnUNet_ensemble
-from query_step import query_step
-from train_nnUNet_ensemble import train_nnUNet_ensemble
-from update_data import update_step
-
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.results.state import State
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset-id", type=int, required=True)
-    args = parser.parse_args()
+from .get_performance import get_performance
+from .predict_nnUNet_ensemble import predict_nnUNet_ensemble
+from .query_step import query_step
+from .train_nnUNet_ensemble import train_nnUNet_ensemble
+from .update_data import update_step
+
+
+@register_subcommand(
+    "multi_loop_AL", [(("-d", "--dataset_id"), {"type": int, "required": True})]
+)
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
 
     config = ActiveConfig.get_from_id(dataset_id)

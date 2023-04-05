@@ -2,7 +2,7 @@ import subprocess
 from itertools import product
 from pathlib import Path
 
-SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts"
+# SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts"
 
 if __name__ == "__main__":
 
@@ -20,10 +20,10 @@ if __name__ == "__main__":
     vals = [val for val in product(uncertainties, seeds)]
 
     for i, (unc, seed) in enumerate(vals):
-        ex_file = SCRIPT_PATH / "convert_to_partannotated.py"
+        ex_command = "nnactive convert"
         output_id = first_d_set + i
         name_suffix = f"patch-full_patch-unc-{unc}-seed-{seed}"
-        ex_call = f"python {ex_file} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
+        ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
 
         print(ex_call)
         subprocess.run(ex_call, shell=True)
@@ -37,9 +37,9 @@ if __name__ == "__main__":
             shell=True,
         )
 
-        ex_file = SCRIPT_PATH / "setup_al_experiment.py"
+        ex_command = "nnactive setup_al_experiment"
         subprocess.run(
-            f"python {ex_file} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --starting-budget {starting_budget} --seed {seed}",
+            f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --starting-budget {starting_budget} --seed {seed}",
             shell=True,
         )
 
@@ -49,11 +49,11 @@ if __name__ == "__main__":
     query_size = 10
 
     for i, (unc, seed) in enumerate(vals):
-        ex_file = SCRIPT_PATH / "convert_to_partannotated.py"
+        ex_command = "nnactive convert"
         output_id = first_d_set + i
         name_suffix = f"patch-patch20-unc-{unc}-seed-{seed}"
         subprocess.run(
-            f"python {ex_file} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --patch-size {patch_size} --num-patches {query_size} --name-suffix {name_suffix}",
+            f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --patch-size {patch_size} --num-patches {query_size} --name-suffix {name_suffix}",
             shell=True,
         )
 
@@ -66,8 +66,8 @@ if __name__ == "__main__":
             shell=True,
         )
 
-        ex_file = SCRIPT_PATH / "setup_al_experiment.py"
+        ex_command = "nnactive setup_al_experiment"
         subprocess.run(
-            f"python {ex_file} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --patch-size {patch_size} --starting-budget {starting_budget} --seed {seed}",
+            f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --patch-size {patch_size} --starting-budget {starting_budget} --seed {seed}",
             shell=True,
         )

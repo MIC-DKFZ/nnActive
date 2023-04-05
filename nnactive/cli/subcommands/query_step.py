@@ -1,7 +1,8 @@
 import json
-from argparse import ArgumentParser
+from argparse import Namespace
 
 from nnactive.calculate_uncertainties import write_uncertainties_from_softmax_preds
+from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.loops.loading import (
     get_patches_from_loop_files,
@@ -21,17 +22,21 @@ from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
 )
 
 
-def main():
+@register_subcommand(
+    "query_step",
+    [
+        (("-d", "--dataset_id"), {"type": int}),
+        (
+            ("-u", "--uncertainty_type"),
+            {"type": str, "default": None},
+        ),  # default="pred_entropy")
+        (("-n", "--num_patches"), {"type": int, "default": None}),
+        (("-s", "--patch_size"), {"type": int, "default": None}),
+    ],
+)
+def main(args: Namespace):
     # TODO: obtain Patch Size
-    parser = ArgumentParser()
     # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument(
-        "-u", "--uncertainty_type", type=str, default=None
-    )  # default="pred_entropy")
-    parser.add_argument("-n", "--num_patches", type=int, default=None)
-    parser.add_argument("-s", "--patch_size", type=int, default=None)
-    args = parser.parse_args()
     dataset_id = args.dataset_id
     patch_size = args.patch_size
 
@@ -129,7 +134,3 @@ def query_step(
         )
     state.query = True
     state.save_state()
-
-
-if __name__ == "__main__":
-    main()

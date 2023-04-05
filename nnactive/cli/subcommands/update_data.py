@@ -1,16 +1,13 @@
-from argparse import ArgumentParser
+from argparse import Namespace
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 from nnactive.results.state import State
 from nnactive.update_data import update_data
 
 
-def main():
-    parser = ArgumentParser()
-    # TODO: help
-    parser.add_argument("-d", "--dataset_id", type=int)
-
-    args = parser.parse_args()
+@register_subcommand("update_data", [(("-d", "--dataset_id"), {"type": int})])
+def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
 
     update_step(dataset_id)
@@ -41,7 +38,3 @@ def update_step(dataset_id, num_folds=5, loop_val=None):
     state.update_data = True
     state.new_loop()
     state.save_state()
-
-
-if __name__ == "__main__":
-    main()
