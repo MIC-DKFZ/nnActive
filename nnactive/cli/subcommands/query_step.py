@@ -1,5 +1,5 @@
 import json
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 
 from nnactive.calculate_uncertainties import write_uncertainties_from_softmax_preds
 from nnactive.cli.registry import register_subcommand
@@ -23,7 +23,7 @@ from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
 
 
 @register_subcommand(
-    "query-step",
+    "query_step",
     [
         (("-d", "--dataset_id"), {"type": int}),
         (

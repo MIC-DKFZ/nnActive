@@ -1,7 +1,7 @@
 import json
 import os
 import subprocess
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
@@ -74,7 +74,7 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-@register_subcommand("get-performance", [(("-d", "--dataset_id"), {"type": int})])
+@register_subcommand("get_performance", [(("-d", "--dataset_id"), {"type": int})])
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     get_performance(dataset_id)

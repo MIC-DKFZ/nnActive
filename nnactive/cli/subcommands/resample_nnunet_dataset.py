@@ -1,5 +1,5 @@
 import shutil
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.resampling import resample_dataset

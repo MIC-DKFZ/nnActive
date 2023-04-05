@@ -1,5 +1,5 @@
 import os
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 
 import SimpleITK as sitk
 
@@ -11,7 +11,7 @@ from nnactive.query.random import create_patch_mask_for_image, get_label_map
 
 
 @register_subcommand(
-    "query-manual", [(("-d", "--dataset_id"), {"type": int, "required": True})]
+    "query_manual", [(("-d", "--dataset_id"), {"type": int, "required": True})]
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id

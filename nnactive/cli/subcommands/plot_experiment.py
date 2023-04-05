@@ -1,6 +1,6 @@
 import json
 import os
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -27,7 +27,7 @@ def load_results(filenames: list[Path]):
 nnActive_results = get_nnActive_results()
 
 
-@register_subcommand("plot-experiment", [(("-d", "--dataset_id"), {"type": int})])
+@register_subcommand("plot_experiment", [(("-d", "--dataset_id"), {"type": int})])
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     experiment_results_path: Path = nnActive_results / convert_id_to_dataset_name(
