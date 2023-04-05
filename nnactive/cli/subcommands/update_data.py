@@ -1,5 +1,6 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 from nnactive.results.state import State
 from nnactive.update_data import update_data
