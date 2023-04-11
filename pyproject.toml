@@ -13,6 +13,7 @@ dependencies = [
     "SimpleITK",
     "rich",
     "pydantic",
+    "xmltodict",
 ]
 
 [project.optional-dependencies]
