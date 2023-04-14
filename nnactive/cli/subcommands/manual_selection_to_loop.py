@@ -287,11 +287,6 @@ def main(args: Namespace) -> None:
     If some of the manually selected patches overlap, the loop file will not be created and the user is asked to
     create the patches again without overlap.
     """
-    # parse the arguments
-    # parser = ArgumentParser()
-    # parser.add_argument("-d", "--dataset_id", type=int)
-    # parser.add_argument("--debug", dest="debug", action="store_true")
-    # args = parser.parse_args()
     dataset_id = args.dataset_id
 
     # create an empty dict to store all patches that should be in the loop_XXX.json file
