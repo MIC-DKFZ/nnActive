@@ -187,6 +187,8 @@ def get_file_patch_list(
     """
     original_image = sitk.ReadImage(original_image_path)
     image_id = original_image_path.stem.split(".")[0]
+    # remove channel suffix from image id
+    image_id = "_".join(image_id.split("_")[:-1])
     file_ending = "".join(original_image_path.suffixes)
     # numpy array with size of original image that marks the already selected patches in the original
     org_image_size = list(original_image.GetSize())
