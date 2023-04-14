@@ -13,7 +13,7 @@ pip install -e '.[dev]'
 
 ## Contributing
 
-- Always run `black` (and ideally `isort`) before commiting
+- *Run `pre-commit install` every time you clone the repo*
 - Turn on `pylint` in your editor, if it shows errors:
     1. Fix the error
     2. If it is a false positive or if you have a good reason to disagree in
