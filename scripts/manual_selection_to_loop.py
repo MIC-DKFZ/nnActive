@@ -6,7 +6,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Tuple
 
-import create_mitk_geometry_patch
 import numpy as np
 import SimpleITK as sitk
 
@@ -16,6 +15,7 @@ from nnactive.loops.loading import get_sorted_loop_files, save_loop
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import get_nnActive_results
 from nnactive.query.random import create_patch_mask_for_image
+from nnactive.utils import create_mitk_geometry_patch
 
 
 def does_overlap(patch_seg: np.array, indices: List[slice]):

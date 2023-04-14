@@ -21,7 +21,8 @@ def set_mitk_geometry_size(
         str: The modified xml string containing the geometry information
 
     """
-    with open("mitk_geometry.xml", "r") as f:
+    script_dir = Path(__file__).parent.absolute()
+    with open(script_dir / "mitk_geometry.xml", "r") as f:
         mitk_geometry_xml = f.read()
     mitk_geometry_xml = mitk_geometry_xml.replace(
         '<Max type="Vector3D" x="0" y="0" z="0"/>',
