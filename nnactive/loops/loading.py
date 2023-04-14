@@ -37,7 +37,7 @@ def get_patches_from_loop_files(
 
 
 def get_sorted_loop_files(data_path: Path) -> list[str]:
-    """Returns a sorted list of all loop file names in the data_path"""
+    """Returns an ascending list of all loop file names in the data_path"""
     loop_files = []
     for file in os.listdir(data_path):
         if file[: len(LOOP_PATTERN)] == LOOP_PATTERN:
@@ -45,6 +45,15 @@ def get_sorted_loop_files(data_path: Path) -> list[str]:
 
     loop_files.sort(key=lambda x: int(x.split(LOOP_PATTERN)[1].split(".json")[0]))
     return loop_files
+
+
+def get_loop_patches(data_path: Path, loop_val: int = None) -> list[Patch]:
+    """Returns patches in one loop, if loop_val is None, the most recent loop is selected."""
+    if loop_val is None:
+        loop_val = len(get_sorted_loop_files(data_path)) - 1
+    with open(data_path / f"{LOOP_PATTERN}{loop_val:03d}.json", "r") as file:
+        patches = json.load(file)["patches"]
+    return [Patch(**patch) for patch in patches]
 
 
 def save_loop(output_path: Path, loop_json: dict, loop_val: int):
