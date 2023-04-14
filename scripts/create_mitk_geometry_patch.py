@@ -2,7 +2,6 @@ import os.path
 from pathlib import Path
 from typing import Tuple
 
-
 # TODO: this script currently only works for 3D images. Needs adjustments for 2D
 
 

@@ -1,7 +1,7 @@
 import argparse
 
-from .subcommands import *
 from .registry import _add_to_parser
+from .subcommands import *
 
 
 def main() -> None:

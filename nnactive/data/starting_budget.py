@@ -27,7 +27,6 @@ def _patch_ids_to_image_coords(
     img_ids: list[int] = np.digitize(patch_ids, bins).tolist()
     coords = []
     for patch_id, img_id in zip(patch_ids, img_ids):
-
         patch_id: int = patch_id - bins[img_id - 1]
 
         size_x, size_y, _ = sizes[img_id]

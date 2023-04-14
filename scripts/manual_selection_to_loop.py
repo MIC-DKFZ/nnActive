@@ -4,10 +4,10 @@ import shutil
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Tuple
-import create_mitk_geometry_patch
 
-import SimpleITK as sitk
+import create_mitk_geometry_patch
 import numpy as np
+import SimpleITK as sitk
 import xmltodict
 
 from nnactive.data import Patch

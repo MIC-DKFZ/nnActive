@@ -1,10 +1,10 @@
+import json
 import os
 from typing import Optional
-import json
 
-from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path
-from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.loops.cross_validation import kfold_cv_from_patches
+from nnactive.loops.loading import get_patches_from_loop_files
+from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path
 
 
 def generate_custom_splits_file(

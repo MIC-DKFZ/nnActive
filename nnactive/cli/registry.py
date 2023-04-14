@@ -37,6 +37,7 @@ def register_subcommand(
     Returns:
         registerd fundtion
     """
+
     def _inner_wrapper(
         func: Callable[[Namespace], None]
     ) -> Callable[[Namespace], None]:

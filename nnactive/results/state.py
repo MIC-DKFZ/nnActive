@@ -13,6 +13,8 @@ from nnactive.results.utils import get_results_folder
 
 
 FILENAME = "state.json"
+
+
 # TODO: This should/ could be redone to a more exhaustive list with all steps!
 # e.g. loop, update_data, trainings, uncertainty, query...
 @dataclass

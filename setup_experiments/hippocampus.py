@@ -5,7 +5,6 @@ from pathlib import Path
 # SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts"
 
 if __name__ == "__main__":
-
     seeds = [12345, 12346, 12347]
     uncertainties = ["random", "mutual_information", "pred_entropy"]
     dataset_id = 4
