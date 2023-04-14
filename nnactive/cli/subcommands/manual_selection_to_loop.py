@@ -2,13 +2,14 @@ import glob
 import json
 import os
 import shutil
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
 import SimpleITK as sitk
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_sorted_loop_files, save_loop
@@ -264,7 +265,21 @@ def get_file_patch_list(
     return patches_image_list, save_preliminary
 
 
-def main():
+@register_subcommand(
+    "manual_selection",
+    [
+        (("-d", "--dataset_id"), {"type": int, "required": True, "help": "Dataset ID"}),
+        (
+            "--debug",
+            {
+                "dest": "debug",
+                "action": "store_true",
+                "help": "Store segmentation of selected parches for debugging",
+            },
+        ),
+    ],
+)
+def main(args: Namespace) -> None:
     """
     Create a loop_XXX file that contains the manually selected patches as a list that should be included for
     training in the next cycle. The manual selected patches are stored as cropped versions of the original images
@@ -273,10 +288,10 @@ def main():
     create the patches again without overlap.
     """
     # parse the arguments
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("--debug", dest="debug", action="store_true")
-    args = parser.parse_args()
+    # parser = ArgumentParser()
+    # parser.add_argument("-d", "--dataset_id", type=int)
+    # parser.add_argument("--debug", dest="debug", action="store_true")
+    # args = parser.parse_args()
     dataset_id = args.dataset_id
 
     # create an empty dict to store all patches that should be in the loop_XXX.json file
@@ -317,7 +332,3 @@ def main():
         # prelim_patches is the folder where overlapping patches are stored as .mitkgeometry files
         if os.path.isdir(selected_patch_dir / "prelim_patches"):
             shutil.rmtree(selected_patch_dir / "prelim_patches")
-
-
-if __name__ == "__main__":
-    main()
