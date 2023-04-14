@@ -18,14 +18,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest",
-  "ipython",
-  "pylint",
   "black",
   "debugpy",
-  "sphinx<6",
+  "ipython",
+  "mypy",
+  "pre-commit",
   "pydata-sphinx-theme",
-  "mypy"
+  "pylint",
+  "pytest",
+  "sphinx<6",
 ]
 
 [project.scripts]
@@ -71,6 +72,19 @@ max-line-length = "88"
 
 [tool.isort]
 profile = "black"
+
+[tool.black]
+line-length = 88
+extend-exclude = '''
+
+(
+  /(
+      \.git
+    | \.venv
+    | _build
+  )/
+)
+'''
 
 [tool.mypy]
 strict = false
