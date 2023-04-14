@@ -2,7 +2,7 @@ import glob
 import json
 import os
 import shutil
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 from pathlib import Path
 from typing import List, Tuple
 
