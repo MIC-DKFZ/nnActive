@@ -1,20 +1,22 @@
 import glob
+import json
 import os
 import shutil
-from argparse import ArgumentParser
+from argparse import Namespace
 from pathlib import Path
 from typing import List, Tuple
 
-import create_mitk_geometry_patch
 import numpy as np
 import SimpleITK as sitk
-import xmltodict
 
+from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_sorted_loop_files, save_loop
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
+from nnactive.paths import get_nnActive_results
 from nnactive.query.random import create_patch_mask_for_image
+from nnactive.utils import create_mitk_geometry_patch
 
 
 def does_overlap(patch_seg: np.array, indices: List[slice]):
@@ -34,40 +36,23 @@ def does_overlap(patch_seg: np.array, indices: List[slice]):
 
 def get_correct_patch_size(data_path: Path):
     """
-    Infer the correct patch size from a .mitkgeometry file that is used to manually select the patches
-    TODO: is this the best way to infer the desired patch size?
-    TODO: this currently only works for 3D images. Needs adjustments for 2D
+    Infer the correct patch size from the nnActive results config
     Args:
-        data_path (Path): the raw dataset path where the patch.mitkgeometry file with the correct size information
-                          should be located.
+        data_path (Path): the raw dataset path
 
     Returns:
         Tuple[int, int, int]: the correct patch size
     """
-    mitk_geometry_file = data_path / "patch.mitkgeometry"
-    with open(mitk_geometry_file, "r") as f:
-        mitk_geometry = f.read()
-    # parse the xml structure to a python dict
-    mitk_geometry_dict = xmltodict.parse(mitk_geometry)
-    # get boundary information of patch
-    bounds = mitk_geometry_dict["GeometryData"]["ProportionalTimeGeometry"][
-        "Geometry3D"
-    ]["Bounds"]
-    min_bounds = bounds["Min"]
-    max_bounds = bounds["Max"]
-    min_x, min_y, min_z = (
-        int(min_bounds["@x"]),
-        int(min_bounds["@y"]),
-        int(min_bounds["@z"]),
-    )
-    max_x, max_y, max_z = (
-        int(max_bounds["@x"]),
-        int(max_bounds["@y"]),
-        int(max_bounds["@z"]),
-    )
-    # calculate size based on boundary information
-    patch_required_size = (max_x - min_x, max_y - min_y, max_z - min_z)
-    return patch_required_size
+    nnActive_results_base = get_nnActive_results()
+    dataset_name = data_path.name
+    nnActive_results_path = nnActive_results_base / dataset_name
+    config_json_path = nnActive_results_path / "config.json"
+    with open(config_json_path, "r") as f:
+        config_json = json.load(f)
+    patch_size = config_json["patch_size"]
+    if len(patch_size) == 3:
+        patch_size.reverse()
+    return tuple(patch_size)
 
 
 def crop_to_correct_size(
@@ -202,6 +187,8 @@ def get_file_patch_list(
     """
     original_image = sitk.ReadImage(original_image_path)
     image_id = original_image_path.stem.split(".")[0]
+    # remove channel suffix from image id
+    image_id = "_".join(image_id.split("_")[:-1])
     file_ending = "".join(original_image_path.suffixes)
     # numpy array with size of original image that marks the already selected patches in the original
     org_image_size = list(original_image.GetSize())
@@ -280,7 +267,21 @@ def get_file_patch_list(
     return patches_image_list, save_preliminary
 
 
-def main():
+@register_subcommand(
+    "manual_selection",
+    [
+        (("-d", "--dataset_id"), {"type": int, "required": True, "help": "Dataset ID"}),
+        (
+            "--debug",
+            {
+                "dest": "debug",
+                "action": "store_true",
+                "help": "Store segmentation of selected parches for debugging",
+            },
+        ),
+    ],
+)
+def main(args: Namespace) -> None:
     """
     Create a loop_XXX file that contains the manually selected patches as a list that should be included for
     training in the next cycle. The manual selected patches are stored as cropped versions of the original images
@@ -288,11 +289,6 @@ def main():
     If some of the manually selected patches overlap, the loop file will not be created and the user is asked to
     create the patches again without overlap.
     """
-    # parse the arguments
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--dataset_id", type=int)
-    parser.add_argument("--debug", dest="debug", action="store_true")
-    args = parser.parse_args()
     dataset_id = args.dataset_id
 
     # create an empty dict to store all patches that should be in the loop_XXX.json file
@@ -333,7 +329,3 @@ def main():
         # prelim_patches is the folder where overlapping patches are stored as .mitkgeometry files
         if os.path.isdir(selected_patch_dir / "prelim_patches"):
             shutil.rmtree(selected_patch_dir / "prelim_patches")
-
-
-if __name__ == "__main__":
-    main()

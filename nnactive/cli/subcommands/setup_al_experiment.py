@@ -1,11 +1,42 @@
+import json
 import os
 from argparse import Namespace
+from typing import List
+
+import numpy as np
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
-from nnactive.nnunet.utils import convert_id_to_dataset_name, get_patch_size
+from nnactive.nnunet.paths import NNUNET_RAW
+from nnactive.nnunet.utils import (
+    convert_id_to_dataset_name,
+    get_patch_size,
+    get_preprocessed_path,
+)
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
+from nnactive.utils import create_mitk_geometry_patch
+
+
+def create_mitk_geometry_file(dataset_id: int, target_id: int, patch_size: List[int]):
+    preprocessed_path = get_preprocessed_path(dataset_id)
+    if not preprocessed_path.exists():
+        assert "Please preprocess the dataset before"
+    nnunet_plans_path = preprocessed_path / "nnUNetPlans.json"
+    with open(nnunet_plans_path, "r") as f:
+        nnunet_plans = json.load(f)
+    scale_factor = nnunet_plans["original_median_spacing_after_transp"]
+    if len(scale_factor) == 3:
+        scale_factor.reverse()
+    scale_factor = np.array(scale_factor)
+    if len(patch_size) == 3:
+        patch_size.reverse()
+    patch_size = np.array(patch_size)
+    target_dir = NNUNET_RAW / convert_id_to_dataset_name(target_id)
+    create_mitk_geometry_patch.main(
+        target_dir / "patch.mitkgeometry",
+        tuple(np.multiply(scale_factor, patch_size)),
+    )
 
 
 @register_subcommand(
@@ -72,3 +103,10 @@ def main(args: Namespace) -> None:
     config.save_id(dataset_id)
     state = State(dataset_id=dataset_id)
     state.save_state()
+    if args.base_id:
+        plans_dataset_id = args.base_id
+    else:
+        plans_dataset_id = dataset_id
+    create_mitk_geometry_file(
+        dataset_id=plans_dataset_id, target_id=dataset_id, patch_size=patch_size
+    )
