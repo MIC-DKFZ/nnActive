@@ -11,6 +11,7 @@ from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.query.random import create_patch_mask_for_image, get_label_map
 
 
+# TODO: rename this to manual_query
 @register_subcommand(
     "query_manual", [(("-d", "--dataset_id"), {"type": int, "required": True})]
 )
@@ -29,7 +30,6 @@ def main(args: Namespace) -> None:
 
     img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
     print(f"Image Names: {len(img_names)}")
-    save_path = data_path / "masksTr"
     save_path = data_path / "masksTr_boundary"
     os.makedirs(save_path, exist_ok=True)
     for img_name in img_names:
