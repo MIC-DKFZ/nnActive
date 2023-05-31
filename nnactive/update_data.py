@@ -4,7 +4,7 @@ from pathlib import Path
 
 from nnactive.data.annotate import create_labels_from_patches
 from nnactive.loops.cross_validation import kfold_cv_from_patches
-from nnactive.loops.loading import get_patches_from_loop_files
+from nnactive.loops.loading import get_loop_patches, get_patches_from_loop_files
 
 
 def update_data(
@@ -16,6 +16,7 @@ def update_data(
     target_dir: Path,
     loop_val: int = None,
     num_folds: int = 5,
+    annotated: bool = True,
 ):
     """Update Dataset Raw with a novel splits_file in Preprocessed
 
@@ -28,12 +29,17 @@ def update_data(
         target_dir (Path): path to labels to be updated
         loop_val (int, optional): which loop val to use. Defaults to None.
     """
-
-    patches = get_patches_from_loop_files(data_path, loop_val)
+    all_patches = get_patches_from_loop_files(data_path, loop_val)
+    if annotated:
+        patches = all_patches
+    else:
+        patches = get_loop_patches(data_path, loop_val)
     print(len(patches))
-    create_labels_from_patches(patches, ignore_label, file_ending, base_dir, target_dir)
+    create_labels_from_patches(
+        patches, ignore_label, file_ending, base_dir, target_dir, overwrite=annotated
+    )
 
-    splits_final = kfold_cv_from_patches(num_folds, patches)
+    splits_final = kfold_cv_from_patches(num_folds, all_patches)
 
     with open(save_splits_file, "w") as file:
         json.dump(splits_final, file, indent=4)

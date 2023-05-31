@@ -61,5 +61,5 @@ def main(args: Namespace) -> None:
                 state = State.get_id_state(dataset_id)
         if al_iteration < config.query_steps - 1:
             if state.update_data is False:
-                update_step(dataset_id)
+                update_step(dataset_id, annotated=True)
                 state = State.get_id_state(dataset_id)
