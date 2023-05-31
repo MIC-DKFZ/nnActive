@@ -15,8 +15,9 @@ def create_labels_from_patches(
     file_ending: str,
     base_dir: Path,
     target_dir: Path,
+    overwrite: bool = True,
 ):
-    """Overwrites the labels files in target_dir base on labels in
+    """Overwrites the labels files in target_dir based on labels in
     base_dir.
 
     Args:
@@ -35,9 +36,6 @@ def create_labels_from_patches(
             patch_label.append(patch)
 
     labeled_files = set([patch.file for patch in (patch_label + whole_label)])
-    empty_segs = [file for file in os.listdir(base_dir) if file.endswith(file_ending)]
-    empty_segs = [file for file in empty_segs if file not in labeled_files]
-
     make_whole_from_ground_truth(whole_label, base_dir, target_dir)
 
     make_patches_from_ground_truth(
@@ -45,11 +43,19 @@ def create_labels_from_patches(
         base_dir,
         target_dir,
         ignore_label,
+        overwrite=overwrite,
     )
 
-    make_empty_from_ground_truth(
-        empty_segs,
-        base_dir,
-        target_dir,
-        ignore_label,
-    )
+    if overwrite:
+        empty_segs = [
+            file
+            for file in os.listdir(base_dir)
+            if file.endswith(file_ending) and file not in labeled_files
+        ]
+
+        make_empty_from_ground_truth(
+            empty_segs,
+            base_dir,
+            target_dir,
+            ignore_label,
+        )

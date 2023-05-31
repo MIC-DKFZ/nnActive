@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import os.path
 import shutil
 from pathlib import Path
 from typing import Any
@@ -176,6 +177,7 @@ def make_patches_from_ground_truth(
     gt_path: Path,
     target_path: Path,
     ignore_label: int,
+    overwrite: bool = True,
 ) -> None:
     """Create label files where only some patches are labeled from ground truth
         and the rest are ignored.
@@ -185,27 +187,41 @@ def make_patches_from_ground_truth(
         gt_path: where the ground truth labels are stored
         target_path: where the patched labels should be stored
         ignore_label: the id for ignored labels
+        overwrite: if true, overrides all label maps. If false, it updates existing ones.
     """
     target_path.mkdir(exist_ok=True)
 
-    for patch in track(patches):
-        img_gt = sitk.ReadImage((gt_path / patch.file))
+    label_files = np.unique([patch.file for patch in patches])
+
+    for label_file in label_files:
+        img_gt = sitk.ReadImage((gt_path / label_file))
         geometry = get_geometry_sitk(img_gt)
         img_gt = sitk.GetArrayFromImage(img_gt)
 
-        img_new = np.full_like(img_gt, ignore_label)
+        if overwrite:
+            img_new = np.full_like(img_gt, ignore_label)
+        elif os.path.isfile(target_path / label_file):
+            img_new = sitk.ReadImage(target_path / label_file)
+            geometry = get_geometry_sitk(img_new)
+            img_new = sitk.GetArrayFromImage(img_new)
+        else:
+            raise ValueError(
+                f"There is no previously existing file for {(target_path / label_file)} and overwrite is False."
+            )
 
-        slice_x = slice(patch.coords[0], patch.coords[0] + patch.size[0])
-        slice_y = slice(patch.coords[1], patch.coords[1] + patch.size[1])
-        slice_z = slice(patch.coords[2], patch.coords[2] + patch.size[2])
+        patches_file = [patch for patch in patches if patch.file == label_file]
+        for patch in patches_file:
+            slice_x = slice(patch.coords[0], patch.coords[0] + patch.size[0])
+            slice_y = slice(patch.coords[1], patch.coords[1] + patch.size[1])
+            slice_z = slice(patch.coords[2], patch.coords[2] + patch.size[2])
 
-        img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
+            img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
 
         img_new = sitk.GetImageFromArray(img_new)
         img_new = set_geometry(img_new, **geometry)
         sitk.WriteImage(
             img_new,
-            (target_path / patch.file),
+            (target_path / label_file),
         )
 
 

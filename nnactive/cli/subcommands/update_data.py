@@ -6,14 +6,37 @@ from nnactive.results.state import State
 from nnactive.update_data import update_data
 
 
-@register_subcommand("update_data", [(("-d", "--dataset_id"), {"type": int})])
+@register_subcommand(
+    "update_data",
+    [
+        (("-d", "--dataset_id"), {"type": int, "required": True}),
+        (
+            ("-l", "--loop"),
+            {
+                "type": int,
+                "default": None,
+                "help": "iteration step to update (which loop_XXX file)",
+            },
+        ),
+        (
+            "--annotated",
+            {
+                "dest": "annotated",
+                "action": "store_true",
+                "help": "If an annotated version of the dataset exists, update with annotated ground truth. "
+                "If not specified, uses predTr folder in raw dataset folder.",
+            },
+        ),
+    ],
+)
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
+    loop_val = args.loop
 
-    update_step(dataset_id)
+    update_step(dataset_id, loop_val=loop_val, annotated=args.annotated)
 
 
-def update_step(dataset_id, num_folds=5, loop_val=None):
+def update_step(dataset_id, num_folds=5, loop_val=None, annotated=True):
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
     target_dir = data_path / "labelsTr"
@@ -22,7 +45,10 @@ def update_step(dataset_id, num_folds=5, loop_val=None):
     ignore_label = dataset_json["labels"]["ignore"]
     file_ending = dataset_json["file_ending"]
 
-    base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
+    if annotated:
+        base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
+    else:
+        base_dir = get_raw_path(dataset_id) / "predTr"
 
     update_data(
         data_path,
@@ -33,6 +59,7 @@ def update_step(dataset_id, num_folds=5, loop_val=None):
         target_dir,
         loop_val=loop_val,
         num_folds=num_folds,
+        annotated=annotated,
     )
     state = State.get_id_state(dataset_id)
     state.update_data = True
