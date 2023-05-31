@@ -7,6 +7,7 @@ from typing import Union
 from pydantic.dataclasses import dataclass
 
 from nnactive.results.utils import get_results_folder
+from nnactive.utils.io import save_dataclass_to_json
 
 FILENAME = "config.json"
 
@@ -39,8 +40,8 @@ class ActiveConfig:
     def save_id(self, id: int):
         save_path: Path = get_results_folder(id) / FILENAME
         print(f"Saving Config File to {save_path}")
-        with open(save_path, "w") as file:
-            json.dump(self.__dict__, file)
+
+        save_dataclass_to_json(self, save_path)
 
     @staticmethod
     def filename():

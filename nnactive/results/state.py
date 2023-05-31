@@ -8,6 +8,7 @@ from pydantic.dataclasses import dataclass
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder
+from nnactive.utils.io import save_dataclass_to_json
 
 # from typing_extensions import Self
 
@@ -37,9 +38,7 @@ class State:
 
     def save_state(self):
         fn = get_results_folder(self.dataset_id) / FILENAME
-        with open(fn, "w") as file:
-            # TODO: SAVING DATACLASS Delete pydantic key value pairs here
-            json.dump(self.__dict__, file)
+        save_dataclass_to_json(self, fn)
 
     def verify(self):
         # if we are in loop X, we want to have loop_XXX.json

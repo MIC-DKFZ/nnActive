@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from nnactive.data import Patch
+from nnactive.utils.io import get_clean_dataclass_dict
 
 LOOP_PATTERN = "loop_"
 
@@ -61,8 +62,9 @@ def save_loop(output_path: Path, loop_json: dict, loop_val: int):
     if len(loop_json["patches"]) > 0:
         assert isinstance(loop_json["patches"][0], Patch)
     save_json = loop_json.copy()
-    # TODO: SAVING DATACLASS Delete pydantic key value pairs here
-    save_json["patches"] = [patch.__dict__ for patch in save_json["patches"]]
+    save_json["patches"] = [
+        get_clean_dataclass_dict(patch) for patch in save_json["patches"]
+    ]
 
     with open(output_path / f"{LOOP_PATTERN}{loop_val:03d}.json", "w") as file:
         json.dump(save_json, file, indent=4)

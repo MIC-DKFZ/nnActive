@@ -26,6 +26,7 @@ def create_labels_from_patches(
         file_ending (str): File Ending
         base_dir (Path): Source Directory with labels
         target_dir (Path): Target Directory for labels
+        overwrite (bool): If true the whole dataset is overwritten based on loop files and base_dir
     """
     whole_label = []
     patch_label = []
