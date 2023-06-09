@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from nnactive.analysis import get_experiment_results
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import convert_id_to_dataset_name
 from nnactive.paths import get_nnActive_results
@@ -33,9 +34,7 @@ def main(args: Namespace) -> None:
     experiment_results_path: Path = nnActive_results / convert_id_to_dataset_name(
         dataset_id
     )
-    filenames = [fn for fn in experiment_results_path.rglob("summary.json")]
-    filenames.sort()
-    out_list = load_results(filenames)
+    out_list = get_experiment_results(experiment_results_path)
     df = pd.DataFrame(out_list)
     fig, ax = plt.subplots()
 
