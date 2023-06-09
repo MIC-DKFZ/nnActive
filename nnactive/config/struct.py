@@ -24,7 +24,10 @@ class ActiveConfig:
     query_steps: int = 10  # how many query steps are supposed to be made
     seed: int = 12345  # seed to be used for everything random in the experiment
     num_processes: int = 4  # how many processes are used within nnU-Net
-    # patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
+    dataset: str = "Dataset Identifier"
+    # TODO:
+    # disable_tta
+    # overlap
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:

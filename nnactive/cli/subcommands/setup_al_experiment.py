@@ -12,6 +12,7 @@ from nnactive.nnunet.utils import (
     convert_id_to_dataset_name,
     get_patch_size,
     get_preprocessed_path,
+    read_dataset_json,
 )
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
@@ -87,6 +88,19 @@ def main(args: Namespace) -> None:
 
     save_path = results_path / dataset_name
 
+    # get base dataset name
+    base_dataset_key = "annotated_id"
+    dataset_json = read_dataset_json(dataset_id)
+
+    if base_dataset_key in dataset_json:
+        base_dataset_ident = dataset_json[base_dataset_key]
+        if isinstance(base_dataset_ident, int):
+            base_dataset_name: str = convert_id_to_dataset_name(base_dataset_ident)
+        else:
+            raise ValueError(f"dataset.json['{base_dataset_key}'] is not of type int.")
+    else:
+        base_dataset_name = dataset_name
+
     config = ActiveConfig(
         trainer=trainer,
         patch_size=patch_size,
@@ -96,6 +110,7 @@ def main(args: Namespace) -> None:
         starting_budget=starting_budget,
         seed=seed,
         num_processes=num_processes,
+        dataset=base_dataset_name,
     )
 
     os.makedirs(save_path, exist_ok=True)
