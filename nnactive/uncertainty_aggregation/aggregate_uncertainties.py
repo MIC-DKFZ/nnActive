@@ -72,7 +72,7 @@ def aggregate_uncertainties_per_image(
     """
     assert len(patch_size) == len(np_image.shape)
     kernel_size = list(
-        max(patch_size[i], np_image.shape[i]) for i in range(len(patch_size))
+        min(patch_size[i], np_image.shape[i]) for i in range(len(patch_size))
     )
     # perform various aggregation methods
     patch_score = whole_patch_aggregation(np_image, kernel_size, mean)
