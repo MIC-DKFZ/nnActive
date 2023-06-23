@@ -1,15 +1,34 @@
+import os
 import subprocess
+from argparse import ArgumentParser
 from itertools import product
 from pathlib import Path
 
 # SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts"
 
+parser = ArgumentParser()
+parser.add_argument(
+    "-f",
+    "--force_override",
+    action="store_true",
+    help="Overrides Dataset and clears all previous experiments.\n Be careful with this one!",
+)
+
+DATA_PATH = os.getenv("nnUNet_raw")
+if DATA_PATH is None:
+    raise ValueError("OS variable nnUNet_raw is not set.")
+DATA_PATH = Path(DATA_PATH)
+
 if __name__ == "__main__":
+    args = parser.parse_args()
+    force_override = args.force_override
+    exisisting_dsets = [
+        folder.name for folder in DATA_PATH.iterdir() if folder.is_dir()
+    ]
     seeds = [12345, 12346, 12347]
     uncertainties = ["random", "mutual_information", "pred_entropy"]
     dataset_id = 4
     first_d_set = 500
-    # patch_size = []
     query_size = 5
     query_steps = 20
     trainer = "nnActiveTrainer_100epochs"
@@ -21,6 +40,30 @@ if __name__ == "__main__":
     for i, (unc, seed) in enumerate(vals):
         ex_command = "nnactive convert"
         output_id = first_d_set + i
+        dset_name = f"Dataset{output_id:03d}"
+        if any([dset.startswith(dset_name) for dset in exisisting_dsets]):
+            print(
+                f"Dataset beginning with '{dset_name}' already exists in {DATA_PATH}."
+            )
+            if not force_override:
+                continue
+            else:
+                os_variables = [
+                    "nnUNet_results",
+                    "nnUNet_raw",
+                    "nnUNet_preprocessed",
+                    "nnActive_results",
+                ]
+                for os_variable in os_variables:
+                    base_path = Path(os.getenv(os_variable))
+                    rm_dirs = [
+                        folder
+                        for folder in base_path.iterdir()
+                        if folder.name.startswith(f"Dataset{output_id:03d}")
+                    ]
+                    for rm_dir in rm_dirs:
+                        os.rmdir(rm_dir)
+
         name_suffix = f"patch-full_patch-unc-{unc}-seed-{seed}"
         ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
 
@@ -51,6 +94,30 @@ if __name__ == "__main__":
         ex_command = "nnactive convert"
         output_id = first_d_set + i
         name_suffix = f"patch-patch20-unc-{unc}-seed-{seed}"
+        dset_name = f"Dataset{output_id:03d}"
+        if any([dset.startswith(dset_name) for dset in exisisting_dsets]):
+            print(
+                f"Dataset beginning with '{dset_name}' already exists in {DATA_PATH}."
+            )
+            if not force_override:
+                continue
+            else:
+                os_variables = [
+                    "nnUNet_results",
+                    "nnUNet_raw",
+                    "nnUNet_preprocessed",
+                    "nnActive_results",
+                ]
+                for os_variable in os_variables:
+                    base_path = Path(os.getenv(os_variable))
+                    rm_dirs = [
+                        folder
+                        for folder in base_path.iterdir()
+                        if folder.name.startswith(f"Dataset{output_id:03d}")
+                    ]
+                    for rm_dir in rm_dirs:
+                        os.rmdir(rm_dir)
+
         subprocess.run(
             f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --patch-size {patch_size} --num-patches {query_size} --name-suffix {name_suffix}",
             shell=True,
