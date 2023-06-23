@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from argparse import ArgumentParser
 from itertools import product
@@ -62,7 +63,8 @@ if __name__ == "__main__":
                         if folder.name.startswith(f"Dataset{output_id:03d}")
                     ]
                     for rm_dir in rm_dirs:
-                        os.rmdir(rm_dir)
+                        print(f"Deleting folder: {rm_dir}")
+                        shutil.rmtree(rm_dir)
 
         name_suffix = f"patch-full_patch-unc-{unc}-seed-{seed}"
         ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
@@ -109,14 +111,18 @@ if __name__ == "__main__":
                     "nnActive_results",
                 ]
                 for os_variable in os_variables:
-                    base_path = Path(os.getenv(os_variable))
+                    base_path = os.getenv(os_variable)
+                    if base_path is None:
+                        raise ValueError(f"OS variable '{os_variable}' is not set.")
+                    base_path = Path(base_path)
                     rm_dirs = [
                         folder
                         for folder in base_path.iterdir()
                         if folder.name.startswith(f"Dataset{output_id:03d}")
                     ]
                     for rm_dir in rm_dirs:
-                        os.rmdir(rm_dir)
+                        print(f"Deleting folder: {rm_dir}")
+                        shutil.rmtree(rm_dir)
 
         subprocess.run(
             f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --patch-size {patch_size} --num-patches {query_size} --name-suffix {name_suffix}",
