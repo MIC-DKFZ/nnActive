@@ -1,9 +1,8 @@
 import json
-import os
-from argparse import Namespace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -63,6 +62,7 @@ def compare_multi_experiment_results(base_path: Path):
         "uncertainty",
     ]
     vals = [seperator for seperator in df.columns if seperator not in skip_keys]
+    max_loop_ind = vals.index("query_steps")
     for key, df_g in df.groupby(vals):
         fig, axs = plt.subplots()
         sns.lineplot(
@@ -74,4 +74,5 @@ def compare_multi_experiment_results(base_path: Path):
             ax=axs,
             markers="O",
         )
+        axs.set_xticks(np.arange(0, key[max_loop_ind]))
         plt.savefig(f"{key}.png")

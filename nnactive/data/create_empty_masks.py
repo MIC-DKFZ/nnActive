@@ -22,7 +22,16 @@ def read_dataset_json(dataset_name):
     return dataset_json
 
 
-def add_ignore_label_to_dataset_json(dataset_json, dataset_name):
+def add_ignore_label_to_dataset_json(dataset_json: dict) -> dict:
+    """Add ignore label to the dataset_json dict if not already present.
+    ignore label value = max(label value)+1
+
+    Args:
+        dataset_json (dict): _description_
+
+    Returns:
+        dict: dataset_json
+    """
     if "ignore" not in dataset_json["labels"]:
         all_labels = []
         for k, r in dataset_json["labels"].items():
@@ -33,12 +42,7 @@ def add_ignore_label_to_dataset_json(dataset_json, dataset_name):
                 all_labels.append(int(r))
         all_labels = list(np.unique(all_labels))
         ignore_label_id = int(max(all_labels) + 1)
-
         dataset_json["labels"]["ignore"] = ignore_label_id
-        raw_data_folder = os.path.join(nnUNet_raw, dataset_name)
-        dataset_json_path = os.path.join(raw_data_folder, "dataset.json")
-        with open(dataset_json_path, "w") as f:
-            json.dump(dataset_json, f, indent=2)
     return dataset_json
 
 
@@ -79,6 +83,10 @@ def create_images_ignore_label(dataset_name, dataset_json):
 
 if __name__ == "__main__":
     dataset_name = convert_id_to_dataset_name(4)
+    raw_data_folder = os.path.join(nnUNet_raw, dataset_name)
+    dataset_json_path = os.path.join(raw_data_folder, "dataset.json")
     dj = read_dataset_json(dataset_name)
-    dj = add_ignore_label_to_dataset_json(dj, dataset_name)
+    dj = add_ignore_label_to_dataset_json(dj)
+    with open(dataset_json_path, "w") as f:
+        json.dump(dj, f, indent=2)
     create_images_ignore_label(dataset_name, dj)

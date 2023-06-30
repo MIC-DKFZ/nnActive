@@ -44,13 +44,6 @@ def create_test_datasets(
     ]
     image_names = _clean_file_ending(image_names)
 
-    # deprecated due to naming issues in general.
-    # def _return_true_if_string_in_list_set(string: str, list_set: list[str]):
-    #     for list_string in list_set:
-    #         if string[: len(list_string)] == list_string:
-    #             return True
-    #     return False
-
     def _return_true_if_file_in_list_set(string: str, list_set: list[str]) -> bool:
         for list_string in list_set:
             if "_".join(string.split("_")[:-1]) == list_string:
@@ -105,13 +98,17 @@ def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     test_size = args.test_size
     # TODO: here the config would be useful!
+    # TODO: save the split to a split file which can be loaded. (avoid unnecessary seed problems)
     raw_folder = get_raw_path(dataset_id)
     file_ending = read_dataset_json(dataset_id)["file_ending"]
     imagesTr = raw_folder / "imagesTr"
     imagesVal = raw_folder / "imagesVal"
     labelsTr = raw_folder / "labelsTr"
     labelsVal = raw_folder / "labelsVal"
-    # TODO: Create an ignore statement if data already has been split!
+    if imagesVal.exists() or labelsVal.exists():
+        raise RuntimeError(
+            f"It seems as if the splits have already been created. Check:\n{labelsTr} \n{labelsVal} "
+        )
     create_test_datasets(
         labelsTr, imagesTr, labelsVal, imagesVal, file_ending, test_size=test_size
     )

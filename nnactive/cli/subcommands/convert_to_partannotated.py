@@ -77,12 +77,10 @@ def convert_dataset_to_partannotated(
 
         # rewrite target_dataset_json and save
         target_dataset_json = deepcopy(base_dataset_json)
-        target_dataset_json["name"] = "{}-{}".format(
-            base_dataset_json["name"], name_suffix
+        target_dataset_json["name"] = "{}{}".format(
+            target_dataset_json["name"], name_suffix
         )
-        target_dataset_json = add_ignore_label_to_dataset_json(
-            target_dataset_json, base_dataset
-        )
+        target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
         target_dir = NNUNET_RAW / target_dataset

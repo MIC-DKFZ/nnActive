@@ -15,11 +15,16 @@ def get_target_spacing(path: Path) -> tuple[int]:
 
 @register_subcommand(
     "resample",
-    [("--target_preprocessed", {"type": str}), ("--target_raw", {"type": str})],
+    [
+        ("--target_preprocessed", {"type": str}),
+        ("--target_raw", {"type": str}),
+        ("--num_processes", {"type": int, "default": 4}),
+    ],
 )
 def main(args: Namespace) -> None:
     target_preprocessed = Path(args.target_preprocessed)
     target_raw = Path(args.target_raw)
+    n_workers = args.num_processes
 
     with open(target_raw / "dataset.json", "r") as file:
         dataset_json = json.load(file)
@@ -31,7 +36,7 @@ def main(args: Namespace) -> None:
         img_path=target_raw / "imagesTr",
         gt_path=target_raw / "labelsTr",
         preprocessed_path=target_preprocessed,
-        n_workers=4,
+        n_workers=n_workers,
     )
 
     resample_dataset(
@@ -41,5 +46,5 @@ def main(args: Namespace) -> None:
         img_path=target_raw / "imagesVal",
         gt_path=target_raw / "labelsVal",
         preprocessed_path=target_preprocessed,
-        n_workers=4,
+        n_workers=n_workers,
     )

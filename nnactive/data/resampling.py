@@ -42,7 +42,10 @@ def resample_to_target_spacing(
         plans_manager: nnUNet PlansManager object
         config_manager: nnUNet ConfigurationManager object
     """
-    input_names = [f"{name}_0000{dataset_cfg['file_ending']}"]
+    input_names = [
+        f"{name}_{channel:04d}{dataset_cfg['file_ending']}"
+        for channel in range(len(dataset_cfg["channel_names"]))
+    ]
     input_images = [str(rs_img_path / input_name) for input_name in input_names]
 
     data, seg, properties = preprocessor.run_case(
@@ -56,23 +59,22 @@ def resample_to_target_spacing(
     data = data.transpose(
         [0, *[i + 1 for i in plans_manager.transpose_backward]]
     ).squeeze()
+    for channel, input_name in enumerate(input_names):
+        img_itk_new = sitk.GetImageFromArray(data[channel])
+        img_itk_new.SetSpacing(
+            [config_manager.spacing[i] for i in plans_manager.transpose_backward]
+        )
+        img_itk_new.SetOrigin(properties["sitk_stuff"]["origin"])
+        img_itk_new.SetDirection(np.array(properties["sitk_stuff"]["direction"]))
+
+        sitk.WriteImage(
+            img_itk_new,
+            (img_path / input_name).with_suffix(dataset_cfg["file_ending"]),
+        )
+
     seg = seg.transpose(
         [0, *[i + 1 for i in plans_manager.transpose_backward]]
     ).squeeze()
-
-    img_itk_new = sitk.GetImageFromArray(data)
-    img_itk_new.SetSpacing(
-        [config_manager.spacing[i] for i in plans_manager.transpose_backward]
-    )
-    img_itk_new.SetOrigin(properties["sitk_stuff"]["origin"])
-    img_itk_new.SetDirection(np.array(properties["sitk_stuff"]["direction"]))
-
-    # TODO: Make Code generalizable for multiple input modalities
-    sitk.WriteImage(
-        img_itk_new,
-        (img_path / input_names[0]).with_suffix(dataset_cfg["file_ending"]),
-    )
-
     img_itk_new = sitk.GetImageFromArray(seg)
     img_itk_new.SetSpacing(
         [config_manager.spacing[i] for i in plans_manager.transpose_backward]
@@ -117,15 +119,15 @@ def resample_dataset(
     plans_manager = PlansManager(plans_cfg)
     config_manager = plans_manager.get_configuration(configuration)
     # Overwrite the normalization used in this step so that nnUNet_preprocess can be used safely in further steps!
-    config_manager.configuration["normalization_schemes"] = ["NoNormalization"]
+    config_manager.configuration["normalization_schemes"] = ["NoNormalization"] * len(
+        dataset_cfg["channel_names"]
+    )
 
     gt_path.mkdir(exist_ok=True)
     img_path.mkdir(exist_ok=True)
     imgs = list((rs_gt_path).glob(f"**/*{dataset_cfg['file_ending']}"))
 
-    print("-" * 8)
-    print(imgs)
-    print("-" * 8)
+    print(f"Resampling of {len(imgs)} images.")
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
 
     if n_workers == 0:
