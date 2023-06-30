@@ -56,9 +56,7 @@ def resample_to_target_spacing(
         dataset_json=dataset_cfg,
     )
     # generalizability, here no sweep but loop over first channel instead and save?
-    data = data.transpose(
-        [0, *[i + 1 for i in plans_manager.transpose_backward]]
-    ).squeeze()
+    data = data.transpose([0, *[i + 1 for i in plans_manager.transpose_backward]])
     for channel, input_name in enumerate(input_names):
         img_itk_new = sitk.GetImageFromArray(data[channel])
         img_itk_new.SetSpacing(
