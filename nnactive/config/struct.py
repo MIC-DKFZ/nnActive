@@ -25,8 +25,8 @@ class ActiveConfig:
     seed: int = 12345  # seed to be used for everything random in the experiment
     num_processes: int = 4  # how many processes are used within nnU-Net
     dataset: str = "Dataset Identifier"
-    # TODO:
-    # disable_tta
+    add_uncertainty: str = ""  # e.g. --disable_tta
+    add_validation: str = ""  # e.g. --disable_tta
     # overlap
 
     @classmethod

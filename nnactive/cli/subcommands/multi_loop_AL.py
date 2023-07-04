@@ -31,9 +31,10 @@ def main(args: Namespace) -> None:
             raise ValueError("A loop has not been executed!")
         if state.preprocess is False:
             # Preprocessing can require a lot of time
-            subprocess.call(
+            subprocess.run(
                 f"nnUNetv2_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
                 shell=True,
+                check=True,
             )
             state = State.get_id_state(dataset_id)
             state.preprocess = True

@@ -21,8 +21,7 @@ def train_nnUNet_ensemble(dataset_id, num_folds=5):
 
     for fold in range(num_folds):
         ex_command = f"nnUNetv2_train {dataset_id} {config.model_config} {fold} -tr {config.trainer}"
-        # print(ex_command)
-        subprocess.call(ex_command, shell=True)
+        subprocess.run(ex_command, shell=True, check=True)
 
     state = State.get_id_state(dataset_id)
     state.training = True

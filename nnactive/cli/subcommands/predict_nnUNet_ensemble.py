@@ -26,9 +26,8 @@ def predict_nnUNet_ensemble(dataset_id, num_folds=5):
 
     for fold in range(num_folds):
         output_fold_path = output_path / f"fold_{fold}"
-        ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {output_fold_path} -tr {config.trainer} -f {fold} --save_probabilities"
-        subprocess.call(ex_command, shell=True, timeout=TIMEOUT_S)
-
-
-if __name__ == "__main__":
-    main()
+        ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {output_fold_path} -tr {config.trainer} -f {fold} --save_probabilities {config.add_uncertainty}"
+        print(ex_command)
+        subprocess.run(
+            ex_command, shell=True, check=True
+        )  # timeout=TIMEOUT_S is not longer required due to better multiprocessing

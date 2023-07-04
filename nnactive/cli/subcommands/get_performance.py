@@ -99,12 +99,15 @@ def get_performance(dataset_id):
 
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer}"
-    subprocess.call(ex_command, shell=True, timeout=TIMEOUT_S)
+    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} {config.add_validation}"
+    print(ex_command)
+    subprocess.run(
+        ex_command, shell=True, check=True
+    )  # timeout=TIMEOUT_S is no longer required due to novel multiprocessing
 
     os.makedirs(loop_results_path, exist_ok=True)
     ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"
-    subprocess.call(ex_command, shell=True)
+    subprocess.run(ex_command, shell=True, check=True)
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
     print("Creating a summary of the cross validation results from training...")
@@ -137,7 +140,3 @@ def get_performance(dataset_id):
     state = State.get_id_state(dataset_id)
     state.get_performance = True
     state.save_state()
-
-
-if __name__ == "__main__":
-    main()
