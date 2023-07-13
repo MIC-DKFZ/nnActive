@@ -65,6 +65,7 @@ def query_step(
     uncertainty_type: str,
     num_patches: int,
     seed: int = None,
+    num_folds: int = 5,
 ):
     raw_dataset_path = get_raw_path(dataset_id)
     dataset_json_path = raw_dataset_path / "dataset.json"
@@ -115,7 +116,9 @@ def query_step(
         loop_json = {"patches": patches}
         save_loop(raw_dataset_path, loop_json, loop)
     else:
-        write_uncertainties_from_softmax_preds(base_softmax_path, uncertainty_path)
+        write_uncertainties_from_softmax_preds(
+            base_softmax_path, uncertainty_path, num_folds
+        )
         read_images_to_numpy(
             dataset_json_path,
             uncertainty_path,

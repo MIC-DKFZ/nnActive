@@ -21,8 +21,7 @@ from nnactive.utils import create_mitk_geometry_patch
 
 def create_mitk_geometry_file(dataset_id: int, target_id: int, patch_size: List[int]):
     preprocessed_path = get_preprocessed_path(dataset_id)
-    if not preprocessed_path.exists():
-        assert "Please preprocess the dataset before"
+    assert preprocessed_path.exists()  # Please preprocess the dataset before
     nnunet_plans_path = preprocessed_path / "nnUNetPlans.json"
     with open(nnunet_plans_path, "r") as f:
         nnunet_plans = json.load(f)
@@ -63,6 +62,7 @@ def create_mitk_geometry_file(dataset_id: int, target_id: int, patch_size: List[
         ("--starting-budget", {"type": str, "default": "standard"}),
         ("--seed", {"type": int, "default": 12345}),
         (("-np", "--num-processes"), {"type": int, "default": 4}),
+        (("--train_folds"), {"type": int, "default": None}),
     ],
 )
 def main(args: Namespace) -> None:
@@ -73,6 +73,7 @@ def main(args: Namespace) -> None:
     starting_budget = args.starting_budget
     seed = args.seed
     num_processes = args.num_processes
+    train_folds = args.train_folds
 
     if args.patch_size is None and args.base_id is None:
         raise ValueError("Either patch_size or base_id have to be set")
@@ -111,6 +112,7 @@ def main(args: Namespace) -> None:
         seed=seed,
         num_processes=num_processes,
         dataset=base_dataset_name,
+        train_folds=train_folds,
     )
 
     os.makedirs(save_path, exist_ok=True)

@@ -48,35 +48,30 @@ def get_predicted_image_names(pred_path: Path) -> Set[str]:
     return softmax_files
 
 
-def load_softmax_predictions(softmax_file_name: str, pred_path: Path) -> torch.Tensor:
+def load_softmax_predictions(
+    softmax_file_name: str, pred_path: Path, num_folds: int = 5
+) -> torch.Tensor:
     """
     Load the softmax predictions of one image for all folds into one tensor
 
     Args:
         softmax_file_name (str): name of the softmax prediction file (.npz file)
         pred_path (Path): base path of the predictions
+        num_folds (int): amount of folds used for training/prediction
 
     Returns:
         torch.Tensor: tensor containing the softmax predictions with the shape [n_folds, n_classes, image_shape]
     """
-    # use softmax prediction from first fold to determine size of the final tensor
-    n_preds = 5
-    fold_0_image = torch.from_numpy(
-        np.load(os.path.join(pred_path, "fold_0", softmax_file_name))[
-            "probabilities.npy"
-        ]
-    )
-    softmax_preds = torch.zeros(n_preds, *fold_0_image.shape)
-    softmax_preds[0] = fold_0_image
-
-    # fill the tensor with the softmax predictions from the remaining folds
-    for fold in range(1, n_preds):
-        fold_image = torch.from_numpy(
-            np.load(os.path.join(pred_path, f"fold_{fold}", softmax_file_name))[
-                "probabilities.npy"
-            ]
+    softmax_preds = []
+    for fold in range(num_folds):
+        softmax_preds.append(
+            torch.from_numpy(
+                np.load(pred_path / (f"fold_{fold}") / softmax_file_name)[
+                    "probabilities.npy"
+                ]
+            )
         )
-        softmax_preds[fold] = fold_image
+    softmax_preds = torch.stack(softmax_preds, 0)
     return softmax_preds
 
 
@@ -111,7 +106,7 @@ def get_pred_image_info(
 
 
 def calculate_uncertainties(
-    softmax_file_names: Set[str], pred_path: Path, target_path: Path
+    softmax_file_names: Set[str], pred_path: Path, target_path: Path, num_folds: int
 ) -> None:
     """
     Calculate the predictive entropy, expected entropy and the mutual information for all predicted images.
@@ -120,10 +115,11 @@ def calculate_uncertainties(
     Args:
         softmax_file_names (Set[str]): the file names from the images that were predicted
         pred_path (Path): the root path of the predictions
+        num_folds (int): number of folds used for training/prediction
     """
     for image_name in softmax_file_names:
         # load the softmax predictions and calculate the mean
-        softmax_preds = load_softmax_predictions(image_name, pred_path)
+        softmax_preds = load_softmax_predictions(image_name, pred_path, num_folds)
         mean_softmax = torch.mean(softmax_preds, dim=0)
 
         # calculate the predictive entropy
@@ -191,15 +187,18 @@ def calculate_uncertainties_from_softmax_preds() -> None:
     )
     args = parser.parse_args()
     pred_folder = Path(args.p)
+    num_folds = len(
+        [folder for folder in pred_folder.iterdir() if folder.name.startswith("fold_")]
+    )
     target_path = pred_folder / "uncertainties"
-    write_uncertainties_from_softmax_preds(pred_folder, target_path)
+    write_uncertainties_from_softmax_preds(pred_folder, target_path, num_folds)
 
 
 def write_uncertainties_from_softmax_preds(
-    pred_folder: Path, target_path: Path
+    pred_folder: Path, target_path: Path, num_folds: int
 ) -> None:
     image_names = get_predicted_image_names(pred_folder)
-    calculate_uncertainties(image_names, pred_folder, target_path)
+    calculate_uncertainties(image_names, pred_folder, target_path, num_folds)
 
 
 if __name__ == "__main__":

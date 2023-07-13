@@ -14,15 +14,16 @@ TIMEOUT_S = 60 * 60
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
 
-    num_folds = 5
-    predict_nnUNet_ensemble(dataset_id, num_folds)
+    predict_nnUNet_ensemble(dataset_id)
 
 
-def predict_nnUNet_ensemble(dataset_id, num_folds=5):
+def predict_nnUNet_ensemble(dataset_id):
     config = ActiveConfig.get_from_id(dataset_id)
 
     images_path = get_raw_path(dataset_id) / "imagesTr"
     output_path = get_results_path(dataset_id) / "predTr"
+
+    num_folds = config.working_folds
 
     for fold in range(num_folds):
         output_fold_path = output_path / f"fold_{fold}"
