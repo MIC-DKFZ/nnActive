@@ -4,6 +4,7 @@ from argparse import ArgumentParser, Namespace
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import get_raw_path, get_results_path
+from nnactive.results.state import State
 
 TIMEOUT_S = 60 * 60
 
@@ -32,3 +33,7 @@ def predict_nnUNet_ensemble(dataset_id):
         subprocess.run(
             ex_command, shell=True, check=True
         )  # timeout=TIMEOUT_S is not longer required due to better multiprocessing
+
+    state = State.get_id_state(dataset_id)
+    state.pred_tr = True
+    state.save_state()
