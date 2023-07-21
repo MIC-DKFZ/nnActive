@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from setup_experiments.experiment_setup import DatasetSetup
+from experiment_setup import DatasetSetup
 
 dataset_id = 4
 train_folds = 5
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # Experiments with smaller Patch Size
     first_d_set = first_d_set + len(setter.vals)
     uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
-    patch_size = "20 20 20"
+    patch_size = [20, 20, 20]
     query_steps = 20
     query_size = 10
 
