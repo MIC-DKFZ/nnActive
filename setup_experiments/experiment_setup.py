@@ -1,0 +1,166 @@
+import os
+import shutil
+import subprocess
+from itertools import product
+from pathlib import Path
+from typing import Union
+
+from nnactive.config import ActiveConfig
+from nnactive.results.state import State
+
+DEFAULT_QUERIES = (
+    "pred_entropy",
+    "mutual_information",
+    "random",
+    "random-label",
+)
+
+
+class DatasetSetup:
+    def __init__(
+        self,
+        base_id: int,
+        query_steps: int,
+        query_size: int,
+        trainer: str = "nnActiveTrainer_5epochs",
+        starting_budget: str = "random",
+        patch_size: Union[None, str] = None,
+        pre_suffix="",
+        add_validation="",
+        add_uncertainty="",
+        uncertainties: Union[list, tuple] = DEFAULT_QUERIES,
+        seeds: Union[list, tuple] = (12345, 12346, 12347),
+        num_processes: int = 4,
+        full_folds: int = 5,
+        train_folds: int = 5,
+        force_override: bool = False,
+    ):
+        self.base_id = base_id
+        # standard values
+        self.force_override = force_override
+        self.train_folds = train_folds
+        self.full_folds = full_folds
+        self.num_processes = num_processes
+        self.add_uncertainty = add_uncertainty
+        self.add_validation = add_validation
+
+        # standard values iterated over
+        self.seeds = seeds
+        self.uncertainties = uncertainties
+
+        self.base_id = base_id
+        self.query_steps = query_steps
+        self.query_size = query_size
+        self.trainer = trainer
+        self.starting_budget = starting_budget
+        self.patch_size = patch_size
+        self.pre_suffix = pre_suffix
+
+    @property
+    def base_dataset_name(self):
+        for folder in self.data_path.iterdir():
+            if folder.name.startswith(f"Dataset{self.base_id:03d}"):
+                return folder.name
+        raise RuntimeError(f"No Dataset with corresponding base id: {self.base_id}")
+
+    @property
+    def data_path(self):
+        data_path = os.getenv("nnUNet_raw")
+        if data_path is None:
+            raise ValueError("OS variable nnUNet_raw is not set.")
+        return Path(data_path)
+
+    @property
+    def vals(self):
+        return [val for val in product(self.uncertainties, self.seeds)]
+
+    @property
+    def existing_dsets(self):
+        existing_dsets = [
+            folder.name
+            for folder in self.data_path.iterdir()
+            if folder.is_dir() and folder.name.startswith("Dataset")
+        ]
+        return existing_dsets
+
+    def check_dataset_id(self, output_id: int):
+        dset_name = f"Dataset{output_id:03d}"
+        if any([dset.startswith(dset_name) for dset in self.existing_dsets]):
+            print(
+                f"Dataset beginning with '{dset_name}' already exists in {self.data_path}."
+            )
+            if not self.force_override:
+                return False
+            else:
+                os_variables = [
+                    "nnUNet_results",
+                    "nnUNet_raw",
+                    "nnUNet_preprocessed",
+                    "nnActive_results",
+                ]
+                for os_variable in os_variables:
+                    base_path = Path(os.getenv(os_variable))
+                    rm_dirs = [
+                        folder
+                        for folder in base_path.iterdir()
+                        if folder.name.startswith(f"Dataset{output_id:03d}")
+                    ]
+                    for rm_dir in rm_dirs:
+                        print(f"Deleting folder: {rm_dir}")
+                        shutil.rmtree(rm_dir)
+        return True
+
+    def convert_dset(self, dataset_id: int, seed: int, uncertainty: str):
+        print("Converting Dataset")
+        ex_command = "nnactive convert"
+        past_suffix = f"__unc-{uncertainty}__seed-{seed}"
+        name_suffix = self.pre_suffix + past_suffix
+        # DO all of this based on dictionaries!
+        ex_call = f"{ex_command} -d {self.base_id} -o {dataset_id} --strategy {self.starting_budget} --seed {seed} --num-patches {self.query_size} --name-suffix {name_suffix}"
+        print(ex_call)
+        subprocess.run(ex_call, shell=True, check=True)
+
+    def prepare_dset(self, datset_id: int):
+        subprocess.run(
+            f"nnUNetv2_extract_fingerprint -d {datset_id}  -np {self.num_processes}",
+            shell=True,
+            check=True,
+        )
+        subprocess.run(
+            f"nnUNetv2_plan_experiment -d {datset_id} -np {self.num_processes}",
+            shell=True,
+            check=True,
+        )
+
+    def setup_al(
+        self,
+        dataset_id: int,
+        seed: int,
+        uncertainty: str,
+    ):
+        config = ActiveConfig(
+            trainer=self.trainer,
+            patch_size=self.patch_size,
+            uncertainty=uncertainty,
+            query_size=self.query_size,
+            query_steps=self.query_steps,
+            starting_budget=self.starting_budget,
+            seed=seed,
+            num_processes=self.num_processes,
+            dataset=self.base_dataset_name,
+            train_folds=self.train_folds,
+            full_folds=self.full_folds,
+            add_uncertainty=self.add_uncertainty,
+            add_validation=self.add_validation,
+        )
+        config.save_id(dataset_id)
+        state = State(dataset_id=dataset_id)
+        state.save_state()
+
+    def rollout(self, start_id: int):
+        for i, (unc, seed) in enumerate(self.vals):
+            output_id = start_id + i
+            if self.check_dataset_id(output_id):
+                self.convert_dset(output_id, seed, unc)
+                self.prepare_dset(output_id)
+                self.setup_al(output_id, seed, unc)

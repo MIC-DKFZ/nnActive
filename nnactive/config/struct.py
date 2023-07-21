@@ -6,6 +6,8 @@ from typing import Union
 
 from pydantic.dataclasses import dataclass
 
+from nnactive.nnunet.utils import convert_id_to_dataset_name
+from nnactive.paths import get_nnActive_results
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 
@@ -43,7 +45,13 @@ class ActiveConfig:
         return ActiveConfig.from_json(fn)
 
     def save_id(self, id: int):
-        save_path: Path = get_results_folder(id) / FILENAME
+        try:
+            save_path: Path = get_results_folder(id) / FILENAME
+        except FileNotFoundError:
+            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(id)
+            print(f"Creating Path: {save_path}")
+            save_path.mkdir()
+            save_path = save_path / FILENAME
         print(f"Saving Config File to {save_path}")
 
         save_dataclass_to_json(self, save_path)
