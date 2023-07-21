@@ -46,11 +46,11 @@ def main(args: Namespace) -> None:
         if state.get_performance is False:
             get_performance(dataset_id)
             state = State.get_id_state(dataset_id)
-        if state.query is False:
-            # This might be the place where multiprocessing fails us!
-            predict_nnUNet_ensemble(dataset_id)
-            state = State.get_id_state(dataset_id)
         if al_iteration < config.query_steps - 1:
+            if state.pred_tr is False:
+                # This might be the place where multiprocessing fails us!
+                predict_nnUNet_ensemble(dataset_id)
+            state = State.get_id_state(dataset_id)
             if state.query is False:
                 query_step(
                     dataset_id,
@@ -58,6 +58,7 @@ def main(args: Namespace) -> None:
                     config.uncertainty,
                     config.query_size,
                     seed=config.seed,
+                    num_folds=config.working_folds,
                 )
                 state = State.get_id_state(dataset_id)
         if al_iteration < config.query_steps - 1:

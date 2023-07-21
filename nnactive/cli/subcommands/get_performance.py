@@ -89,8 +89,9 @@ def get_performance(dataset_id):
     dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
     plans_identifier = "nnUNetPlans"
     plans_path = get_preprocessed_path(dataset_id) / f"{plans_identifier}.json"
-    splits_path = get_preprocessed_path(dataset_id) / "splits_final.json"
 
+    num_folds = config.working_folds
+    folds = " ".join([f"{fold}" for fold in range(num_folds)])
     loop_results_path: Path = (
         nnActive_results
         / convert_id_to_dataset_name(dataset_id)
@@ -99,7 +100,7 @@ def get_performance(dataset_id):
 
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} {config.add_validation}"
+    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
     print(ex_command)
     subprocess.run(
         ex_command, shell=True, check=True
@@ -111,12 +112,11 @@ def get_performance(dataset_id):
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
     print("Creating a summary of the cross validation results from training...")
-    with open(splits_path, "r") as f:
-        n_folds = len(json.load(f))
+    num_folds = config.working_folds
     summary_cross_val_dict = {}
 
     # first save the individual cross val dicts by simply appending them with key fold_X
-    for fold in range(n_folds):
+    for fold in range(num_folds):
         trained_model_path = get_output_folder(
             dataset_id, config.trainer, plans_identifier, config.model_config, fold
         )
@@ -126,9 +126,9 @@ def get_performance(dataset_id):
         summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
 
     # get foreground mean across folds
-    foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, n_folds)
+    foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, num_folds)
     # get the per class mean across folds
-    per_class_mean_cv = get_mean_cv(summary_cross_val_dict, n_folds)
+    per_class_mean_cv = get_mean_cv(summary_cross_val_dict, num_folds)
     summary_cross_val_dict["mean"] = {}
     summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
     summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv

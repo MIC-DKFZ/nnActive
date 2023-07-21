@@ -5,8 +5,6 @@ from argparse import ArgumentParser
 from itertools import product
 from pathlib import Path
 
-# SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts"
-
 parser = ArgumentParser()
 parser.add_argument(
     "-f",
@@ -70,21 +68,22 @@ if __name__ == "__main__":
         ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
 
         print(ex_call)
-        subprocess.run(ex_call, shell=True)
+        subprocess.run(ex_call, shell=True, check=True)
 
         subprocess.run(
             f"nnUNetv2_extract_fingerprint -d {output_id}  -np 4",
             shell=True,
+            check=True,
         )
         subprocess.run(
-            f"nnUNetv2_plan_experiment -d {output_id} -np 4",
-            shell=True,
+            f"nnUNetv2_plan_experiment -d {output_id} -np 4", shell=True, check=True
         )
 
         ex_command = "nnactive setup_al_experiment"
         subprocess.run(
             f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --starting-budget {starting_budget} --seed {seed}",
             shell=True,
+            check=True,
         )
 
     first_d_set = first_d_set + len(vals)
@@ -127,19 +126,19 @@ if __name__ == "__main__":
         subprocess.run(
             f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --patch-size {patch_size} --num-patches {query_size} --name-suffix {name_suffix}",
             shell=True,
+            check=True,
         )
 
         subprocess.run(
-            f"nnUNetv2_extract_fingerprint -d {output_id} -np 4",
-            shell=True,
+            f"nnUNetv2_extract_fingerprint -d {output_id} -np 4", shell=True, check=True
         )
         subprocess.run(
-            f"nnUNetv2_plan_experiment -d {output_id}  -np 4",
-            shell=True,
+            f"nnUNetv2_plan_experiment -d {output_id}  -np 4", shell=True, check=True
         )
 
         ex_command = "nnactive setup_al_experiment"
         subprocess.run(
             f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --patch-size {patch_size} --starting-budget {starting_budget} --seed {seed}",
             shell=True,
+            check=True,
         )

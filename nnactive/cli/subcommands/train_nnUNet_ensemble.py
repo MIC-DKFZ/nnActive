@@ -8,16 +8,14 @@ from nnactive.results.state import State
 
 @register_subcommand("train_nnUNet_ensemble", [(("-d", "--dataset_id"), {"type": int})])
 def main(args: Namespace) -> None:
-    # TODO: help
     dataset_id = args.dataset_id
 
-    num_folds = 5
-
-    train_nnUNet_ensemble(dataset_id, num_folds)
+    train_nnUNet_ensemble(dataset_id)
 
 
-def train_nnUNet_ensemble(dataset_id, num_folds=5):
+def train_nnUNet_ensemble(dataset_id):
     config = ActiveConfig.get_from_id(dataset_id)
+    num_folds = config.working_folds
 
     for fold in range(num_folds):
         ex_command = f"nnUNetv2_train {dataset_id} {config.model_config} {fold} -tr {config.trainer}"

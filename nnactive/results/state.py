@@ -25,6 +25,7 @@ class State:
     preprocess: bool = False
     training: bool = False
     get_performance: bool = False
+    pred_tr: bool = False
     query: bool = False
     update_data: bool = False
 
@@ -33,6 +34,7 @@ class State:
         self.preprocess = False
         self.training = False
         self.get_performance = False
+        self.pred_tr = False
         self.query = False
         self.update_data = False
 
@@ -56,8 +58,12 @@ class State:
             assert (
                 self.training
             )  # performance for loop requires trained models for this loop
+        if self.pred_tr:
+            assert self.training
         if self.query:
             assert self.training  # query for loop requires trained models for this loop
+            # TODO: better version
+            # assert self.pred_tr
         if self.update_data:
             assert self.query  # updating data requires loop_XXX.json file
 

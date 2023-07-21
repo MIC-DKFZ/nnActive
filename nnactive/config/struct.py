@@ -24,6 +24,8 @@ class ActiveConfig:
     query_steps: int = 10  # how many query steps are supposed to be made
     seed: int = 12345  # seed to be used for everything random in the experiment
     num_processes: int = 4  # how many processes are used within nnU-Net
+    full_folds: int = 5  # the amount of folds used in the split
+    train_folds: Union[int, None] = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
     add_uncertainty: str = ""  # e.g. --disable_tta
     add_validation: str = ""  # e.g. --disable_tta
@@ -49,3 +51,7 @@ class ActiveConfig:
     @staticmethod
     def filename():
         return FILENAME
+
+    @property
+    def working_folds(self):
+        return self.train_folds if self.train_folds is not None else self.full_folds
