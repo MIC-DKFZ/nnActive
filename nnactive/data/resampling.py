@@ -59,6 +59,8 @@ def resample_to_target_spacing(
     data = data.transpose([0, *[i + 1 for i in plans_manager.transpose_backward]])
     for channel, input_name in enumerate(input_names):
         img_itk_new = sitk.GetImageFromArray(data[channel])
+        # TODO: This implementation caused issues when resampling the amos dataset. Workaround for amos dataset:
+        #  img_itk_new.SetSpacing(tuple(list(config_manager.spacing)[::-1]))
         img_itk_new.SetSpacing(
             [config_manager.spacing[i] for i in plans_manager.transpose_backward]
         )
@@ -74,6 +76,8 @@ def resample_to_target_spacing(
         [0, *[i + 1 for i in plans_manager.transpose_backward]]
     ).squeeze()
     img_itk_new = sitk.GetImageFromArray(seg)
+    # TODO: This implementation caused issues when resampling the amos dataset. Workaround for amos dataset:
+    #  img_itk_new.SetSpacing(tuple(list(config_manager.spacing)[::-1]))
     img_itk_new.SetSpacing(
         [config_manager.spacing[i] for i in plans_manager.transpose_backward]
     )
