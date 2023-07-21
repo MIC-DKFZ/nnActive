@@ -109,6 +109,7 @@ def convert_dataset_to_partannotated(
         target_labelsTr_dir = target_dir / "labelsTr"
 
         ignore_label = target_dataset_json["labels"]["ignore"]
+        background_cls = base_dataset_json["labels"].get("background")
         file_ending = base_dataset_json["file_ending"]
 
         # create patches list for dataset creation
@@ -122,6 +123,7 @@ def convert_dataset_to_partannotated(
             patch_func_kwargs=patch_kwargs,
             strategy=strategy,
             seed=seed,
+            background_cls=background_cls,
         )
 
         # Create labels from patches
@@ -143,6 +145,7 @@ def get_patches_for_partannotation(
     patch_func_kwargs: dict = None,
     strategy: str = "random",
     seed: int = 12345,
+    background_cls: Union[int, None] = None,
 ) -> list[Patch]:
     """Creates patches based on annotation strategies.
 
@@ -193,7 +196,8 @@ def get_patches_for_partannotation(
             patch_size,
             n_patches=num_patches,
             labeled_patches=patches,
-            seed=seed,  # change seed here so that list is not identical
+            seed=seed,
+            background_cls=background_cls,
         )
     else:
         raise NotImplementedError(f"strategy `{strategy}` is not implemented")

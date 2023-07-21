@@ -51,6 +51,7 @@ def generate_random_patches_labels(
     labeled_patches: list[Patch],
     seed: int = None,
     trials_per_img: int = 6000,
+    background_cls: Union[int, None] = None,
 ) -> list[Patch]:
     rng = np.random.default_rng(seed)
     img_names = [path.name for path in seg_labels_path.glob(f"**/*{file_ending}")]
@@ -61,6 +62,9 @@ def generate_random_patches_labels(
 
     patches = []
     for i in range(n_patches):
+        print("-" * 8)
+        print("-" * 8)
+        print(f"Start Creation of Patch {i}")
         labeled = False
         patch_count = 0
         while True:
@@ -69,6 +73,7 @@ def generate_random_patches_labels(
                 break
 
             img_name = img_generator.__next__()
+            print("-" * 8)
             print(f"Loading image: {img_name}")
             label_map = get_label_map(
                 img_name.replace(file_ending, ""), seg_labels_path, file_ending
@@ -93,7 +98,9 @@ def generate_random_patches_labels(
 
             if area in ["seg", "border"]:
                 print(f"Get Locations for Style: {area}")
-                locs = get_locs_from_segmentation(label_map, area).tolist()
+                locs = get_locs_from_segmentation(
+                    label_map, area, state=rng, background_cls=background_cls
+                ).tolist()
                 print("Obtaining Locations was succesful.")
                 if len(locs) == 0:
                     continue
@@ -304,7 +311,7 @@ def _obtain_random_patch_from_locs(
 
     for dim_loc, dim_img, dim_patch in zip(loc, img_size, patch_real_size):
         if dim_patch >= dim_img:
-            patch_loc.append([0])
+            patch_loc.append(0)
         else:
             # patch fits right into the image
             if dim_loc + dim_patch // 2 <= dim_img and dim_loc - dim_patch // 2 >= 0:

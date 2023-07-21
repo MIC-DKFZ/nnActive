@@ -98,6 +98,7 @@ def query_step(
         labeled_patches = get_patches_from_loop_files(raw_dataset_path, loop - 1)
 
         base_path = get_raw_path(dataset_json["annotated_id"])
+        background_cls = dataset_json["labels"].get("background")
 
         patches = generate_random_patches_labels(
             file_ending,
@@ -107,6 +108,7 @@ def query_step(
             labeled_patches=labeled_patches,
             seed=seed + loop,
             trials_per_img=600,
+            background_cls=background_cls,
         )
         # bring into loop_XXX.json format and save!
         loop_json = {"patches": patches}
