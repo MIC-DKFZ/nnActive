@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Union
 
 from nnactive.config import ActiveConfig
+from nnactive.nnunet.utils import get_patch_size
 from nnactive.results.state import State
 
 DEFAULT_QUERIES = (
@@ -14,6 +15,7 @@ DEFAULT_QUERIES = (
     "random",
     "random-label",
 )
+from typing import List
 
 
 class DatasetSetup:
@@ -24,7 +26,7 @@ class DatasetSetup:
         query_size: int,
         trainer: str = "nnActiveTrainer_5epochs",
         starting_budget: str = "random",
-        patch_size: Union[None, str] = None,
+        patch_size: Union[None, List[int]] = None,
         pre_suffix="",
         add_validation="",
         add_uncertainty="",
@@ -53,7 +55,9 @@ class DatasetSetup:
         self.query_size = query_size
         self.trainer = trainer
         self.starting_budget = starting_budget
-        self.patch_size = patch_size
+        self.patch_size = (
+            get_patch_size(self.base_id) if patch_size is None else patch_size
+        )
         self.pre_suffix = pre_suffix
 
     @property
@@ -116,7 +120,10 @@ class DatasetSetup:
         past_suffix = f"__unc-{uncertainty}__seed-{seed}"
         name_suffix = self.pre_suffix + past_suffix
         # DO all of this based on dictionaries!
-        ex_call = f"{ex_command} -d {self.base_id} -o {dataset_id} --strategy {self.starting_budget} --seed {seed} --num-patches {self.query_size} --name-suffix {name_suffix}"
+        patch_call = str(self.patch_size)
+        for rm in ["(", ")", "[", "]", ","]:
+            patch_call = patch_call.replace(rm, "")
+        ex_call = f"{ex_command} -d {self.base_id} -o {dataset_id} --strategy {self.starting_budget} --seed {seed} --num-patches {self.query_size} --name-suffix {name_suffix} --patch-size {patch_call}"
         print(ex_call)
         subprocess.run(ex_call, shell=True, check=True)
 

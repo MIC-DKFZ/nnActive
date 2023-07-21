@@ -35,6 +35,7 @@ if __name__ == "__main__":
     starting_budget = "random"
     num_processes = 10
     train_folds = 5
+    pre_suffix = "__patch-full_patch"
 
     # Experiments with whole Images as Patches
     setter = DatasetSetup(
@@ -47,6 +48,7 @@ if __name__ == "__main__":
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=force_override,
+        pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
 
@@ -57,6 +59,8 @@ if __name__ == "__main__":
     query_steps = 20
     query_size = 10
 
+    pre_suffix = "__patch-20"
+
     setter = DatasetSetup(
         base_id=dataset_id,
         query_steps=query_steps,
@@ -67,14 +71,17 @@ if __name__ == "__main__":
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=force_override,
+        pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
 
-    # Experimetns with small Patch Size
+    # Experiments with smaller Patch Size & bigger Query Size
 
     first_d_set = first_d_set + len(setter.vals)
     query_steps = 10
     query_size = 20
+
+    pre_suffix = "__patch-20__qs20"
     setter = DatasetSetup(
         base_id=dataset_id,
         query_steps=query_steps,
@@ -85,12 +92,16 @@ if __name__ == "__main__":
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=force_override,
+        pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
+
+    # Experiments with smaller Patch Size & much bigger Query Size
 
     first_d_set = first_d_set + len(setter.vals)
     query_steps = 5
     query_size = 40
+    pre_suffix = "__patch-20__qs40"
     setter = DatasetSetup(
         base_id=dataset_id,
         query_steps=query_steps,
@@ -101,5 +112,6 @@ if __name__ == "__main__":
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=force_override,
+        pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
