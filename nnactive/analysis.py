@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -46,7 +47,9 @@ def get_experiment_results(experiment_path: Path):
     return dict_list
 
 
-def compare_multi_experiment_results(base_path: Path):
+def compare_multi_experiment_results(
+    base_path: Path, base_dataset_id: Union[int, None] = None
+):
     """WIP version to plot and combine results of multiple experiments.
     Plots results of the current experiments in current folder.
 
@@ -58,9 +61,12 @@ def compare_multi_experiment_results(base_path: Path):
         if exp_path.name.startswith("Dataset"):
             experiment_vals.extend(get_experiment_results(exp_path))
     df = pd.DataFrame(experiment_vals)
-
-    # TODO: multiple different datasets
-    # Currently this is not supported at all!
+    if base_dataset_id:
+        df = (
+            df[df["dataset"].str.startswith(f"Dataset{base_dataset_id:03d}")]
+            .reset_index()
+            .drop("index", axis=1)
+        )
 
     skip_keys = [
         "Experiment Name",
@@ -86,7 +92,7 @@ def compare_multi_experiment_results(base_path: Path):
         )
 
         # Value for Hippocampus Dataset
-        axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
+        # axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
         axs.set_xticks(np.arange(0, key[max_loop_ind]))
         axs.legend(loc="best")
         plt.savefig(f"Performance__{key}.png")

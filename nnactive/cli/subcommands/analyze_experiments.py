@@ -17,8 +17,17 @@ from nnactive.paths import get_nnActive_results
                 "help": "Path to nnActive results for later use",
             },
         ),
+        (
+            ("--base_dataset_id"),
+            {
+                "type": int,
+                "default": None,
+                "help": "Dataset ID from which the childern are used for visualization",
+            },
+        ),
     ],
 )
 def main(args: Namespace):
     base_path = Path(args.base_path)
-    compare_multi_experiment_results(base_path)
+    base_dataset_id = args.base_dataset_id
+    compare_multi_experiment_results(base_path, base_dataset_id)
