@@ -52,6 +52,7 @@ def generate_random_patches_labels(
     seed: int = None,
     trials_per_img: int = 6000,
     background_cls: Union[int, None] = None,
+    verbose: bool = False,
 ) -> list[Patch]:
     rng = np.random.default_rng(seed)
     img_names = [path.name for path in seg_labels_path.glob(f"**/*{file_ending}")]
@@ -62,30 +63,34 @@ def generate_random_patches_labels(
 
     patches = []
     for i in range(n_patches):
-        print("-" * 8)
-        print("-" * 8)
-        print(f"Start Creation of Patch {i}")
+        if verbose:
+            print("-" * 8)
+            print("-" * 8)
+            print(f"Start Creation of Patch {i}")
         labeled = False
         patch_count = 0
         while True:
             if patch_count > 3 * len(img_names):
-                print("No more Patches could be Created!")
+                print(f"No more Patches could be Created for Patch {i}!")
                 break
 
             img_name = img_generator.__next__()
-            print("-" * 8)
-            print(f"Loading image: {img_name}")
+            if verbose:
+                print("-" * 8)
+                print(f"Loading image: {img_name}")
             label_map = get_label_map(
                 img_name.replace(file_ending, ""), seg_labels_path, file_ending
             )
             current_patch_list = labeled_patches + patches
             img_size = label_map.shape
             # only needed for creation of patches in first iteration
-            print(f"Create Mask: {img_name}")
+            if verbose:
+                print(f"Create Mask: {img_name}")
             selected_array = create_patch_mask_for_image(
                 img_name, current_patch_list, img_size
             )
-            print("Mask creation succesfull")
+            if verbose:
+                print("Mask creation succesfull")
 
             area = rng.choice(["all", "seg", "border"])
 
@@ -94,14 +99,17 @@ def generate_random_patches_labels(
             # label_map[selected_array] = 0
             # Let us not do that since for big images it takes ages
 
-            print(f"Start drawing random patch with strategy: {area}")
+            if verbose:
+                print(f"Start drawing random patch with strategy: {area}")
 
             if area in ["seg", "border"]:
-                print(f"Get Locations for Style: {area}")
+                if verbose:
+                    print(f"Get Locations for Style: {area}")
                 locs = get_locs_from_segmentation(
                     label_map, area, state=rng, background_cls=background_cls
                 ).tolist()
-                print("Obtaining Locations was succesful.")
+                if verbose:
+                    print("Obtaining Locations was succesful.")
                 if len(locs) == 0:
                     continue
 
@@ -110,7 +118,8 @@ def generate_random_patches_labels(
             while True:
                 # propose a random patch
                 if area in ["seg", "border"]:
-                    print("Draw Random Patch")
+                    if verbose:
+                        print("Draw Random Patch")
                     iter_patch_loc, iter_patch_size = _obtain_random_patch_from_locs(
                         locs, img_size, patch_size, rng
                     )
@@ -150,6 +159,7 @@ def generate_random_patches(
     labeled_patches: list[Patch],
     seed: int = None,
     trials_per_img: int = 6000,
+    verbose: bool = False,
 ) -> list[Patch]:
     """Generates random patches based on randomly drawing starting indices fitting inside the dataset.
 
@@ -177,7 +187,8 @@ def generate_random_patches(
         labeled = False
         while True:
             img_name = img_generator.__next__()
-            print(f"Loading Image: {img_name}")
+            if verbose:
+                print(f"Loading Image: {img_name}")
             label_map: np.ndarray = get_label_map(
                 img_name.replace(file_ending, ""), raw_labels_path, file_ending
             )

@@ -28,6 +28,7 @@ from nnactive.query.random import (
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
+from nnactive.utils.hostutils import get_verbose
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
 NNUNET_PREPROCESSED = (
@@ -198,6 +199,7 @@ def get_patches_for_partannotation(
             labeled_patches=patches,
             seed=seed,
             background_cls=background_cls,
+            verbose=get_verbose(None),
         )
     else:
         raise NotImplementedError(f"strategy `{strategy}` is not implemented")

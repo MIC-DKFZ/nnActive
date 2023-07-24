@@ -20,6 +20,7 @@ from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
     aggregate_uncertainties_per_image,
     read_images_to_numpy,
 )
+from nnactive.utils.hostutils import get_verbose
 
 
 @register_subcommand(
@@ -109,6 +110,7 @@ def query_step(
             seed=seed + loop,
             trials_per_img=600,
             background_cls=background_cls,
+            verbose=get_verbose(None),
         )
         # bring into loop_XXX.json format and save!
         loop_json = {"patches": patches}
