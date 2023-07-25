@@ -16,7 +16,7 @@ PALETTE = {
     "pred_entropy": "tab:green",
     "mutual_information": "tab:orange",
     # "other_1": "tab:purple",
-    # "other_2": "tab:red",
+    "random-label": "tab:red",
     # "other_3": "tab:cyan",
 }
 
@@ -39,7 +39,11 @@ def get_experiment_results(experiment_path: Path):
     filenames.sort()
     dict_list = load_results(filenames)
 
-    config = ActiveConfig.from_json(experiment_path / ActiveConfig.filename()).__dict__
+    config_item = ActiveConfig.from_json(experiment_path / ActiveConfig.filename())
+    config = config_item.__dict__
+    config.pop("train_folds")
+    config["working_folds"] = config_item.working_folds
+
     for dictval in dict_list:
         dictval["Experiment Name"] = experiment_path.name
         dictval.update(config)
@@ -102,7 +106,7 @@ def compare_multi_experiment_results(
         label_eff_plot = []
 
         # try:
-        if True:
+        if False:
             #######################
             # version for each random
             #######################
