@@ -164,8 +164,11 @@ class DatasetSetup:
         state = State(dataset_id=dataset_id)
         state.save_state()
 
-    def rollout(self, start_id: int):
+    def rollout(self, start_id: int, num_experiments: int | None = None):
         for i, (unc, seed) in enumerate(self.vals):
+            if num_experiments:
+                if i >= num_experiments:
+                    break
             output_id = start_id + i
             if self.check_dataset_id(output_id):
                 self.convert_dset(output_id, seed, unc)
