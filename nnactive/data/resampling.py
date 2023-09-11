@@ -14,7 +14,6 @@ from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     DefaultPreprocessor,
     PlansManager,
 )
-from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 from rich.progress import track
 
 
@@ -104,7 +103,6 @@ def resample_dataset(
         dataset_cfg: nnUNet dataset json
         rs_img_path: original images path
         rs_gt_path: original gt labels path
-        raw_path: nnUNet raw path
         img_path: target images path
         gt_path: target gt labels path
         preprocessed_path: nnUNet preprocessed path

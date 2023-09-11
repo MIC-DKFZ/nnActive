@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from nnactive.query_patches import get_top_n_non_overlapping_patches
+from nnactive.strategies.base_uncertainty import select_top_n_non_overlapping_patches
 from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
     whole_patch_aggregation,
 )
@@ -26,7 +26,7 @@ def test_query_patches(test_image, patch_size):
     image_aggregated = whole_patch_aggregation(test_image, patch_size)
     selected_array = np.zeros_like(test_image)
     n = 3
-    queried_patches = get_top_n_non_overlapping_patches(
+    queried_patches = select_top_n_non_overlapping_patches(
         "test", n, image_aggregated, np.array(patch_size), selected_array
     )
     queried_patches = sorted(queried_patches, key=lambda d: d["score"], reverse=True)
@@ -44,7 +44,7 @@ def test_query_patches_with_annotated(test_image, patch_size):
     selected_array = np.zeros_like(test_image)
     selected_array[0:10] = 1
     n = 3
-    queried_patches = get_top_n_non_overlapping_patches(
+    queried_patches = select_top_n_non_overlapping_patches(
         "test", n, image_aggregated, np.array(patch_size), selected_array
     )
     queried_patches = sorted(queried_patches, key=lambda d: d["score"], reverse=True)

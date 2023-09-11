@@ -7,8 +7,6 @@ from nnactive.query_pool import query_pool
 from nnactive.results.state import State
 
 from .get_performance import get_performance
-from .predict_nnUNet_ensemble import predict_nnUNet_ensemble
-from .query_step import query_step
 from .train_nnUNet_ensemble import train_nnUNet_ensemble
 from .update_data import update_step
 

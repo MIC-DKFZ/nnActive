@@ -18,6 +18,7 @@ from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
 
+from nnactive.aggregations.convolution import ConvolveAgg
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.masking import does_overlap, mark_selected
@@ -37,6 +38,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         super().__init__(dataset_id, query_size, patch_size, file_ending)
         # self.top_patches = []  # carries the top patches of all images
         self.config = ActiveConfig.get_from_id(dataset_id)
+        self.aggregation = ConvolveAgg(patch_size)
 
     def query(self, verbose=False) -> list[Patch]:
         # Initialize Predictor
@@ -82,7 +84,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             # unc_num_nan = torch.sum(torch.isnan(uncertainty))
             # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
             print(f" NAN values in uncertainties for image {label_file}")
-        agg_uncertainty, kernel_size = self.aggregate(uncertainty)
+        agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
         agg_uncertainty = agg_uncertainty.cpu().numpy()
 
         selected_array = self.initialize_selected_array(
@@ -103,7 +105,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             out_probs (torch.Tensor): probability maps for image [M x C x XYZ]
 
         Returns:
-            torch.Tensor: outputs
+            torch.Tensor: outputs [M x C xXYZ]
         """
 
     def select_top_n_non_overlapping_patches(
@@ -128,7 +130,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             sorted_uncertainty_scores, sorted_uncertainty_indices
         ):
             # get coordinates in image space from aggregated indices
-            coords = self.transpose_aggregate(uncertainty_index, aggregated.shape)
+            coords = self.aggregation.backward_index(
+                uncertainty_index, aggregated.shape
+            )
             # Check if coordinated overlap with already queried region
             if not does_overlap(coords, patch_size, selected_array):
                 # If it is a non-overlapping region, append this patch to be queried
@@ -147,43 +151,6 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             if n is not None and len(selected_patches) >= n:
                 break
         return selected_patches
-
-    def aggregate(self, uncertainty: torch.Tensor) -> Tuple[torch.Tensor, list[int]]:
-        kernel_size = [
-            min(self.patch_size[i], uncertainty.shape[i])
-            for i in range(len(self.patch_size))
-        ]
-        kernel = torch.ones(size=[1, 1] + kernel_size, device=uncertainty.device)
-
-        if len(uncertainty.shape) == 2:
-            aggregated = torch.nn.functional.conv2d(
-                uncertainty.unsqueeze(0).unsqueeze(0),
-                weight=kernel,
-            )
-        elif len(uncertainty.shape) == 3:
-            aggregated = torch.nn.functional.conv3d(
-                uncertainty.unsqueeze(0).unsqueeze(0),
-                weight=kernel,
-            )
-        else:
-            raise NotImplementedError()
-        return aggregated.squeeze(), kernel_size
-
-    def transpose_aggregate(
-        self, aggregated_index: np.ndarray, aggregated_shape: Iterable[int]
-    ) -> np.ndarray:
-        """Compute indices from the aggregated images into starting coordinates for patches in image space
-
-        Args:
-            aggregated_index (np.ndarray): index in aggregated space
-            aggregated_shape (Iterable[int]): shape of aggregated image
-
-        Returns:
-            np.ndarray: corresponding index in image space
-        """
-        # Get the index as coordinates
-        # this works after convolution index_img_start = index_conv_start, index_img_end = index_conv_start+ size_dim
-        return np.unravel_index(aggregated_index, aggregated_shape)
 
     def compose_query_of_patches(self):
         sorted_top_patches = sorted(
@@ -379,3 +346,55 @@ class nnActivePredictor(nnUNetPredictor):
             num_processes_preprocessing,
         )
         return data_iterator
+
+
+def select_top_n_non_overlapping_patches(
+    image_name: str,
+    n: int,
+    uncertainty_scores: np.ndarray,
+    patch_size: np.ndarray,
+    selected_array: np.ndarray,
+) -> list[dict]:
+    """
+    Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
+
+    Args:
+        image_name (str): the name of the aggregated uncertainty map (npz file)
+        n (int): number of non-overlapping patches that should be queried at most
+        uncertainty_scores (np.ndarray): the aggregated uncertainty map
+        patch_size (np.ndarray): patch size that was used to aggregate the uncertainties
+        selected_array (np.ndarray): array with already labeled patches
+
+    Returns:
+        list[dict]: the most n uncertain non-overlapping patches for one image
+    """
+    selected_patches = []
+    sorted_uncertainty_scores = np.flip(np.sort(uncertainty_scores.flatten()))
+    sorted_uncertainty_indices = np.flip(np.argsort(uncertainty_scores.flatten()))
+    # This was just for visualization purposes in MITK
+    # selected = 0
+
+    # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
+    for uncertainty_score, uncertainty_index in zip(
+        sorted_uncertainty_scores, sorted_uncertainty_indices
+    ):
+        # Get the index as coordinates
+        coords = np.unravel_index(uncertainty_index, uncertainty_scores.shape)
+        # Check if coordinated overlap with already queried region
+        if not does_overlap(coords, patch_size, selected_array):
+            # If it is a non-overlapping region, append this patch to be queried
+            selected_patches.append(
+                {
+                    "file": image_name,
+                    "coords": coords,
+                    "size": patch_size,
+                    "score": uncertainty_score,
+                }
+            )
+            # selected += 1
+            # Mark region as queried
+            selected_array = mark_selected(selected_array, coords, patch_size)
+        # Stop if we reach the maximum number of patches to be queried
+        if n is not None and len(selected_patches) >= n:
+            break
+    return selected_patches
