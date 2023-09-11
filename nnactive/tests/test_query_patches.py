@@ -2,9 +2,7 @@ import numpy as np
 import pytest
 
 from nnactive.strategies.base_uncertainty import select_top_n_non_overlapping_patches
-from nnactive.uncertainty_aggregation.aggregate_uncertainties import (
-    whole_patch_aggregation,
-)
+from nnactive.aggregations.convolution import ConvolveAgg
 
 
 @pytest.fixture
@@ -23,7 +21,8 @@ def test_image():
 
 
 def test_query_patches(test_image, patch_size):
-    image_aggregated = whole_patch_aggregation(test_image, patch_size)
+    aggregation = ConvolveAgg(patch_size)
+    image_aggregated = aggregation.forward(test_image)
     selected_array = np.zeros_like(test_image)
     n = 3
     queried_patches = select_top_n_non_overlapping_patches(
@@ -40,7 +39,8 @@ def test_query_patches(test_image, patch_size):
 
 
 def test_query_patches_with_annotated(test_image, patch_size):
-    image_aggregated = whole_patch_aggregation(test_image, patch_size)
+    aggregation = ConvolveAgg(patch_size)
+    image_aggregated = aggregation.forward(test_image)
     selected_array = np.zeros_like(test_image)
     selected_array[0:10] = 1
     n = 3
