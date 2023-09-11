@@ -5,6 +5,7 @@ Adds ignore value to dataset.json if not already present
 
 import json
 import os
+from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
@@ -14,11 +15,11 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnactive.data.utils import copy_geometry_sitk
 
 
-def read_dataset_json(dataset_name):
-    raw_data_folder = os.path.join(nnUNet_raw, dataset_name)
-    dataset_json_path = os.path.join(raw_data_folder, "dataset.json")
-    with open(dataset_json_path, "r") as f:
-        dataset_json = json.load(f)
+def read_dataset_json(dataset_name: str) -> dict:
+    raw_data_folder: str = os.path.join(nnUNet_raw, dataset_name)
+    dataset_json_path: str = os.path.join(raw_data_folder, "dataset.json")
+    with open(dataset_json_path, "r") as file:
+        dataset_json = json.load(file)
     return dataset_json
 
 
@@ -46,13 +47,13 @@ def add_ignore_label_to_dataset_json(dataset_json: dict) -> dict:
     return dataset_json
 
 
-def create_empty_mask(image_filename, ignore_label, save_filename):
+def create_empty_mask(image_filename: Path, ignore_label: int, save_filename: Path):
     """Create an empty label mask for a sitk readable image with ignore label.
 
     Args:
-        image_filename (_type_): _description_
-        ignore_label (_type_): _description_
-        save_filename (_type_): _description_
+        image_filename (Path): filename of labelmap to be loaded
+        ignore_label (int): fill value of new labelmap
+        save_filename (Path): path to new filename
     """
     img_itk = sitk.ReadImage(image_filename)
     img_npy = sitk.GetArrayFromImage(img_itk)
@@ -63,7 +64,7 @@ def create_empty_mask(image_filename, ignore_label, save_filename):
     sitk.WriteImage(img_itk_new, save_filename)
 
 
-def create_images_ignore_label(dataset_name, dataset_json):
+def create_images_ignore_label(dataset_name: str, dataset_json: dict):
     imagesTr_dir = os.path.join(nnUNet_raw, dataset_name, "imagesTr")
     labelsTr_dir = os.path.join(nnUNet_raw, dataset_name, "labelsTr")
     os.makedirs(labelsTr_dir, exist_ok=True)

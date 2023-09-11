@@ -10,6 +10,7 @@ from nnactive.nnunet.utils import convert_id_to_dataset_name
 from nnactive.paths import get_nnActive_results
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
+from nnactive.utils.pyutils import get_clean_dataclass_dict
 
 FILENAME = "config.json"
 
@@ -43,6 +44,9 @@ class ActiveConfig:
     def get_from_id(cls, id: int) -> ActiveConfig:
         fn = get_results_folder(id) / FILENAME
         return ActiveConfig.from_json(fn)
+
+    def to_dict(self):
+        return get_clean_dataclass_dict(self)
 
     def save_id(self, id: int):
         try:

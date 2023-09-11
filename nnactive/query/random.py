@@ -2,10 +2,10 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
-import SimpleITK as sitk
 
 from nnactive.data import Patch
 from nnactive.query.get_locs import get_locs_from_segmentation
+from nnactive.utils.io import load_label_map
 
 
 def _get_infinte_iter(finite_list):
@@ -37,12 +37,6 @@ def _does_overlap(
     return False
 
 
-def get_label_map(image_id: str, raw_labels_dir: Path, file_ending: str) -> np.ndarray:
-    image_path = raw_labels_dir / f"{image_id}{file_ending}"
-    sitk_image = sitk.ReadImage(image_path)
-    return sitk.GetArrayFromImage(sitk_image)
-
-
 def generate_random_patches_labels(
     file_ending: str,
     seg_labels_path: Path,
@@ -62,6 +56,7 @@ def generate_random_patches_labels(
     img_generator = _get_infinte_iter(img_names)
 
     patches = []
+    print("Verbose", verbose)
     for i in range(n_patches):
         if verbose:
             print("-" * 8)
@@ -78,7 +73,7 @@ def generate_random_patches_labels(
             if verbose:
                 print("-" * 8)
                 print(f"Loading image: {img_name}")
-            label_map = get_label_map(
+            label_map = load_label_map(
                 img_name.replace(file_ending, ""), seg_labels_path, file_ending
             )
             current_patch_list = labeled_patches + patches
@@ -139,6 +134,7 @@ def generate_random_patches_labels(
                 if num_tries == trials_per_img:
                     print(f"Could not place patch in image {img_name}")
                     print(f"PatchCount {len(patches)}")
+                    print(num_tries)
                     count = 0
                     for item in img_names:
                         if item == img_name:
@@ -159,7 +155,7 @@ def generate_random_patches(
     labeled_patches: list[Patch],
     seed: int = None,
     trials_per_img: int = 6000,
-    verbose: bool = False,
+    verbose: bool = True,
 ) -> list[Patch]:
     """Generates random patches based on randomly drawing starting indices fitting inside the dataset.
 
@@ -176,6 +172,8 @@ def generate_random_patches(
         list[Patch]: _description_
     """
     rng = np.random.default_rng(seed)
+    if verbose:
+        print(f"Initializing RNG with Seed: {seed}")
     img_names = [path.name for path in raw_labels_path.glob(f"**/*{file_ending}")]
     rng.shuffle(img_names)
 
@@ -189,7 +187,7 @@ def generate_random_patches(
             img_name = img_generator.__next__()
             if verbose:
                 print(f"Loading Image: {img_name}")
-            label_map: np.ndarray = get_label_map(
+            label_map = load_label_map(
                 img_name.replace(file_ending, ""), raw_labels_path, file_ending
             )
             current_patch_list = labeled_patches + patches
@@ -212,12 +210,14 @@ def generate_random_patches(
                     patches.append(Patch(img_name, iter_patch_loc, iter_patch_size))
                     # print(f"Creating Patch with iteration: {num_tries}")
                     labeled = True
+                    print(num_tries)
                     break
 
                 # if no new patch could fit inside of img do not consider again
                 if num_tries == trials_per_img:
                     print(f"Could not place patch in image {img_name}")
                     print(f"PatchCount {len(patches)}")
+                    print(num_tries)
                     count = 0
                     for item in img_names:
                         if item == img_name:

@@ -7,7 +7,7 @@ def get_hostname() -> str:
 
 
 def get_verbose(verbose: Union[bool, None]):
-    if get_verbose is not None:
+    if verbose is not None:
         return verbose
     else:
         hostname = get_hostname()

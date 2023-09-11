@@ -24,6 +24,7 @@ def predict_nnUNet_ensemble(dataset_id):
         images_path = get_raw_path(dataset_id) / "imagesTr"
         output_path = get_results_path(dataset_id) / "predTr"
 
+        state = State.get_id_state(dataset_id)
         num_folds = config.working_folds
 
         for fold in range(num_folds):
@@ -34,6 +35,5 @@ def predict_nnUNet_ensemble(dataset_id):
                 ex_command, shell=True, check=True
             )  # timeout=TIMEOUT_S is not longer required due to better multiprocessing
 
-    state = State.get_id_state(dataset_id)
     state.pred_tr = True
     state.save_state()

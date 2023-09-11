@@ -73,7 +73,7 @@ nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
 
 1. Create Validation Split
 ```bash
-python scripts/create_val_split.py -d 4
+python nnactive create_val_split.py -d 4
 ```
 Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
 

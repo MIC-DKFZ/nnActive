@@ -15,11 +15,11 @@ def get_patches_from_loop_files(
     """Returns aggregated labeled patches of all loop_xxx.json files within loop_val
 
     Args:
-        data_path (Path): _description_
-        loop_val (Optional[int], optional): _description_. Defaults to None.
+        data_path (Path): path to datafolder with loop_xxx.json files
+        loop_val (Optional[int], optional): int(xxx) to allow until corresponding file. Defaults to None.
 
     Returns:
-        list[Patch]: _description_
+        list[Patch]: see description
     """
 
     loop_files = get_sorted_loop_files(data_path)

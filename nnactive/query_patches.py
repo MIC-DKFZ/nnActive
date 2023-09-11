@@ -2,94 +2,23 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import SimpleITK as sitk
 
 from nnactive.data import Patch
 from nnactive.loops.loading import save_loop
+from nnactive.masking import does_overlap, mark_already_annotated_patches, mark_selected
+from nnactive.utils.io import load_label_map
 
 # from nnunetv2.paths import nnUNet_raw
-
-
-def does_overlap(
-    start_indices: Tuple[np.ndarray], patch_size: np.ndarray, selected_array: np.ndarray
-) -> bool:
-    """
-    Check if a patch overlaps with an already annotated region
-    Args:
-        start_indices (Tuple[str]): start indices of the patch
-        patch_size (np.ndarray): patch size to determine end indices
-        selected_array (np.ndarray): array containing the already annotated regions
-
-    Returns:
-        bool: True if the patch overlaps with an already annotated region, False if not
-    """
-    # Convert the indices to slices, makes indexing of selected_array possible without being dependent on dimensions
-    slices = []
-    for start_index, size in zip(start_indices, patch_size.tolist()):
-        slices.append(slice(start_index, start_index + size))
-    # Areas that are already annotated should be marked with 1 in the selected_array
-    if selected_array[tuple(slices)].max() > 0:
-        return True
-    return False
 
 
 def image_id_from_aggregated_name(
     image_aggregated_name: str, uncertainty_type: str
 ) -> str:
     return image_aggregated_name.split(f"_{uncertainty_type}")[0]
-
-
-def get_label_map(image_id: str, raw_dataset_dir: Path, file_ending: str) -> np.ndarray:
-    # TODO: get file ending from dataset.json
-    image_path = raw_dataset_dir / "labelsTr" / f"{image_id}{file_ending}"
-    sitk_image = sitk.ReadImage(image_path)
-    return sitk.GetArrayFromImage(sitk_image)
-
-
-def mark_already_annotated_patches(
-    selected_array: np.ndarray, labeled_array: np.ndarray, ignore_label: int
-) -> np.ndarray:
-    """Returns array where annotated areas are set to in selected_array
-
-    Args:
-        selected_array (np.ndarray): array to simulate selection
-        labeled_array (np.ndarray): array with label information
-        ignore_label (int): label value signaling unlabeled regions
-
-    Returns:
-        np.ndarrary: see description
-    """
-    selected_array[labeled_array != ignore_label] = 1
-    return selected_array
-
-
-def mark_selected(
-    selected_array: np.ndarray,
-    coords: Tuple[np.ndarray],
-    patch_size: np.ndarray,
-    selected_idx: int = 1,
-) -> np.ndarray:
-    """
-    Mark a patch as selected that no area of this patch is queried multiple times
-    Args:
-        selected_array (np.ndarray): array with already queried regions that should be extended by the patch
-        coords (Tuple[np.ndarray]): start coordinated of the patch
-        patch_size (np.ndarray): patch size to determine end indices
-        selected_idx (int): int which should be used to mark the patch as annotated
-        (normally 1, can be changed for visualization)
-
-    Returns:
-        np.ndarray: array with queried region including the patch that was passed
-    """
-    slices = []
-    for start_index, size in zip(coords, patch_size):
-        slices.append(slice(start_index, start_index + size))
-    # Mark the corresponding region
-    selected_array[tuple(slices)] = selected_idx
-    return selected_array
 
 
 def get_top_n_non_overlapping_patches(
@@ -184,7 +113,9 @@ def get_most_uncertain_patches(
             # Get the image id to find the image in the original data folder of the training images
             image_id = image_id_from_aggregated_name(image_name, uncertainty_type)
             # Selected array is an array of the raw input image size that is used to mark which areas have already been queried
-            labeled_map = get_label_map(image_id, raw_dataset_dir, file_ending)
+            labeled_map = load_label_map(
+                image_id, raw_dataset_dir / "imagesTr", file_ending
+            )
             selected_array = np.zeros_like(labeled_map)
             # Mark the patched as annotated that were annotated in previous loops
             selected_array = mark_already_annotated_patches(

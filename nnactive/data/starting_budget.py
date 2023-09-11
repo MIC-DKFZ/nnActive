@@ -15,7 +15,7 @@ from rich.progress import track
 from nnactive.data import Patch
 from nnactive.data.create_empty_masks import create_empty_mask
 from nnactive.data.utils import get_geometry_sitk, set_geometry
-from nnactive.query_patches import does_overlap, get_label_map
+from nnactive.utils.patches import get_slices_for_file_from_patch
 
 
 def _patch_ids_to_image_coords(
@@ -209,12 +209,9 @@ def make_patches_from_ground_truth(
                 f"There is no previously existing file for {(target_path / label_file)} and overwrite is False."
             )
 
-        patches_file = [patch for patch in patches if patch.file == label_file]
-        for patch in patches_file:
-            slice_x = slice(patch.coords[0], patch.coords[0] + patch.size[0])
-            slice_y = slice(patch.coords[1], patch.coords[1] + patch.size[1])
-            slice_z = slice(patch.coords[2], patch.coords[2] + patch.size[2])
+        patch_access = get_slices_for_file_from_patch(patches, label_file)
 
+        for slice_x, slice_y, slice_z in patch_access:
             img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
 
         img_new = sitk.GetImageFromArray(img_new)

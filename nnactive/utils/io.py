@@ -1,19 +1,23 @@
 import json
 from pathlib import Path
+from typing import Any
 
+import numpy as np
+import SimpleITK as sitk
 from pydantic import dataclasses
 
+from nnactive.utils.pyutils import get_clean_dataclass_dict
 
-def get_clean_dataclass_dict(data: dataclasses):
-    datadict = data.__dict__
-    popkeys = []
-    for key in datadict:
-        if isinstance(key, str):
-            if key.startswith("__") and key.endswith("__"):
-                popkeys.append(key)
-    for key in popkeys:
-        datadict.pop(key)
-    return datadict
+
+def save_json(save_json: Any, save_path: Path):
+    with open(save_path, "w") as file:
+        json.dump(save_json, file, indent=4)
+
+
+def load_label_map(image_id: str, data_path: Path, file_ending: str) -> np.ndarray:
+    image_path = data_path / f"{image_id}{file_ending}"
+    sitk_image = sitk.ReadImage(image_path)
+    return sitk.GetArrayFromImage(sitk_image)
 
 
 def save_dataclass_to_json(data: dataclasses, filepath: Path):

@@ -2,7 +2,7 @@
 import json
 import os
 import shutil
-from argparse import ArgumentParser, Namespace
+from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional, Union
@@ -21,13 +21,10 @@ from nnactive.data.create_empty_masks import (
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_patch_size
-from nnactive.query.random import (
-    generate_random_patches,
-    generate_random_patches_labels,
-)
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
+from nnactive.strategies import init_strategy
 from nnactive.utils.hostutils import get_verbose
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
@@ -122,9 +119,10 @@ def convert_dataset_to_partannotated(
             base_labelsTr_dir,
             target_labelsTr_dir,
             patch_func_kwargs=patch_kwargs,
-            strategy=strategy,
+            strategy_name=strategy,
             seed=seed,
             background_cls=background_cls,
+            dataset_id=target_id,
         )
 
         # Create labels from patches
@@ -143,8 +141,9 @@ def get_patches_for_partannotation(
     file_ending: str,
     base_labelsTr_dir: Path,
     target_labelsTr_dir: Path,
+    dataset_id: int,
     patch_func_kwargs: dict = None,
-    strategy: str = "random",
+    strategy_name: str = "random",
     seed: int = 12345,
     background_cls: Union[int, None] = None,
 ) -> list[Patch]:
@@ -181,29 +180,21 @@ def get_patches_for_partannotation(
     ]
     print(f"# whole image patches: {len(patches)}")
 
-    if strategy == "random":
-        patches_partial = generate_random_patches(
-            file_ending,
-            base_labelsTr_dir,
-            patch_size,
-            n_patches=num_patches,
-            labeled_patches=patches,
-            seed=seed,
-        )
-    elif strategy == "random-label":
-        patches_partial = generate_random_patches_labels(
-            file_ending,
-            base_labelsTr_dir,
-            patch_size,
-            n_patches=num_patches,
-            labeled_patches=patches,
-            seed=seed,
-            background_cls=background_cls,
-            verbose=get_verbose(None),
-        )
-    else:
-        raise NotImplementedError(f"strategy `{strategy}` is not implemented")
-    print(f"#{strategy} based patches: {patches_partial}")
+    strategy = init_strategy(
+        strategy_name,
+        dataset_id,
+        query_size=num_patches,
+        patch_size=patch_size,
+        seed=seed,
+        trials_per_img=6000,
+        annotated_labels_path=base_labelsTr_dir,
+        background_cls=background_cls,
+        raw_labels_path=base_labelsTr_dir,
+    )
+    print("Finished Initialization")
+    print(strategy)
+    patches_partial = strategy.query(verbose=get_verbose(True))
+    print(f"#{strategy_name} based patches: {patches_partial}")
     patches = patches_partial + patches
 
     return patches

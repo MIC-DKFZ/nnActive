@@ -8,7 +8,7 @@ from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_loop_patches
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
-from nnactive.query.random import create_patch_mask_for_image, get_label_map
+from nnactive.query.random import create_patch_mask_for_image, load_label_map
 
 
 # TODO: rename this to manual_query
@@ -36,7 +36,7 @@ def main(args: Namespace) -> None:
         img_patches = [patch for patch in patches if patch.file == img_name]
         if len(img_patches) == 0:
             continue
-        label_shape = get_label_map(
+        label_shape = load_label_map(
             img_name.replace(file_ending, ""), labels_dir, file_ending
         ).shape
         mask = create_patch_mask_for_image(

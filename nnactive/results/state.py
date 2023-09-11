@@ -10,9 +10,6 @@ from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 
-# from typing_extensions import Self
-
-
 FILENAME = "state.json"
 
 
@@ -75,10 +72,11 @@ class State:
         return state
 
     @classmethod
-    def get_id_state(cls, id: int) -> State:
+    def get_id_state(cls, id: int, verify: bool = True) -> State:
         fn = get_results_folder(id) / "state.json"
         state = State.from_json(fn)
-        state.verify()
+        if verify:
+            state.verify()
         return state
 
     @staticmethod

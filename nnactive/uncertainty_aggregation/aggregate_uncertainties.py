@@ -106,7 +106,7 @@ def aggregate_uncertainties():
         help="Folder containing the uncertainty maps",
     )
     parser.add_argument(
-        "-0",
+        "-o",
         "--output",
         type=str,
         required=True,
