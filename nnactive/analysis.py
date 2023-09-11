@@ -72,6 +72,8 @@ def compare_multi_experiment_results(
             .drop("index", axis=1)
         )
 
+    df["#Patches"] = (df["Loop"] + 1) * df["query_size"]
+
     skip_keys = [
         "Experiment Name",
         "seed",
@@ -79,6 +81,7 @@ def compare_multi_experiment_results(
         "Loop",
         "Mean Dice",
         "uncertainty",
+        "#Patches",
     ]
     query_key = "uncertainty"
     vals = [seperator for seperator in df.columns if seperator not in skip_keys]
@@ -93,6 +96,7 @@ def compare_multi_experiment_results(
             errorbar="sd",
             ax=axs,
             markers="O",
+            palette=PALETTE,
         )
 
         # Value for Hippocampus Dataset
@@ -100,6 +104,26 @@ def compare_multi_experiment_results(
         axs.set_xticks(np.arange(0, key[max_loop_ind]))
         axs.legend(loc="best")
         plt.savefig(f"Performance__{key}.png")
+
+        fig, axs = plt.subplots()
+        sns.lineplot(
+            data=df_g,
+            x="#Patches",
+            y="Mean Dice",
+            hue=query_key,
+            errorbar="sd",
+            ax=axs,
+            markers="O",
+            palette=PALETTE,
+        )
+
+        # Value for Hippocampus Dataset
+        axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
+        axs.set_ylim(0.84, 0.90)
+        axs.set_xlim(10, 200)
+        # axs.set_xticks(np.arange(0, key[max_loop_ind]))
+        axs.legend(loc="best")
+        plt.savefig(f"PerformancePatch__{key}.png")
 
         ### Label Efficency Plot starts here
 
@@ -184,7 +208,7 @@ def compare_multi_experiment_results(
                         label_efficency = (row["Loop"] + 1) / (
                             min(
                                 df_g_unc[
-                                    df_g_unc["Mean Dice"] >= (row["Mean Dice"] - 0.002)
+                                    df_g_unc["Mean Dice"] >= (row["Mean Dice"] - 0.0002)
                                 ]["Loop"]
                             )
                             + 1
