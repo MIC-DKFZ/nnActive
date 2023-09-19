@@ -8,6 +8,8 @@ from nnactive.strategies import get_strategy
 from nnactive.utils.io import save_json
 
 
+# TODO: Allow settings s.a. disabled tta. Currently everything is enabled by default.
+# TODO: Change way of feeding in disable_tta. Currently this is done via direct CLI arguments.
 def query_pool(dataset_id: int):
     state = State.get_id_state(dataset_id)
     config = ActiveConfig.get_from_id(dataset_id)

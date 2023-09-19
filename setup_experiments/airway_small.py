@@ -11,11 +11,10 @@ if __name__ == "__main__":
     query_size = 33
     query_steps = 3
     trainer = "nnActiveTrainer_airway_5epochs"
-    starting_budget = "pred_entropy"
     num_processes = 4
     train_folds = 1
     starting_budget = "random-label"
-    force_override = False
+    force_override = True
 
     pre_suffix = f"__patch-std_patch__sb-{starting_budget}"
     num_experiments = 1

@@ -25,18 +25,36 @@ class RandomLabel(Random):
         seed: int,
         trials_per_img: int = 600,
         file_ending: str = ".nii.gz",
-        annotated_labels_path: Path | None = None,
+        raw_labels_path: Path | None = None,
         background_cls: int | None = None,
         **kwargs,
     ):
+        """
+
+        Args:
+            dataset_id (int): _description_
+            query_size (int): _description_
+            patch_size (list[int]): _description_
+            seed (int): _description_
+            trials_per_img (int, optional): _description_. Defaults to 600.
+            file_ending (str, optional): _description_. Defaults to ".nii.gz".
+            raw_labels_path (Path | None, optional): Is expected to be path to a fully annotated dataset. Defaults to None.
+            background_cls (int | None, optional): _description_. Defaults to None.
+        """
         super().__init__(
-            dataset_id, query_size, patch_size, seed, trials_per_img, file_ending
+            dataset_id,
+            query_size,
+            patch_size,
+            seed,
+            trials_per_img,
+            file_ending,
+            raw_labels_path,
         )
-        self.annotated_labels_path = annotated_labels_path
-        if self.annotated_labels_path is None:
+        self.raw_labels_path = raw_labels_path
+        if self.raw_labels_path is None:
             config = ActiveConfig.get_from_id(self.dataset_id)
             annotated_id = int(config.dataset.split("_")[0][-3:])
-            self.annotated_labels_path = get_raw_path(annotated_id) / "labelsTr"
+            self.raw_labels_path = get_raw_path(annotated_id) / "labelsTr"
 
         self.background_cls = background_cls
         if self.background_cls is None:
@@ -46,6 +64,7 @@ class RandomLabel(Random):
             self.background_cls = dataset_json["labels"].get("background")
 
     def query(self, verbose: bool = False) -> List[Patch]:
+        print(self.img_names)
         img_generator = _get_infinte_iter(self.img_names)
         labeled_patches = self.annotated_patches
         patches = []
@@ -65,7 +84,7 @@ class RandomLabel(Random):
                     print(f"Loading Image: {img_name}")
                 label_map: np.ndarray = load_label_map(
                     img_name.replace(self.file_ending, ""),
-                    self.annotated_labels_path,
+                    self.raw_labels_path,
                     self.file_ending,
                 )
                 current_patch_list = labeled_patches + patches
