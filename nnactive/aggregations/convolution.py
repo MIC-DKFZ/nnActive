@@ -8,7 +8,7 @@ class ConvolveAgg:
     def __init__(self, patch_size: list[int]):
         self.patch_size = patch_size
 
-    def forward(self, data: torch.Tensor) -> torch.Tensor:
+    def forward(self, data: torch.Tensor) -> tuple[torch.Tensor, list[int]]:
         kernel_size = [
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))
         ]
@@ -28,7 +28,7 @@ class ConvolveAgg:
             )
         else:
             raise NotImplementedError()
-        return aggregated.squeeze(), kernel_size
+        return aggregated.squeeze(0).squeeze(0), kernel_size
 
     def backward_index(
         self,
