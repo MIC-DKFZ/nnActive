@@ -32,13 +32,13 @@ class ConvolveAgg:
 
     def backward_index(
         self,
-        aggregated_index: np.ndarray,
+        aggregated_index: int,
         aggregated_shape: Iterable[int],
-    ) -> np.ndarray:
-        """Compute indices from the aggregated images into starting coordinates for patches in image space
+    ) -> tuple[int]:
+        """Compute indices from the flattened aggregated images into starting coordinates for patches in image space
 
         Args:
-            aggregated_index (np.ndarray): index in aggregated space
+            aggregated_index (int): 1 flattened index in aggregated space
             aggregated_shape (Iterable[int]): shape of aggregated image
 
         Returns:
@@ -46,4 +46,7 @@ class ConvolveAgg:
         """
         # Get the index as coordinates
         # this works after convolution index_img_start = index_conv_start, index_img_end = index_conv_start+ size_dim
-        return np.unravel_index(aggregated_index, aggregated_shape)
+
+        return tuple(
+            [t.item() for t in np.unravel_index(aggregated_index, aggregated_shape)]
+        )
