@@ -115,12 +115,17 @@ nnUNetv2_plan_and_preprocess -d 504 -c 3d_fullres -np 4
 7. Create Config and Set Up AL experiment folder
     - [ ] TODO: make this generalizable
 ```bash
-python scripts/setup_al_experiment.py -d 504
+python nnactive setup_al_experiment.py -d 504
 ```
 
 ## Active Learning whole loop
 ```bash
-scripts/multi_loop_AL.py -d 504
+nnactive run_al_loops -d 504
+```
+
+### Deprecated
+```bash
+nnactive multi_loop_AL -d 504
 ```
 
 ## Active Learning Workflow
@@ -137,13 +142,13 @@ nnUNetv2_train 504 3d_fullres X -tr nnUNetDebugTrainer
 #### nnUNet
 Alternative:
 ```bash
-python scripts/train_nnUNet_ensemble.py -d 504
+python nnactive train_nnUNet_ensemble.py -d 504
 ```
 
 ### Prediction on external Validation/Test Set
 #### nnUNet
 ```bash
-python scripts/get_performance.py -d 504
+python nnactive get_performance.py -d 504
 ```
 Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
 
@@ -155,7 +160,7 @@ nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-pa
 ```
 #### nnUNet
 ```bash
-python scripts/predict_nnUNet_ensemble.py -d 504
+python nnactive predict_nnUNet_ensemble.py -d 504
 ```
 
 
@@ -179,7 +184,12 @@ python nnactive/query_patches.py -i ${nnUNet_results}/Dataset504_Hippocampus-par
 ```
 #### nnUNet
 ```bash
-python scripts/query_step.py -d 504
+python nnactive query_pool.py -d 504
+```
+
+##### Deprecated
+```bash
+python nnactive query_step.py -d 504
 ```
 
 #### Outcome
@@ -196,7 +206,7 @@ python nnactive/update_data.py -i ${nnUNet_raw}/Dataset004_Hippocampus -p ${nnUN
 
 #### nnUNet
 ```bash
-python scripts/update_data.py -d 504
+python nnactive update_data.py -d 504
 ```
 
 Start with Training of all folds and repeat....
@@ -226,6 +236,6 @@ dataset.json in raw data
     "relase": "1.0 04/05/2018",
     "tensorImageSize": "3D",
     "annotated_id" : 4 
-    // id to annotated dataset or path?
+    // id to annotated dataset 
 }
 ```

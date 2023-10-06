@@ -25,6 +25,9 @@ from nnactive.masking import does_overlap, mark_selected
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
 
+# TODO: replace this with a variable which is easier to access!
+NPP = 1
+
 
 class AbstractUncertainQueryMethod(AbstractQueryMethod):
     def __init__(
@@ -36,7 +39,6 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         **kwargs,
     ):
         super().__init__(dataset_id, query_size, patch_size, file_ending)
-        # self.top_patches = []  # carries the top patches of all images
         self.config = ActiveConfig.get_from_id(dataset_id)
         self.aggregation = ConvolveAgg(patch_size)
 
@@ -62,7 +64,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         data_iterator = predictor.get_data_iterator_from_folders(
             list_of_lists_or_source_folder=source_folder,
             output_folder_or_list_of_truncated_output_files=output_folder,
-            num_processes_preprocessing=3,
+            num_processes_preprocessing=NPP,
         )
         predictor.compute_from_data_iterator(data_iterator, self)
         return self.compose_query_of_patches()
@@ -122,9 +124,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         flat_aggregated_uncertainties = aggregated.flatten()
 
         sorted_uncertainty_indices = np.flip(np.argsort(flat_aggregated_uncertainties))
-        sorted_uncertainty_scores = np.take_along_axis(
+        sorted_uncertainty_scores: list[float] = np.take_along_axis(
             flat_aggregated_uncertainties, sorted_uncertainty_indices, axis=0
-        )
+        ).tolist()
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
         for uncertainty_score, uncertainty_index in zip(
             sorted_uncertainty_scores, sorted_uncertainty_indices
