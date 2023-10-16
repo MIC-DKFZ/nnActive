@@ -1,78 +1,43 @@
-import subprocess
-from itertools import product
+from argparse import ArgumentParser
+
+from experiment_setup import DatasetSetup
+
+parser = ArgumentParser()
+parser = DatasetSetup.add_args(parser)
 
 if __name__ == "__main__":
+    args = parser.parse_args()
     seeds = [12345, 12346, 12347]
-    uncertainties = ["random", "mutual_information", "pred_entropy"]
+    # seeds = [12345]
+    uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
+    # uncertainties = ["pred_entropy"]
     dataset_id = 137
     first_d_set = 750
     query_size = 50
     query_steps = 20
-    trainer = "nnActiveTrainer_5epochs"
-    starting_budget = "random"
-    num_processes = 10
-    format_suffix = "__patch-full_patch__sb-{starting_budget}__unc-{unc}__seed-{seed}"
-    np = 10
+    trainer = "nnActiveTrainer_100epochs"
+    starting_budget = "random-label"
+    num_processes = 4
+    train_folds = 5
+    patch_size = [20, 20, 20]
+    pre_suffix = "__patch-20"
+    add_validation = ""
+    add_uncertainty = ""
 
-    vals = [val for val in product(uncertainties, seeds)]
+    setter = DatasetSetup(
+        base_id=dataset_id,
+        query_steps=query_steps,
+        uncertainties=uncertainties,
+        query_size=query_size,
+        trainer=trainer,
+        patch_size=patch_size,
+        starting_budget=starting_budget,
+        num_processes=num_processes,
+        train_folds=train_folds,
+        force_override=args.force_override,
+        pre_suffix=pre_suffix,
+        add_validation=add_validation,
+        add_uncertainty=add_uncertainty,
+    )
 
-    for i, (unc, seed) in enumerate(vals):
-        ex_command = "nnactive convert"
-        output_id = first_d_set + i
-        name_suffix = format_suffix.format(
-            starting_budget=starting_budget, unc=unc, seed=seed
-        )
-        ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
-
-        print(ex_call)
-        subprocess.run(ex_call, shell=True, check=True)
-
-        subprocess.run(
-            f"nnUNetv2_extract_fingerprint -d {output_id}  -np {np}",
-            shell=True,
-            check=True,
-        )
-        subprocess.run(
-            f"nnUNetv2_plan_experiment -d {output_id} -np {np}", shell=True, check=True
-        )
-
-        ex_command = "nnactive setup_al_experiment"
-        subprocess.run(
-            f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --starting-budget {starting_budget} --seed {seed}",
-            shell=True,
-            check=True,
-        )
-        if i == 0:
-            break
-
-    # first_d_set += len(vals)
-    # starting_budget = "random-label"
-
-    # for i, (unc, seed) in enumerate(vals):
-    #     ex_command = "nnactive convert"
-    #     output_id = first_d_set + i
-    #     name_suffix = format_suffix.format(
-    #         starting_budget=starting_budget, unc=unc, seed=seed
-    #     )
-    #     ex_call = f"{ex_command} -d {dataset_id} -o {output_id} --strategy {starting_budget} --seed {seed} --num-patches {query_size} --name-suffix {name_suffix}"
-
-    #     print(ex_call)
-    #     subprocess.run(ex_call, shell=True, check=True)
-
-    #     subprocess.run(
-    #         f"nnUNetv2_extract_fingerprint -d {output_id}  -np {np}",
-    #         shell=True,
-    #         check=True,
-    #     )
-    #     subprocess.run(
-    #         f"nnUNetv2_plan_experiment -d {output_id} -np {np}", shell=True, check=True
-    #     )
-
-    #     ex_command = "nnactive setup_al_experiment"
-    #     subprocess.run(
-    #         f"{ex_command} -d {output_id} --trainer {trainer} --base_id {dataset_id} --query-steps {query_steps} --query-size {query_size} --uncertainty {unc} --starting-budget {starting_budget} --seed {seed}",
-    #         shell=True,
-    #         check=True,
-    #     )
-    #     if i == 0:
-    #         break
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)

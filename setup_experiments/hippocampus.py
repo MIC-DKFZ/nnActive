@@ -13,17 +13,10 @@ starting_budget = "random"
 
 
 parser = ArgumentParser()
-parser.add_argument(
-    "-f",
-    "--force_override",
-    action="store_true",
-    help="Overrides Dataset and clears all previous experiments.\n Be careful with this one!",
-)
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    force_override = args.force_override
 
     seeds = [12345, 12346, 12347]
     uncertainties = ["random", "mutual_information", "pred_entropy"]
@@ -47,7 +40,7 @@ if __name__ == "__main__":
         starting_budget=starting_budget,
         num_processes=num_processes,
         train_folds=train_folds,
-        force_override=force_override,
+        force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
@@ -70,7 +63,7 @@ if __name__ == "__main__":
         patch_size=patch_size,
         num_processes=num_processes,
         train_folds=train_folds,
-        force_override=force_override,
+        force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
@@ -91,7 +84,7 @@ if __name__ == "__main__":
         patch_size=patch_size,
         num_processes=num_processes,
         train_folds=train_folds,
-        force_override=force_override,
+        force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)
@@ -111,7 +104,7 @@ if __name__ == "__main__":
         patch_size=patch_size,
         num_processes=num_processes,
         train_folds=train_folds,
-        force_override=force_override,
+        force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
     setter.rollout(first_d_set)

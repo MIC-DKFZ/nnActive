@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+from argparse import ArgumentParser
 from itertools import product
 from pathlib import Path
 from typing import Union
@@ -15,7 +16,6 @@ DEFAULT_QUERIES = (
     "random",
     "random-label",
 )
-from typing import List
 
 
 class DatasetSetup:
@@ -26,7 +26,7 @@ class DatasetSetup:
         query_size: int,
         trainer: str = "nnActiveTrainer_5epochs",
         starting_budget: str = "random",
-        patch_size: Union[None, List[int]] = None,
+        patch_size: Union[None, list[int]] = None,
         pre_suffix="",
         add_validation="",
         add_uncertainty="",
@@ -164,13 +164,39 @@ class DatasetSetup:
         state = State(dataset_id=dataset_id)
         state.save_state()
 
-    def rollout(self, start_id: int, num_experiments: int | None = None):
+    def rollout(
+        self, start_id: int, num_experiments: int | None = None, debug: bool = False
+    ):
         for i, (unc, seed) in enumerate(self.vals):
             if num_experiments:
                 if i >= num_experiments:
                     break
             output_id = start_id + i
             if self.check_dataset_id(output_id):
+                if debug:
+                    print(f"Creating Dataset{output_id:3d}....")
+                    continue
                 self.convert_dset(output_id, seed, unc)
                 self.prepare_dset(output_id)
                 self.setup_al(output_id, seed, unc)
+
+    @staticmethod
+    def add_args(parser: ArgumentParser) -> ArgumentParser:
+        parser.add_argument(
+            "--num_experiments",
+            type=int,
+            default=None,
+            help="How many experiments to create counting from first",
+        )
+        parser.add_argument(
+            "--debug",
+            "-d",
+            action="store_true",
+            help="Activate Debug Modus. No Dataset is created.",
+        )
+        parser.add_argument(
+            "--force_override",
+            action="store_true",
+            help="Overrides all Experiments defined in this batch. USE WITH CAUTION!",
+        )
+        return parser

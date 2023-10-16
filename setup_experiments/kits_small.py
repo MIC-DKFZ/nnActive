@@ -1,6 +1,12 @@
+from argparse import ArgumentParser
+
 from experiment_setup import DatasetSetup
 
+parser = ArgumentParser()
+parser = DatasetSetup.add_args(parser)
+
 if __name__ == "__main__":
+    args = parser.parse_args()
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 982
@@ -12,8 +18,6 @@ if __name__ == "__main__":
     starting_budget = "random-label"
     num_processes = 4
     train_folds = 2
-    num_experiments = 1
-    force_override = True
     pre_suffix = "__patch-full_patch"
     add_validation = "--disable_tta"
     add_uncertainty = "--diable_tta"
@@ -27,9 +31,9 @@ if __name__ == "__main__":
         starting_budget=starting_budget,
         num_processes=num_processes,
         train_folds=train_folds,
-        force_override=force_override,
+        force_override=args.force_override,
         pre_suffix=pre_suffix,
         add_validation=add_validation,
         add_uncertainty=add_uncertainty,
     )
-    setter.rollout(first_d_set, num_experiments)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)

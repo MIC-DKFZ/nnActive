@@ -77,25 +77,25 @@ python nnactive create_val_split.py -d 4
 ```
 Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
 
-3. Obtain nnU-Net preprocessing instructions
+2. Obtain nnU-Net preprocessing instructions
 ```bash
-nnUNetv2_extract_fingerprint -d 4
+nnUNetv2_extract_fingerprint -d 4 --clean
 nnUNetv2_plan_experiment -d 4
 ```
-4. Resample images
+3. Resample images
 ```bash
-python nnactive/resample_dataset.py --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
+python nnactive resample_dataset --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
 ```
 Alternatively:
 ```bash
-python scripts/resample_nnunet_dataset -d 4
+python nnactive resample_nnunet_dataset -d 4
 ```
 resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
 Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
 ### Create Partially annotated dataset
-5. Create Dataset
+4. Create Dataset
 ```bash
-python scripts/convert_to_partannotated.py -d 4
+python nnactive convert -d 4
 ```
 Creates dataset with offset of 500. In this case dataset 504.
 Creates: 
@@ -103,7 +103,7 @@ Creates:
     2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
 
 
-6. Create Plans
+5. Create Plans
 ```bash
 nnUNetv2_extract_fingerprint -d 504
 nnUNetv2_plan_experiment -d 504 -c 3d_fullres
