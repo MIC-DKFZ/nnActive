@@ -3,9 +3,10 @@
 from typing import Union
 
 import numpy as np
-from acvl_utils.morphology.gpu_binary_morphology import gpu_binary_erosion
 from skimage.morphology import ball
 from torch.backends import cudnn
+
+from nnactive.utils.torchutils import maybe_gpu_binary_erosion
 
 
 def get_locs_from_segmentation(
@@ -37,7 +38,7 @@ def get_locs_from_segmentation(
     cudnn.deterministic = False
     cudnn.benchmark = False
     if area == "border":
-        use_seg_border = use_seg - gpu_binary_erosion(use_seg > 0, ball(1))
+        use_seg_border = use_seg - maybe_gpu_binary_erosion(use_seg > 0, ball(1))
         return np.argwhere(use_seg_border > 0)
     elif area == "seg":
         return np.argwhere(use_seg > 0)
