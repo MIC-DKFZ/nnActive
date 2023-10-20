@@ -31,7 +31,7 @@ def main(args: Namespace) -> None:
         if state.preprocess is False:
             # Preprocessing can require a lot of time
             subprocess.run(
-                f"nnUNetv2_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
+                f"nnactive nnunet_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
                 shell=True,
                 check=True,
             )
