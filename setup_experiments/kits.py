@@ -8,7 +8,7 @@ parser = DatasetSetup.add_args(parser)
 if __name__ == "__main__":
     args = parser.parse_args()
     seeds = [12345, 12346, 12347]
-    uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
+    uncertainties = ["pred_entropy", "random", "mutual_information", "random-label"]
     dataset_id = 135
     first_d_set = 700
     # patch_size = []
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     starting_budget = "random-label"
     pre_suffix = "__patch-full_patch"
     train_folds = 5
-    num_processes = 4
+    num_processes = 2
     add_validation = ""
     add_uncertainty = ""
 
