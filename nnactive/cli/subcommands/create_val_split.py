@@ -8,6 +8,7 @@ import numpy as np
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
+from nnactive.utils.io import save_json
 
 random_seed = 12345
 
@@ -20,7 +21,7 @@ def create_test_datasets(
     file_ending: str,
     test_size: Union[int, float] = 0.25,
     move: bool = True,
-):
+) -> tuple[int, int]:
     seg_names = os.listdir(base_labelsTr_dir)
     seg_names = [seg_name for seg_name in seg_names if seg_name.endswith(file_ending)]
 
@@ -68,6 +69,8 @@ def create_test_datasets(
         copy_files(base_labelsTr_dir, target_labelsVal_dir, val_segs, file_ending)
         copy_files(base_imagesTr_dir, target_imagesVal_dir, val_images, file_ending)
 
+    return len(seg_names) - test_size, test_size
+
 
 def move_files(
     source_dir: Path, target_dir: Path, file_names: list[str], file_ending: str
@@ -109,6 +112,11 @@ def main(args: Namespace) -> None:
         raise RuntimeError(
             f"It seems as if the splits have already been created. Check:\n{labelsTr} \n{labelsVal} "
         )
-    create_test_datasets(
+    num_train, num_val = create_test_datasets(
         labelsTr, imagesTr, labelsVal, imagesVal, file_ending, test_size=test_size
     )
+    dataset_json = read_dataset_json(dataset_id)
+    dataset_json["numTraining"] = num_train
+    dataset_json["numValidation"] = num_val
+
+    save_json(dataset_json, raw_folder / "dataset.json")
