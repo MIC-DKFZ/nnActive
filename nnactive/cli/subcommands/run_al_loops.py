@@ -30,8 +30,11 @@ def main(args: Namespace) -> None:
             raise ValueError("A loop has not been executed!")
         if state.preprocess is False:
             # Preprocessing can require a lot of time
+            ex_call = f"nnactive nnunet_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}"
+            if al_iteration == 0:
+                ex_call += " --do_all"
             subprocess.run(
-                f"nnUNetv2_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}",
+                ex_call,
                 shell=True,
                 check=True,
             )
