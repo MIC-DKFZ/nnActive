@@ -70,7 +70,7 @@ class nnActivePreprocessor(DefaultPreprocessor):
             nnUNet_preprocessed, dataset_name, configuration_manager.data_identifier
         )
 
-        if isdir(output_directory):
+        if isdir(output_directory) and do_all:
             shutil.rmtree(output_directory)
 
         maybe_mkdir_p(output_directory)
