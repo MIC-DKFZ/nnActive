@@ -44,7 +44,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
 
     def query(self, verbose=False) -> list[Patch]:
         # Initialize Predictor
-        predictor = nnActivePredictor()
+        predictor = nnActivePredictor(
+            tile_step_size=0.75, use_mirroring=False, verbose=True, allow_tqdm=False
+        )
 
         # Initialize Model for Predictor
         nnunet_plans_identifier = "nnUNetPlans"
@@ -79,15 +81,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             image_shape (Iterable[int]): shape of image
             label_file (str): name of label file
         """
+        with torch.no_grad():
+            uncertainty = self.get_uncertainty(out_probs)
 
-        uncertainty = self.get_uncertainty(out_probs)
-
-        if torch.any(torch.isnan(uncertainty)):
-            # unc_num_nan = torch.sum(torch.isnan(uncertainty))
-            # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
-            print(f" NAN values in uncertainties for image {label_file}")
-        agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
-        agg_uncertainty = agg_uncertainty.cpu().numpy()
+            if torch.any(torch.isnan(uncertainty)):
+                # unc_num_nan = torch.sum(torch.isnan(uncertainty))
+                # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
+                print(f" NAN values in uncertainties for image {label_file}")
+            agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
+            agg_uncertainty = agg_uncertainty.cpu().numpy()
 
         selected_array = self.initialize_selected_array(
             image_shape, label_file, self.annotated_patches
@@ -302,9 +304,15 @@ class nnActivePredictor(nnUNetPredictor):
                 # probs_where_nan = torch.argwhere(torch.isnan(out_probs))
                 print(f" NAN values in probablities for image {filename}")
 
-            query_method.query_from_probs(
-                out_probs, properties["shape_before_cropping"], filename
-            )
+            try:
+                query_method.query_from_probs(
+                    out_probs, properties["shape_before_cropping"], filename
+                )
+            except RuntimeError:
+                out_probs = out_probs.to("cpu")
+                query_method.query_from_probs(
+                    out_probs, properties["shape_before_cropping"], filename
+                )
             # TODO: possibly add some multiprocessing as in nnUNet_predictor
 
         if isinstance(data_iterator, MultiThreadedAugmenter):
