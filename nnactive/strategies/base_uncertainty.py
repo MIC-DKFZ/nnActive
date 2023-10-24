@@ -229,7 +229,14 @@ class nnActivePredictor(nnUNetPredictor):
                         predictions.append(
                             self.predict_sliding_window_return_logits(data)
                         )
-            predictions = torch.stack(predictions, 0)
+
+            # stacking doubles the memory footprint therefore we try to perform it on gpu if not then on cpu
+            try:
+                predictions = torch.stack(predictions, 0)
+            except RuntimeError:  # CUDA OOM is RuntimeError
+                for i in range(len(predictions)):
+                    predictions[i] = predictions[i].cpu()
+                predictions = torch.stack(predictions)
 
             self.perform_everything_on_gpu = original_perform_everything_on_gpu
         return predictions
