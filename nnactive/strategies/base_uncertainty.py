@@ -82,23 +82,27 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             label_file (str): name of label file
         """
         with torch.no_grad():
+            print("Compute uncertaintes...")
             uncertainty = self.get_uncertainty(out_probs)
 
             if torch.any(torch.isnan(uncertainty)):
                 # unc_num_nan = torch.sum(torch.isnan(uncertainty))
                 # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
-                print(f" NAN values in uncertainties for image {label_file}")
+                raise ValueError(f" NAN values in uncertainties for image {label_file}")
+            print("Aggregate uncertainties...")
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
             agg_uncertainty = agg_uncertainty.cpu().numpy()
 
+        print("Initialize selected array...")
         selected_array = self.initialize_selected_array(
             image_shape, label_file, self.annotated_patches
         )
 
+        print("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
             kernel_size, agg_uncertainty, selected_array, label_file, self.query_size
         )
-
+        print("Finished patch selection.")
         self.top_patches += selected_patches
 
     @abstractmethod
@@ -122,13 +126,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
     ) -> list[dict]:
         selected_patches = []
         # sort only once since this can take a significant amount of time
-
+        print("Sort potential queries")
         flat_aggregated_uncertainties = aggregated.flatten()
 
         sorted_uncertainty_indices = np.flip(np.argsort(flat_aggregated_uncertainties))
         sorted_uncertainty_scores: list[float] = np.take_along_axis(
             flat_aggregated_uncertainties, sorted_uncertainty_indices, axis=0
         ).tolist()
+        print("Start finding non-overlapping patches.")
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
         for uncertainty_score, uncertainty_index in zip(
             sorted_uncertainty_scores, sorted_uncertainty_indices
@@ -289,7 +294,8 @@ class nnActivePredictor(nnUNetPredictor):
 
             out_probs = []
 
-            for prediction in logits:
+            for i, prediction in enumerate(logits):
+                print(f"Postprocessing output fold {i}")
                 (
                     _,
                     out_prob,
@@ -307,10 +313,9 @@ class nnActivePredictor(nnUNetPredictor):
             )  # Shape: M x C x ...
 
             if torch.any(torch.isnan(out_probs)):
-                # probs_num_nan = torch.sum(torch.isnan(out_probs))
-                # probs_where_nan = torch.argwhere(torch.isnan(out_probs))
-                print(f" NAN values in probablities for image {filename}")
+                raise ValueError(f"NAN values in probablities for image {filename}")
 
+            print("Start Query")
             try:
                 query_method.query_from_probs(
                     out_probs, properties["shape_before_cropping"], filename
