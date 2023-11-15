@@ -15,10 +15,18 @@ from nnactive.utils.io import load_label_map
     "manual_vis_annotated",
     [
         (("-d", "--dataset_id"), {"type": int, "required": True, "help": "Dataset ID"}),
+        (
+            ("--identify_patch"),
+            {
+                "action": "store_true",
+                "help": "When set to true, multiple patches in one image get different labels.",
+            },
+        ),
     ],
 )
 def main(args: Namespace):
     dataset_id: int = args.dataset_id
+    identify_patch: bool = args.identify_patch
 
     raw_dataset_path = get_raw_path(dataset_id)
     labels_dir = raw_dataset_path / "labelsTr"
@@ -27,7 +35,7 @@ def main(args: Namespace):
     file_ending = dataset_json["file_ending"]
 
     loop = len(get_sorted_loop_files(raw_dataset_path))
-    save_path = raw_dataset_path / "annotated"
+    save_path = raw_dataset_path / "annotated_regions"
     if loop >= 0:
         os.makedirs(save_path, exist_ok=True)
         labeled_patches = get_patches_from_loop_files(raw_dataset_path, loop - 1)
@@ -42,11 +50,11 @@ def main(args: Namespace):
                 continue
             label_shape = load_label_map(
                 img_name.replace(file_ending, ""),
-                raw_dataset_path / "imagesTr",
+                raw_dataset_path / "labelsTr",
                 file_ending,
             ).shape
             mask = create_patch_mask_for_image(
-                img_name, labeled_patches, label_shape, identify_patch=True
+                img_name, labeled_patches, label_shape, identify_patch=identify_patch
             )
             img = sitk.ReadImage(labels_dir / img_name)
             mask_save = sitk.GetImageFromArray(mask)
