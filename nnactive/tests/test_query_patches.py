@@ -26,7 +26,6 @@ def test_query_patches(test_image, patch_size):
     image_aggregated, _ = aggregation.forward(test_image)
     selected_array = np.zeros_like(test_image)
     n = 3
-    image_aggregated = image_aggregated.cpu().numpy()
     queried_patches = select_top_n_non_overlapping_patches(
         "test", n, image_aggregated, np.array(patch_size), selected_array
     )
@@ -45,7 +44,6 @@ def test_query_patches(test_image, patch_size):
 def test_query_patches_with_annotated(test_image, patch_size):
     aggregation = ConvolveAgg(patch_size)
     image_aggregated, _ = aggregation.forward(test_image)
-    image_aggregated = image_aggregated.cpu().numpy()
     selected_array = np.zeros_like(test_image)
     selected_array[0:10] = 1
     n = 3

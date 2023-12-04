@@ -15,7 +15,7 @@ class ConvolveAgg:
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))
         ]
         print("Created kernel")
-        kernel = np.ones(kernel_size)
+        kernel = np.ones(kernel_size) / np.prod(kernel_size)
         data = data.cpu().numpy()
         aggregated = convolve(data, kernel, mode="valid")
         print("Done with convolution")
