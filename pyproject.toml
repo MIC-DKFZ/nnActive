@@ -13,6 +13,7 @@ dependencies = [
     "SimpleITK",
     "rich",
     "pydantic",
+    "psutil",
 ]
 
 [project.optional-dependencies]
