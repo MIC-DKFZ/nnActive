@@ -5,5 +5,5 @@ from nnactive.strategies.uncertainties import prob_mutual_information
 
 
 class BALD(AbstractUncertainQueryMethod):
-    def get_uncertainty(self, out_probs: torch.Tensor) -> torch.Tensor:
-        return prob_mutual_information(out_probs)
+    def get_uncertainty(self, num_folds: int) -> torch.Tensor:
+        return prob_mutual_information(num_folds, self.dataset_id)

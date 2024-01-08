@@ -2,33 +2,24 @@ from typing import Iterable
 
 import numpy as np
 import torch
+from scipy.signal import convolve
 
 
 class ConvolveAgg:
     def __init__(self, patch_size: list[int]):
         self.patch_size = patch_size
 
-    def forward(self, data: torch.Tensor) -> tuple[torch.Tensor, list[int]]:
+    def forward(self, data: torch.Tensor) -> tuple[np.array, list[int]]:
+        print("Started forward")
         kernel_size = [
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))
         ]
-        kernel = torch.ones(size=[1, 1] + kernel_size, device=data.device) / np.prod(
-            kernel_size
-        )
-
-        if len(data.shape) == 2:
-            aggregated = torch.nn.functional.conv2d(
-                data.unsqueeze(0).unsqueeze(0),
-                weight=kernel,
-            )
-        elif len(data.shape) == 3:
-            aggregated = torch.nn.functional.conv3d(
-                data.unsqueeze(0).unsqueeze(0),
-                weight=kernel,
-            )
-        else:
-            raise NotImplementedError()
-        return aggregated.squeeze(0).squeeze(0), kernel_size
+        print("Created kernel")
+        kernel = np.ones(kernel_size) / np.prod(kernel_size)
+        data = data.cpu().numpy()
+        aggregated = convolve(data, kernel, mode="valid")
+        print("Done with convolution")
+        return aggregated, kernel_size
 
     def backward_index(
         self,

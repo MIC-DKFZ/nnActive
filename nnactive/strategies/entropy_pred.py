@@ -5,5 +5,5 @@ from nnactive.strategies.uncertainties import prob_pred_entropy
 
 
 class PredictiveEntropy(AbstractUncertainQueryMethod):
-    def get_uncertainty(self, out_probs: torch.Tensor) -> torch.Tensor:
-        return prob_pred_entropy(out_probs)
+    def get_uncertainty(self, num_folds: int) -> torch.Tensor:
+        return prob_pred_entropy(num_folds, self.dataset_id)
