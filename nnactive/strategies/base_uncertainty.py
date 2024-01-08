@@ -20,6 +20,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_t
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
+from tqdm import tqdm
 
 from nnactive.aggregations.convolution import ConvolveAgg
 from nnactive.config.struct import ActiveConfig
@@ -28,7 +29,6 @@ from nnactive.masking import does_overlap, mark_selected
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod
-from tqdm import tqdm
 
 # TODO: replace this with a variable which is easier to access!
 NPP = 1
@@ -127,7 +127,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         selected_array: np.ndarray,
         label_file: str,
         n: int,
-        verbose:bool=False
+        verbose: bool = False,
     ) -> list[dict]:
         selected_patches = []
         # sort only once since this can take a significant amount of time
@@ -142,13 +142,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
         if not verbose:
-            iterator = tqdm(zip(
-            sorted_uncertainty_scores, sorted_uncertainty_indices), total=len(sorted_uncertainty_indices)
+            iterator = tqdm(
+                zip(sorted_uncertainty_scores, sorted_uncertainty_indices),
+                total=len(sorted_uncertainty_indices),
             )
         else:
             iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
-            
-        for (uncertainty_score, uncertainty_index) in enumerate(iterator):
+
+        for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
             # get coordinates in image space from aggregated indices
             coords = self.aggregation.backward_index(
                 uncertainty_index, aggregated.shape
