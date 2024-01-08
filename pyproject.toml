@@ -27,6 +27,8 @@ dev = [
   "pylint",
   "pytest",
   "sphinx<6",
+  "psutil", # required to get RAM requirements
+  "nnunet", # required for some project related functions
 ]
 
 [project.scripts]

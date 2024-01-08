@@ -8,7 +8,7 @@ if __name__ == "__main__":
     uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 983
     first_d_set = 993
-    query_size = 33
+    query_size = 10
     query_steps = 3
     trainer = "nnActiveTrainer_airway_5epochs"
     num_processes = 4

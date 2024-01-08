@@ -11,7 +11,7 @@ if __name__ == "__main__":
     uncertainties = ["pred_entropy"]
     dataset_id = 981
     first_d_set = 991
-    query_size = 50
+    query_size = 10
     query_steps = 3
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label"

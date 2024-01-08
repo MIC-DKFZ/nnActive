@@ -12,7 +12,7 @@ if __name__ == "__main__":
     dataset_id = 982
     first_d_set = 992
     # patch_size = []
-    query_size = 60
+    query_size = 10
     query_steps = 3
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label"
