@@ -49,7 +49,7 @@ class ConvolveAggScipy:
 
 
 class ConvolveAggTorch:
-    def __init__(self, patch_size: list[int], stride: Union[int, list[int]] = 8):
+    def __init__(self, patch_size: list[int], stride: Union[int, list[int]] = 1):
         self.patch_size = patch_size
         self.stride = stride
         if isinstance(stride, int):
