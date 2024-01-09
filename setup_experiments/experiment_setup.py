@@ -36,6 +36,7 @@ class DatasetSetup:
         full_folds: int = 5,
         train_folds: int = 5,
         force_override: bool = False,
+        agg_stride: Union[int, list[int]] = 1,
     ):
         self.base_id = base_id
         # standard values
@@ -45,6 +46,7 @@ class DatasetSetup:
         self.num_processes = num_processes
         self.add_uncertainty = add_uncertainty
         self.add_validation = add_validation
+        self.agg_stride = agg_stride
 
         # standard values iterated over
         self.seeds = seeds
@@ -159,6 +161,7 @@ class DatasetSetup:
             full_folds=self.full_folds,
             add_uncertainty=self.add_uncertainty,
             add_validation=self.add_validation,
+            agg_stride=self.agg_stride,
         )
         config.save_id(dataset_id)
         state = State(dataset_id=dataset_id)

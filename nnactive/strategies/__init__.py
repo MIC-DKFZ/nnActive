@@ -1,3 +1,5 @@
+from typing import Union
+
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.entropy_exp import ExpectedEntropy
@@ -16,6 +18,7 @@ def init_strategy(
     query_size: int,
     patch_size: list[int],
     seed: int,
+    agg_stride: Union[int, list[int]],
     trials_per_img: int,
     file_ending: str = ".nii.gz",
     **kwargs,
@@ -27,6 +30,7 @@ def init_strategy(
         seed=seed,
         trials_per_img=trials_per_img,
         file_ending=file_ending,
+        agg_stride=agg_stride,
         **kwargs,
     )
 

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from nnactive.aggregations.convolution import ConvolveAgg
+from nnactive.aggregations.convolution import ConvolveAggTorch
 from nnactive.strategies.base_uncertainty import select_top_n_non_overlapping_patches
 
 
@@ -22,7 +22,7 @@ def test_image():
 
 
 def test_query_patches(test_image, patch_size):
-    aggregation = ConvolveAgg(patch_size)
+    aggregation = ConvolveAggTorch(patch_size)
     image_aggregated, _ = aggregation.forward(test_image)
     selected_array = np.zeros_like(test_image)
     n = 3
@@ -42,7 +42,7 @@ def test_query_patches(test_image, patch_size):
 
 
 def test_query_patches_with_annotated(test_image, patch_size):
-    aggregation = ConvolveAgg(patch_size)
+    aggregation = ConvolveAggTorch(patch_size)
     image_aggregated, _ = aggregation.forward(test_image)
     selected_array = np.zeros_like(test_image)
     selected_array[0:10] = 1
