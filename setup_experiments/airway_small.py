@@ -1,9 +1,12 @@
-import subprocess
-from itertools import product
+from argparse import ArgumentParser
 
 from experiment_setup import DatasetSetup
 
+parser = ArgumentParser()
+parser = DatasetSetup.add_args(parser)
+
 if __name__ == "__main__":
+    args = parser.parse_args()
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 983
@@ -15,9 +18,12 @@ if __name__ == "__main__":
     train_folds = 1
     starting_budget = "random-label"
     force_override = True
+    agg_stride = 8
 
     pre_suffix = f"__patch-std_patch__sb-{starting_budget}"
     num_experiments = 1
+    if args.num_experiments is None:
+        args.num_experiments = 1
 
     # Experiments with whole Images as Patches
     setter = DatasetSetup(
@@ -29,6 +35,7 @@ if __name__ == "__main__":
         starting_budget=starting_budget,
         num_processes=num_processes,
         train_folds=train_folds,
+        agg_stride=agg_stride,
         force_override=force_override,
         pre_suffix=pre_suffix,
     )

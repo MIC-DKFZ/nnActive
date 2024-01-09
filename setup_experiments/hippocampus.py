@@ -13,7 +13,7 @@ starting_budget = "random"
 
 
 parser = ArgumentParser()
-
+parser = DatasetSetup.add_args(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     first_d_set = 500
     query_size = 5
     query_steps = 20
-    trainer = "nnActiveTrainer_100epochs"
+    trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random"
     num_processes = 10
     train_folds = 5
@@ -43,11 +43,12 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
 
     # Experiments with smaller Patch Size
     first_d_set = first_d_set + len(setter.vals)
-    uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
+    # uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
+    uncertainties = ["mutual_information"]
     patch_size = [20, 20, 20]
     query_steps = 20
     query_size = 10
@@ -66,7 +67,7 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
 
     # Experiments with smaller Patch Size & bigger Query Size
 
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
 
     # Experiments with smaller Patch Size & much bigger Query Size
 
@@ -107,4 +108,4 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
