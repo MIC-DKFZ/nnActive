@@ -22,7 +22,7 @@ from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
 from tqdm import tqdm
 
-from nnactive.aggregations.convolution import ConvolveAgg
+from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.masking import does_overlap, mark_selected
@@ -40,17 +40,30 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         dataset_id: int,
         query_size: int,
         patch_size: list[int],
+        agg_stride: Union[int, list[int]],
         file_ending: str = ".nii.gz",
         **kwargs,
     ):
         super().__init__(dataset_id, query_size, patch_size, file_ending)
         self.config = ActiveConfig.get_from_id(dataset_id)
-        self.aggregation = ConvolveAgg(patch_size)
+        if (
+            agg_stride == 1
+        ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
+            self.aggregation = ConvolveAggScipy(patch_size, stride=agg_stride)
+        else:
+            self.aggregation = ConvolveAggTorch(patch_size, stride=agg_stride)
+
+        print(
+            f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
+        )
 
     def query(self, verbose=False) -> list[Patch]:
         # Initialize Predictor
         predictor = nnActivePredictor(
-            tile_step_size=0.75, use_mirroring=False, verbose=True, allow_tqdm=False
+            tile_step_size=0.75,
+            use_mirroring=False,
+            verbose=verbose,
+            allow_tqdm=not verbose,
         )
 
         # Initialize Model for Predictor
@@ -141,15 +154,17 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         print("Start finding non-overlapping patches.")
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
-        if not verbose:
-            iterator = tqdm(
-                zip(sorted_uncertainty_scores, sorted_uncertainty_indices),
-                total=len(sorted_uncertainty_indices),
-            )
-        else:
-            iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
+        iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
+        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=verbose)
+        pbar1 = tqdm(
+            total=len(sorted_uncertainty_scores),
+            position=1,
+            desc="Possible Patch Search",
+            disable=verbose,
+        )
 
         for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
+            pbar1.update()
             # get coordinates in image space from aggregated indices
             coords = self.aggregation.backward_index(
                 uncertainty_index, aggregated.shape
@@ -170,8 +185,11 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 # Mark region as queried
                 selected_array = mark_selected(selected_array, coords, patch_size)
                 # Stop if we reach the maximum number of patches to be queried
+                pbar0.update()
             if n is not None and len(selected_patches) >= n:
                 break
+        pbar1.close()
+        pbar0.close()
         print("Selected patches")
         return selected_patches
 

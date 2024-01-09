@@ -20,6 +20,8 @@ if __name__ == "__main__":
     pre_suffix = "__patch-full_patch"
     add_validation = "--disable_tta"
     add_uncertainty = "--diable_tta"
+    if args.num_experiments is None:
+        args.num_experiments = 1
 
     setter = DatasetSetup(
         base_id=dataset_id,

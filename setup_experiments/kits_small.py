@@ -21,6 +21,9 @@ if __name__ == "__main__":
     pre_suffix = "__patch-full_patch"
     add_validation = "--disable_tta"
     add_uncertainty = "--diable_tta"
+    agg_stride = 8
+    if args.num_experiments is None:
+        args.num_experiments = 1
 
     setter = DatasetSetup(
         base_id=dataset_id,
@@ -33,6 +36,7 @@ if __name__ == "__main__":
         train_folds=train_folds,
         force_override=args.force_override,
         pre_suffix=pre_suffix,
+        agg_stride=agg_stride,
         add_validation=add_validation,
         add_uncertainty=add_uncertainty,
     )

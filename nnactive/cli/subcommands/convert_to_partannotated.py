@@ -118,6 +118,7 @@ def convert_dataset_to_partannotated(
             file_ending,
             base_labelsTr_dir,
             target_labelsTr_dir,
+            agg_stride=1,  # random queries do not use this variable
             patch_func_kwargs=patch_kwargs,
             strategy_name=strategy,
             seed=seed,
@@ -142,6 +143,7 @@ def get_patches_for_partannotation(
     base_labelsTr_dir: Path,
     target_labelsTr_dir: Path,
     dataset_id: int,
+    agg_stride: Union[int, list[int]] = 1,
     patch_func_kwargs: dict = None,
     strategy_name: str = "random",
     seed: int = 12345,
@@ -186,6 +188,7 @@ def get_patches_for_partannotation(
         query_size=num_patches,
         patch_size=patch_size,
         seed=seed,
+        agg_stride=agg_stride,
         trials_per_img=6000,
         annotated_labels_path=base_labelsTr_dir,
         background_cls=background_cls,
