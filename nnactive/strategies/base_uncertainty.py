@@ -86,7 +86,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             output_folder_or_list_of_truncated_output_files=output_folder,
             num_processes_preprocessing=NPP,
         )
-        predictor.compute_from_data_iterator(data_iterator, self)
+        predictor.predict_from_data_iterator(data_iterator, self)
         return self.compose_query_of_patches()
 
     def query_from_probs(
@@ -279,9 +279,9 @@ class nnActivePredictor(nnUNetPredictor):
         Args:
             data (torch.TensorType): Preprocessed Data
         """
-        original_perform_everything_on_gpu = self.perform_everything_on_gpu
+        original_perform_everything_on_device = self.perform_everything_on_device
         with torch.no_grad():
-            if self.perform_everything_on_gpu:
+            if self.perform_everything_on_device:
                 try:
                     for fold, params in enumerate(self.list_of_parameters):
                         # messing with state dict names...
@@ -303,9 +303,9 @@ class nnActivePredictor(nnUNetPredictor):
                     )
                     print("Error:")
                     traceback.print_exc()
-                    self.perform_everything_on_gpu = False
+                    self.perform_everything_on_device = False
 
-            if not self.perform_everything_on_gpu:
+            if not self.perform_everything_on_device:
                 # TODO: probably do not predict everything from scratch again but only from fold where gpu prediciton is canceled
                 for fold, params in enumerate(self.list_of_parameters):
                     # messing with state dict names...
@@ -317,9 +317,9 @@ class nnActivePredictor(nnUNetPredictor):
                     out_probs = self.postprocess_logits(logits, properties)
                     self.save_out_probs_temp(out_probs, fold)
 
-            self.perform_everything_on_gpu = original_perform_everything_on_gpu
+            self.perform_everything_on_device = original_perform_everything_on_device
 
-    def compute_from_data_iterator(
+    def predict_from_data_iterator(
         self,
         data_iterator,
         query_method: AbstractUncertainQueryMethod,
@@ -346,9 +346,9 @@ class nnActivePredictor(nnUNetPredictor):
             else:
                 print(f"\nPredicting image of shape {data.shape}:")
 
-            print(f"perform_everything_on_gpu: {self.perform_everything_on_gpu}")
+            print(f"perform_everything_on_gpu: {self.perform_everything_on_device}")
 
-            properties = preprocessed["data_properites"]
+            properties = preprocessed["data_properties"]
             self.predict_fold_logits_from_preprocessed_data(data, properties)
 
             print("Start Query")
