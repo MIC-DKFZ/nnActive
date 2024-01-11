@@ -5,6 +5,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
+from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
@@ -74,13 +75,24 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-@register_subcommand("get_performance", [(("-d", "--dataset_id"), {"type": int})])
+@register_subcommand(
+    "get_performance",
+    [
+        (("-d", "--dataset_id"), {"type": int}),
+        (
+            ("-f", "--force"),
+            {"action": "store_true", "help": "Ignores the internal State."},
+        ),
+    ],
+)
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
-    get_performance(dataset_id)
+    force = args.force
+    get_performance(dataset_id, force)
 
 
-def get_performance(dataset_id):
+def get_performance(dataset_id: int, force: bool = False):
+    state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
     images_path = get_raw_path(dataset_id) / "imagesVal"
     labels_path = get_raw_path(dataset_id) / "labelsVal"
@@ -108,7 +120,15 @@ def get_performance(dataset_id):
 
     os.makedirs(loop_results_path, exist_ok=True)
     ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"
-    subprocess.run(ex_command, shell=True, check=True)
+    # subprocess.run(ex_command, shell=True, check=True)
+    compute_metrics_on_folder2(
+        folder_ref=str(labels_path),
+        folder_pred=str(pred_path),
+        dataset_json_file=str(dataset_json_path),
+        plans_file=str(plans_path),
+        output_file=str(loop_summary_json),
+        num_processes=8,
+    )
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
     print("Creating a summary of the cross validation results from training...")
@@ -137,6 +157,6 @@ def get_performance(dataset_id):
     with open(loop_summary_cross_val_json, "w") as f:
         json.dump(summary_cross_val_dict, f, indent=2)
 
-    state = State.get_id_state(dataset_id)
-    state.get_performance = True
-    state.save_state()
+    if not force:
+        state.get_performance = True
+        state.save_state()
