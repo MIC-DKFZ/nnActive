@@ -11,8 +11,8 @@ import psutil
 import torch
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from nnunetv2.configuration import default_num_processes
-from nnunetv2.inference.export_prediction import (
-    convert_predicted_logits_to_segmentation_with_correct_shape,
+from nnunetv2.inference.export_probs import (
+    convert_predicted_logits_to_probs_with_correct_shape,
 )
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.inference.sliding_window_prediction import compute_gaussian
@@ -29,6 +29,7 @@ from nnactive.masking import does_overlap, mark_selected
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.utils.timer import CudaTimer, Timer
 
 # TODO: replace this with a variable which is easier to access!
 NPP = 1
@@ -234,17 +235,18 @@ class nnActivePredictor(nnUNetPredictor):
                 raise RuntimeError(f"NAN values in logits")
         del logits_nf
 
-        (
-            _,
-            out_prob,
-        ) = convert_predicted_logits_to_segmentation_with_correct_shape(
+        conversion_timer = CudaTimer()
+        conversion_timer.start()
+        print(f"Shape before postprocessing: {logits.shape}")
+        out_prob = convert_predicted_logits_to_probs_with_correct_shape(
             logits,
             self.plans_manager,
             self.configuration_manager,
             self.label_manager,
             properties,
-            return_probabilities=True,
         )
+        print(f"Shape after postprocessing: {out_prob.shape}")
+        print(f"Time for conversion: {conversion_timer.stop()/1000}s")
 
         # fastest way to check if nan in np array
         # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
@@ -260,10 +262,13 @@ class nnActivePredictor(nnUNetPredictor):
             out_probs (np.ndarray): Predicted probabilities
             fold (int): current predicted fold
         """
+        save_timer = Timer()
+        save_timer.start()
         dataset_id = convert_dataset_name_to_id(self.plans_manager.dataset_name)
         temp_path = get_nnactive_results_folder(dataset_id) / "temp"
         os.makedirs(temp_path, exist_ok=True)
         np.save(str(temp_path / f"probs_fold{fold}"), out_probs)
+        print(f"Time for saving: {save_timer.stop()/1000}s")
 
     def delete_temp_path(self):
         """Delete temp files to not mess up in subsequent query steps"""
