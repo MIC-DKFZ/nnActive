@@ -42,18 +42,20 @@ class ActiveConfig:
         return ActiveConfig(**parsed)
 
     @classmethod
-    def get_from_id(cls, id: int) -> ActiveConfig:
-        fn = get_results_folder(id) / FILENAME
+    def get_from_id(cls, dataset_id: int) -> ActiveConfig:
+        fn = get_results_folder(dataset_id) / FILENAME
         return ActiveConfig.from_json(fn)
 
     def to_dict(self):
         return get_clean_dataclass_dict(self)
 
-    def save_id(self, id: int):
+    def save_id(self, dataset_id: int):
         try:
-            save_path: Path = get_results_folder(id) / FILENAME
+            save_path: Path = get_results_folder(dataset_id) / FILENAME
         except FileNotFoundError:
-            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(id)
+            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
+                dataset_id
+            )
             print(f"Creating Path: {save_path}")
             save_path.mkdir()
             save_path = save_path / FILENAME

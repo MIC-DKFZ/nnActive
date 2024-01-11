@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from pydantic.dataclasses import dataclass
 
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import get_raw_path
+from nnactive.paths import get_nnActive_results
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 
 FILENAME = "state.json"
 
 
-# TODO: This should/ could be redone to a more exhaustive list with all steps!
-# e.g. loop, update_data, trainings, uncertainty, query...
 @dataclass
 class State:
     dataset_id: int
@@ -36,7 +36,15 @@ class State:
         self.update_data = False
 
     def save_state(self):
-        fn = get_results_folder(self.dataset_id) / FILENAME
+        try:
+            fn = get_results_folder(self.dataset_id) / FILENAME
+        except FileNotFoundError:
+            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
+                self.dataset_id
+            )
+            print(f"Creating Path: {save_path}")
+            save_path.mkdir()
+            fn = save_path / FILENAME
         save_dataclass_to_json(self, fn)
 
     def verify(self):

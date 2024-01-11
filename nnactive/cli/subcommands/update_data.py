@@ -41,7 +41,13 @@ def main(args: Namespace) -> None:
     update_step(dataset_id, loop_val=loop_val, annotated=args.annotated, force=force)
 
 
-def update_step(dataset_id, num_folds=5, loop_val=None, annotated=True, force=False):
+def update_step(
+    dataset_id: int,
+    num_folds: int = 5,
+    loop_val: int = None,
+    annotated: bool = True,
+    force: bool = False,
+):
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
     target_dir = data_path / "labelsTr"
@@ -55,8 +61,7 @@ def update_step(dataset_id, num_folds=5, loop_val=None, annotated=True, force=Fa
     else:
         base_dir = get_raw_path(dataset_id) / "predTr"
 
-    if not force:
-        state = State.get_id_state(dataset_id)
+    state = State.get_id_state(dataset_id, verify=not force)
 
     update_data(
         data_path,
@@ -69,6 +74,7 @@ def update_step(dataset_id, num_folds=5, loop_val=None, annotated=True, force=Fa
         num_folds=num_folds,
         annotated=annotated,
     )
+
     if not force:
         state.update_data = True
         state.new_loop()

@@ -12,6 +12,7 @@ from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
+from nnactive.results.state import State
 
 
 def preprocess_dataset(
@@ -21,7 +22,13 @@ def preprocess_dataset(
     num_processes: Union[int, Tuple[int, ...], List[int]] = (8, 4, 8),
     verbose: bool = False,
     do_all: bool = False,
+    force: bool = False,
 ) -> None:
+    try:
+        state = State.get_id_state(dataset_id, verify=not force)
+    except FileNotFoundError:
+        state = State(dataset_id=dataset_id, loop=0)
+
     if not isinstance(num_processes, list):
         num_processes = list(num_processes)
     if len(num_processes) == 1:
@@ -41,7 +48,7 @@ def preprocess_dataset(
     for n, c in zip(num_processes, configurations):
         print(f"Configuration: {c}...")
         if c not in plans_manager.available_configurations:
-            print(
+            raise FileNotFoundError(
                 f"INFO: Configuration {c} not found in plans file {plans_identifier + '.json'} of "
                 f"dataset {dataset_name}. Skipping."
             )
@@ -58,6 +65,10 @@ def preprocess_dataset(
         )
         for i in subfiles(join(nnUNet_raw, dataset_name, "labelsTr"))
     ]
+
+    if not force:
+        state.preprocess = True
+        state.save_state()
 
 
 def preprocess(
