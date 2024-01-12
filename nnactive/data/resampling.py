@@ -74,6 +74,12 @@ def resample_to_target_spacing(
     seg = seg.transpose(
         [0, *[i + 1 for i in plans_manager.transpose_backward]]
     ).squeeze()
+
+    # fix -1 label issue here. nnU-Net sometimes sets -1 values in certain regions to ignore during loss.
+    # We do not want this, as this may lead to problems within nnU-Net.
+    # Therefore we set these regions to 0 as background. -- Fabian approves this!
+    seg[seg == -1] = 0
+
     img_itk_new = sitk.GetImageFromArray(seg)
     # Spacing is extremely werid in sitk. It is saved in x y z levels.
     # Therefore spacing needs to be inverted here.
