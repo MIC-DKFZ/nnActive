@@ -118,7 +118,7 @@ def get_performance(dataset_id: int, force: bool = False):
     ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
     print(ex_command)
     torch.cuda.synchronize()
-    torch.cuda.empyt_cache()
+    torch.cuda.empty_cache()
     subprocess.run(
         ex_command, shell=True, check=True
     )  # timeout=TIMEOUT_S is no longer required due to novel multiprocessing
