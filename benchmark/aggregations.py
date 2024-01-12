@@ -21,7 +21,7 @@ def timeit(func, *args, **kwargs):
     - result: The result of the wrapped function.
     - elapsed_time: The time taken for the function to execute.
     """
-    # torch.cuda.synchronize()
+    torch.cuda.synchronize()
     start_time = time.time()
     result = func(*args, **kwargs)
     torch.cuda.synchronize()
