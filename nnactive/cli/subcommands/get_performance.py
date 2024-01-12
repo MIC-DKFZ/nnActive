@@ -14,6 +14,7 @@ from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
+from nnactive.nnunet.predict import predict_entry_point
 from nnactive.nnunet.utils import (
     convert_id_to_dataset_name,
     get_preprocessed_path,
@@ -106,7 +107,6 @@ def get_performance(dataset_id: int, force: bool = False):
     plans_path = get_preprocessed_path(dataset_id) / f"{plans_identifier}.json"
 
     num_folds = config.working_folds
-    folds = " ".join([f"{fold}" for fold in range(num_folds)])
     loop_results_path: Path = (
         nnActive_results
         / convert_id_to_dataset_name(dataset_id)
@@ -115,13 +115,21 @@ def get_performance(dataset_id: int, force: bool = False):
 
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
+
+    folds = " ".join([f"{fold}" for fold in range(num_folds)])
     ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
     print(ex_command)
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
-    subprocess.run(
-        ex_command, shell=True, check=True
-    )  # timeout=TIMEOUT_S is no longer required due to novel multiprocessing
+    # TODO: redo add_validation in config!
+    folds = [i for i in range(num_folds)]
+
+    predict_entry_point(
+        input_folder=str(images_path),
+        output_folder=str(pred_path),
+        dataset_id=dataset_id,
+        train_identifier=config.trainer,
+        configuration_identifier=config.model_config,
+        folds=folds,
+    )
 
     os.makedirs(loop_results_path, exist_ok=True)
     ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"
