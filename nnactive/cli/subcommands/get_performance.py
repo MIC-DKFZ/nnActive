@@ -5,7 +5,9 @@ from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
+import torch
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
+from nnunetv2.inference.predict_from_raw_data import predict
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
@@ -114,6 +116,8 @@ def get_performance(dataset_id: int, force: bool = False):
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
     ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
     print(ex_command)
+    torch.cuda.synchronize()
+    torch.cuda.empyt_cache()
     subprocess.run(
         ex_command, shell=True, check=True
     )  # timeout=TIMEOUT_S is no longer required due to novel multiprocessing
