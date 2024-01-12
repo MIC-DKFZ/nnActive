@@ -226,12 +226,7 @@ class nnActivePredictor(nnUNetPredictor):
         print(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
         logits_nf = torch.isfinite(logits) == 0
         if torch.any(logits_nf):
-            print(f"Replacing non finite values in logits")
-            logits[logits == torch.inf] = 100
-            logits[logits == -torch.inf] = -100
-            logits_nf = torch.isfinite(logits) == 0
-            if torch.any(logits_nf):
-                raise RuntimeError(f"NAN values in logits")
+            raise RuntimeError(f"NAN values in logits")
         del logits_nf
 
         (
