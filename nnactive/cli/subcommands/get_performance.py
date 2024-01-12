@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 import torch
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
-from nnunetv2.inference.predict_from_raw_data import predict
+
+# from nnunetv2.inference.predict_from_raw_data import predict
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
