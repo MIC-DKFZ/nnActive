@@ -35,6 +35,15 @@ class State:
         self.query = False
         self.update_data = False
 
+    def reset(self):
+        self.loop = 0
+        self.preprocess = False
+        self.training = False
+        self.get_performance = False
+        self.pred_tr = False
+        self.query = False
+        self.update_data = False
+
     def save_state(self):
         try:
             fn = get_results_folder(self.dataset_id) / FILENAME
