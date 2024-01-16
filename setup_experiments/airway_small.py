@@ -7,6 +7,7 @@ parser = DatasetSetup.add_args(parser)
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    force_override = args.force_override
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 983
@@ -17,11 +18,9 @@ if __name__ == "__main__":
     num_processes = 4
     train_folds = 1
     starting_budget = "random-label"
-    force_override = True
     agg_stride = 8
 
     pre_suffix = f"__patch-std_patch__sb-{starting_budget}"
-    num_experiments = 1
     if args.num_experiments is None:
         args.num_experiments = 1
 
@@ -39,4 +38,4 @@ if __name__ == "__main__":
         force_override=force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set, num_experiments)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
