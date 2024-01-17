@@ -37,6 +37,7 @@ def get_array(shape: Iterable[int] = (524, 524, 524)):
 image_shapes = [64, 128, 256, 512]
 kernel_shapes = [32, 64, 128, 128]
 agg_classes = [ConvolveAggScipy, ConvolveAggTorch]
+agg_kwargs = [{}, {"stride": 8}]
 num_dims = 3
 
 if __name__ == "__main__":
@@ -47,7 +48,7 @@ if __name__ == "__main__":
         for kernel_s, image_s in zip(kernel_shapes, image_shapes):
             print(f"Image Shape: {image_s} \t Kernel Shape: {kernel_s}")
             input_image = get_array([image_s] * num_dims).to("cuda:0")
-            for agg_c in agg_classes:
-                aggregation = agg_c([kernel_s] * input_image.dim())
+            for agg_c, agg_kw in zip(agg_classes, agg_kwargs, strict=True):
+                aggregation = agg_c([kernel_s] * input_image.dim(), **agg_kw)
                 result, elapsed_time = timeit(aggregation.forward, input_image)
                 print("\t{}: {:.5f}".format(agg_c.__name__, elapsed_time))
