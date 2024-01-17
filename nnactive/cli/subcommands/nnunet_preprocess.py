@@ -78,10 +78,11 @@ def preprocess(
     num_processes: Union[int, Tuple[int, ...], List[int]] = (8, 4, 8),
     verbose: bool = False,
     do_all: bool = False,
+    force: bool = False,
 ):
     for d in dataset_ids:
         preprocess_dataset(
-            d, plans_identifier, configurations, num_processes, verbose, do_all
+            d, plans_identifier, configurations, num_processes, verbose, do_all, force
         )
 
 
@@ -156,6 +157,15 @@ def preprocess(
                 "Recommended for cluster environments",
             },
         ),
+        (
+            ("--force"),
+            {
+                "action": "store_true",
+                "required": False,
+                "help": "Set this to force using this command without taking the state.json of the dataset into account! "
+                "Be Careufl with this one!",
+            },
+        ),
     ],
 )
 def main(args):
@@ -171,4 +181,5 @@ def main(args):
         num_processes=np,
         verbose=args.verbose,
         do_all=args.do_all,
+        force=args.force,
     )

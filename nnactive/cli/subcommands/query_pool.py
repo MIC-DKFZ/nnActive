@@ -29,16 +29,26 @@ from nnactive.query_pool import query_pool
                 "help": "Patch Size to be queried. Currently not implemented",
             },
         ),
+        (
+            ("--force"),
+            {
+                "action": "store_true",
+                "required": False,
+                "help": "Set this to force using this command without taking the state.json of the dataset into account! "
+                "Be Careufl with this one!",
+            },
+        ),
     ],
 )
 def main(args: Namespace):
     dataset_id = args.dataset_id
     patch_size = args.patch_size
     query_size = args.num_patches
+    force = args.force
 
     config = ActiveConfig.get_from_id(dataset_id)
     if patch_size is not None:
         config.patch_size = patch_size
     if query_size is not None:
         config.query_size = query_size
-    query_pool(dataset_id)
+    query_pool(dataset_id, force=force)

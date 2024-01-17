@@ -5,24 +5,22 @@ from experiment_setup import DatasetSetup
 parser = ArgumentParser()
 parser = DatasetSetup.add_args(parser)
 
+
 if __name__ == "__main__":
     args = parser.parse_args()
     force_override = args.force_override
-    seeds = [12345, 12346, 12347]
-    uncertainties = ["pred_entropy", "mutual_information", "random"]
-    dataset_id = 983
-    first_d_set = 993
-    query_size = 10
+
+    seeds = [12345]  # , 12346, 12347]
+    uncertainties = ["mutual_information", "random", "pred_entropy"]
+    dataset_id = 984
+    first_d_set = 990
+    query_size = 60
     query_steps = 3
-    trainer = "nnActiveTrainer_airway_5epochs"
+    agg_stride = 8
+    trainer = "nnActiveTrainer_5epochs"
+    starting_budget = "random-label"
     num_processes = 4
     train_folds = 1
-    starting_budget = "random-label"
-    agg_stride = 8
-
-    pre_suffix = f"__patch-std_patch__sb-{starting_budget}"
-    if args.num_experiments is None:
-        args.num_experiments = 1
 
     # Experiments with whole Images as Patches
     setter = DatasetSetup(
@@ -33,9 +31,8 @@ if __name__ == "__main__":
         trainer=trainer,
         starting_budget=starting_budget,
         num_processes=num_processes,
-        train_folds=train_folds,
         agg_stride=agg_stride,
+        train_folds=train_folds,
         force_override=force_override,
-        pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
+    setter.rollout(first_d_set, num_experiments=args.num_experiments)
