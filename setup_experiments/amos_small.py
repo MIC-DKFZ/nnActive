@@ -16,6 +16,7 @@ if __name__ == "__main__":
     first_d_set = 990
     query_size = 60
     query_steps = 3
+    agg_stride = 8
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label"
     num_processes = 4
@@ -30,6 +31,7 @@ if __name__ == "__main__":
         trainer=trainer,
         starting_budget=starting_budget,
         num_processes=num_processes,
+        agg_stride=agg_stride,
         train_folds=train_folds,
         force_override=force_override,
     )

@@ -16,6 +16,7 @@ if __name__ == "__main__":
     # patch_size = []
     query_size = 5
     query_steps = 20
+    agg_stride = 8
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label"
     pre_suffix = "__patch-full_patch"
@@ -34,6 +35,7 @@ if __name__ == "__main__":
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=args.force_override,
+        agg_stride=agg_stride,
         pre_suffix=pre_suffix,
         add_validation=add_validation,
         add_uncertainty=add_uncertainty,
