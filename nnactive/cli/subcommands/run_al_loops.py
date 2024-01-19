@@ -1,5 +1,8 @@
+import os
 import subprocess
 from argparse import Namespace
+
+import torch
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
@@ -27,6 +30,14 @@ def main(args: Namespace) -> None:
     state = State.get_id_state(dataset_id)
 
     print(config)
+
+    try:
+        os.environ["nnUNet_compile"]
+    except KeyError:
+        # torch.compile is only available from torch 2.0 onwards
+        # see https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html
+        if torch.__version__ >= "2.0":
+            os.environ["nnUNet_compile"] = "True"
 
     for al_iteration in range(config.query_steps):
         if al_iteration < state.loop:
