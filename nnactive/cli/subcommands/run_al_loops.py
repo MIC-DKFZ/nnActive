@@ -35,6 +35,7 @@ def main(args: Namespace) -> None:
         os.environ["nnUNet_compile"]
     except KeyError:
         # torch.compile is only available from torch 2.0 onwards
+        # see https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html
         if torch.__version__ >= "2.0":
             os.environ["nnUNet_compile"] = "True"
 
