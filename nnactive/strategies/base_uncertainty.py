@@ -112,9 +112,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
         print("Initialize selected array...")
-        selected_array = self.initialize_selected_array(
-            image_shape, label_file, self.annotated_patches
-        )
+        selected_array = [patch for patch in self.annotated_patches]
 
         print("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
@@ -138,7 +136,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         self,
         patch_size: list[int],
         aggregated: np.ndarray,
-        selected_array: np.ndarray,
+        selected_array: list[Patch],
         label_file: str,
         n: int,
         verbose: bool = False,
@@ -170,9 +168,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             coords = self.aggregation.backward_index(
                 uncertainty_index, aggregated.shape
             )
+            patch = Patch(
+                file=label_file + ".nii.gz",
+                coords=coords,
+                size=patch_size,
+            )
+
             # coords = np.unravel_index(uncertainty_index, aggregated.shape)
             # Check if coordinated overlap with already queried region
-            if not does_overlap(coords, patch_size, selected_array):
+            if not does_overlap(patch, selected_array):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -184,7 +188,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 )
                 # selected += 1
                 # Mark region as queried
-                selected_array = mark_selected(selected_array, coords, patch_size)
+                # selected_array = mark_selected(selected_array, coords, patch_size)
+                selected_array.append(patch)
                 # Stop if we reach the maximum number of patches to be queried
                 pbar0.update()
             if n is not None and len(selected_patches) >= n:
@@ -414,7 +419,7 @@ def select_top_n_non_overlapping_patches(
     n: int,
     uncertainty_scores: np.ndarray,
     patch_size: np.ndarray,
-    selected_array: np.ndarray,
+    selected_array: list[Patch],
 ) -> list[dict]:
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -442,7 +447,12 @@ def select_top_n_non_overlapping_patches(
         # Get the index as coordinates
         coords = np.unravel_index(uncertainty_index, uncertainty_scores.shape)
         # Check if coordinated overlap with already queried region
-        if not does_overlap(coords, patch_size, selected_array):
+        patch = Patch(
+            file=image_name,
+            coords=coords,
+            size=patch_size,
+        )
+        if not does_overlap(patch, selected_array):
             # If it is a non-overlapping region, append this patch to be queried
             selected_patches.append(
                 {
@@ -454,7 +464,7 @@ def select_top_n_non_overlapping_patches(
             )
             # selected += 1
             # Mark region as queried
-            selected_array = mark_selected(selected_array, coords, patch_size)
+            selected_array.append(patch)
         # Stop if we reach the maximum number of patches to be queried
         if n is not None and len(selected_patches) >= n:
             break

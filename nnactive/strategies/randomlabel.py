@@ -92,9 +92,10 @@ class RandomLabel(Random):
                 # only needed for creation of patches in first iteration
                 if verbose:
                     print(f"Create Mask: {img_name}")
-                selected_array = create_patch_mask_for_image(
-                    img_name, current_patch_list, img_size
-                )
+                selected_array = [
+                    patch for patch in current_patch_list if patch.file == img_name
+                ]
+
                 if verbose:
                     print("Mask creation succesfull")
 
@@ -134,11 +135,15 @@ class RandomLabel(Random):
                             img_size, self.patch_size, self.rng
                         )
 
+                    patch = Patch(
+                        file=img_name,
+                        coords=iter_patch_loc,
+                        size=iter_patch_size,
+                    )
+
                     # check if patch is valid
-                    if not does_overlap(
-                        iter_patch_loc, iter_patch_size, selected_array
-                    ):
-                        patches.append(Patch(img_name, iter_patch_loc, iter_patch_size))
+                    if not does_overlap(patch, selected_array):
+                        patches.append(patch)
                         # print(f"Creating Patch with iteration: {num_tries}")
                         labeled = True
                         break
