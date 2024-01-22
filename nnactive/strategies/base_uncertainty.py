@@ -418,7 +418,7 @@ def select_top_n_non_overlapping_patches(
     image_name: str,
     n: int,
     uncertainty_scores: np.ndarray,
-    patch_size: np.ndarray,
+    patch_size: tuple[int, int, int],
     selected_array: list[Patch],
 ) -> list[dict]:
     """

@@ -3,6 +3,7 @@ import pytest
 import torch
 
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
+from nnactive.data import Patch
 from nnactive.strategies.base_uncertainty import select_top_n_non_overlapping_patches
 
 
@@ -33,10 +34,10 @@ def aggregations(patch_size):
 def test_query_patches(test_image, patch_size, aggregations):
     for aggregation in aggregations:
         image_aggregated, _ = aggregation.forward(test_image)
-        selected_array = np.zeros_like(test_image)
+        selected_array = []
         n = 3
         queried_patches = select_top_n_non_overlapping_patches(
-            "test", n, image_aggregated, np.array(patch_size), selected_array
+            "test", n, image_aggregated, patch_size, selected_array
         )
         queried_patches = sorted(
             queried_patches, key=lambda d: d["score"], reverse=True
@@ -55,11 +56,10 @@ def test_query_patches(test_image, patch_size, aggregations):
 def test_query_patches_with_annotated(test_image, patch_size, aggregations):
     for aggregation in aggregations:
         image_aggregated, _ = aggregation.forward(test_image)
-        selected_array = np.zeros_like(test_image)
-        selected_array[0:10] = 1
+        selected_array = [Patch("test", (0, 0, 0), (10, 10, 10))]
         n = 3
         queried_patches = select_top_n_non_overlapping_patches(
-            "test", n, image_aggregated, np.array(patch_size), selected_array
+            "test", n, image_aggregated, patch_size, selected_array
         )
         queried_patches = sorted(
             queried_patches, key=lambda d: d["score"], reverse=True
