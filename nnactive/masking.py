@@ -89,27 +89,16 @@ def mark_already_annotated_patches(
 
 
 def does_overlap(
-    start_indices: Tuple[np.ndarray],
-    patch_size: Union[np.ndarray, List[int]],
-    selected_array: np.ndarray,
-) -> bool:
-    """
-    Check if a patch overlaps with an already annotated region
-    Args:
-        start_indices (Tuple[str]): start indices of the patch
-        patch_size (np.ndarray): patch size to determine end indices
-        selected_array (np.ndarray): array containing the already annotated regions
+    ipatch: Patch,
+    patches: list[Patch],
+):
+    num_dims = len(ipatch.coords)
 
-    Returns:
-        bool: True if the patch overlaps with an already annotated region, False if not
-    """
-    # Convert the indices to slices, makes indexing of selected_array possible without being dependent on dimensions
-    if isinstance(patch_size, np.ndarray):
-        patch_size = patch_size.tolist()
-    slices = []
-    for start_index, size in zip(start_indices, patch_size):
-        slices.append(slice(start_index, start_index + size))
-    # Areas that are already annotated should be marked with 1 in the selected_array
-    if selected_array[tuple(slices)].max() > 0:
-        return True
+    for patch in patches:
+        if all(
+            ipatch.coords[i] < patch.coords[i] + patch.size[i]
+            and ipatch.coords[i] + ipatch.size[i] > patch.coords[i]
+            for i in range(num_dims)
+        ):
+            return True
     return False

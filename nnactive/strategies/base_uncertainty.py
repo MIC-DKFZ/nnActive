@@ -11,8 +11,8 @@ import psutil
 import torch
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from nnunetv2.configuration import default_num_processes
-from nnunetv2.inference.export_prediction import (
-    convert_predicted_logits_to_segmentation_with_correct_shape,
+from nnunetv2.inference.export_probs import (
+    convert_predicted_logits_to_probs_with_correct_shape,
 )
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.inference.sliding_window_prediction import compute_gaussian
@@ -29,6 +29,7 @@ from nnactive.masking import does_overlap, mark_selected
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.utils.timer import CudaTimer, Timer
 
 # TODO: replace this with a variable which is easier to access!
 NPP = 1
@@ -111,9 +112,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
         print("Initialize selected array...")
-        selected_array = self.initialize_selected_array(
-            image_shape, label_file, self.annotated_patches
-        )
+        selected_array = [patch for patch in self.annotated_patches]
 
         print("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
@@ -137,7 +136,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         self,
         patch_size: list[int],
         aggregated: np.ndarray,
-        selected_array: np.ndarray,
+        selected_array: list[Patch],
         label_file: str,
         n: int,
         verbose: bool = False,
@@ -169,9 +168,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             coords = self.aggregation.backward_index(
                 uncertainty_index, aggregated.shape
             )
+            patch = Patch(
+                file=label_file + ".nii.gz",
+                coords=coords,
+                size=patch_size,
+            )
+
             # coords = np.unravel_index(uncertainty_index, aggregated.shape)
             # Check if coordinated overlap with already queried region
-            if not does_overlap(coords, patch_size, selected_array):
+            if not does_overlap(patch, selected_array):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -183,7 +188,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 )
                 # selected += 1
                 # Mark region as queried
-                selected_array = mark_selected(selected_array, coords, patch_size)
+                # selected_array = mark_selected(selected_array, coords, patch_size)
+                selected_array.append(patch)
                 # Stop if we reach the maximum number of patches to be queried
                 pbar0.update()
             if n is not None and len(selected_patches) >= n:
@@ -229,17 +235,18 @@ class nnActivePredictor(nnUNetPredictor):
             raise RuntimeError(f"NAN values in logits")
         del logits_nf
 
-        (
-            _,
-            out_prob,
-        ) = convert_predicted_logits_to_segmentation_with_correct_shape(
+        conversion_timer = CudaTimer()
+        conversion_timer.start()
+        print(f"Shape before postprocessing: {logits.shape}")
+        out_prob = convert_predicted_logits_to_probs_with_correct_shape(
             logits,
             self.plans_manager,
             self.configuration_manager,
             self.label_manager,
             properties,
-            return_probabilities=True,
         )
+        print(f"Shape after postprocessing: {out_prob.shape}")
+        print(f"Time for conversion: {conversion_timer.stop()/1000}s")
 
         # fastest way to check if nan in np array
         # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
@@ -255,10 +262,13 @@ class nnActivePredictor(nnUNetPredictor):
             out_probs (np.ndarray): Predicted probabilities
             fold (int): current predicted fold
         """
+        save_timer = Timer()
+        save_timer.start()
         dataset_id = convert_dataset_name_to_id(self.plans_manager.dataset_name)
         temp_path = get_nnactive_results_folder(dataset_id) / "temp"
         os.makedirs(temp_path, exist_ok=True)
         np.save(str(temp_path / f"probs_fold{fold}"), out_probs)
+        print(f"Time for saving: {save_timer.stop()/1000}s")
 
     def delete_temp_path(self):
         """Delete temp files to not mess up in subsequent query steps"""
@@ -403,8 +413,8 @@ def select_top_n_non_overlapping_patches(
     image_name: str,
     n: int,
     uncertainty_scores: np.ndarray,
-    patch_size: np.ndarray,
-    selected_array: np.ndarray,
+    patch_size: tuple[int, int, int],
+    selected_array: list[Patch],
 ) -> list[dict]:
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -432,7 +442,12 @@ def select_top_n_non_overlapping_patches(
         # Get the index as coordinates
         coords = np.unravel_index(uncertainty_index, uncertainty_scores.shape)
         # Check if coordinated overlap with already queried region
-        if not does_overlap(coords, patch_size, selected_array):
+        patch = Patch(
+            file=image_name,
+            coords=coords,
+            size=patch_size,
+        )
+        if not does_overlap(patch, selected_array):
             # If it is a non-overlapping region, append this patch to be queried
             selected_patches.append(
                 {
@@ -444,7 +459,7 @@ def select_top_n_non_overlapping_patches(
             )
             # selected += 1
             # Mark region as queried
-            selected_array = mark_selected(selected_array, coords, patch_size)
+            selected_array.append(patch)
         # Stop if we reach the maximum number of patches to be queried
         if n is not None and len(selected_patches) >= n:
             break
