@@ -9,6 +9,12 @@ from pydantic import dataclasses
 from nnactive.utils.pyutils import get_clean_dataclass_dict
 
 
+def load_json(save_path: Path) -> Any:
+    with open(save_path, "r") as file:
+        out = json.load(file)
+    return out
+
+
 def save_json(save_json: Any, save_path: Path):
     with open(save_path, "w") as file:
         json.dump(save_json, file, indent=4)

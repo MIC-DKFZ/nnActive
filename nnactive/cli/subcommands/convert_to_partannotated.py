@@ -44,7 +44,11 @@ def convert_dataset_to_partannotated(
     patch_kwargs: Optional[dict] = None,
     strategy: str = "random",
     seed: int = 12345,
+    force: bool = False,
 ):
+    """
+    force: only use for development!
+    """
     already_exists = False
     try:
         exists_name = convert_id_to_dataset_name(target_id)
@@ -63,11 +67,11 @@ def convert_dataset_to_partannotated(
     except FileNotFoundError:
         print("No naming conflict with nnActive")
 
-    if already_exists:
+    if already_exists and not force:
         raise NotImplementedError(
             "Dataset ID already exists, check corresponding folders."
         )
-    if not already_exists:
+    if not already_exists or force:
         # load base_dataset_json
         base_dataset: str = convert_id_to_dataset_name(base_id)
         base_dataset_json: dict = read_dataset_json(base_dataset)
@@ -82,7 +86,7 @@ def convert_dataset_to_partannotated(
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
         target_dir = NNUNET_RAW / target_dataset
-        os.makedirs(target_dir)
+        os.makedirs(target_dir, exist_ok=True)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
             json.dump(target_dataset_json, file, indent=4)
@@ -91,10 +95,19 @@ def convert_dataset_to_partannotated(
         )  # basedataset/dataset.json is not supposed to change!
 
         # Copy all data except for labelsTr to target_dir and dataset.json
-        copy_folders = ["imagesTr", "imagesTs", "labelsTs", "imagesVal", "labelsVal"]
+        copy_folders = [
+            "imagesTr",
+            "imagesTs",
+            "labelsTs",
+            "imagesVal",
+            "labelsVal",
+            "addTr",
+        ]
         for copy_folder in copy_folders:
             if copy_folder in os.listdir(base_dir):
-                shutil.copytree(base_dir / copy_folder, target_dir / copy_folder)
+                shutil.copytree(
+                    base_dir / copy_folder, target_dir / copy_folder, dirs_exist_ok=True
+                )
             else:
                 print(
                     "Skip Path for copying into target:\n{}".format(
@@ -110,6 +123,10 @@ def convert_dataset_to_partannotated(
         background_cls = base_dataset_json["labels"].get("background")
         file_ending = base_dataset_json["file_ending"]
 
+        additional_label_path = None
+        if target_dataset_json.get("use_mask_for_norm") is True:
+            additional_label_path: Path = target_dir / "addTr"
+
         # create patches list for dataset creation
         patches = get_patches_for_partannotation(
             full_images,
@@ -124,11 +141,17 @@ def convert_dataset_to_partannotated(
             seed=seed,
             background_cls=background_cls,
             dataset_id=target_id,
+            additional_label_path=additional_label_path,
         )
 
         # Create labels from patches
         create_labels_from_patches(
-            patches, ignore_label, file_ending, base_labelsTr_dir, target_labelsTr_dir
+            patches,
+            ignore_label,
+            file_ending,
+            base_labelsTr_dir,
+            target_labelsTr_dir,
+            additional_label_path=additional_label_path,
         )
 
         loop_json = {"patches": patches}
@@ -148,6 +171,7 @@ def get_patches_for_partannotation(
     strategy_name: str = "random",
     seed: int = 12345,
     background_cls: Union[int, None] = None,
+    additional_label_path: Union[Path, None] = None,
 ) -> list[Patch]:
     """Creates patches based on annotation strategies.
 
@@ -193,6 +217,7 @@ def get_patches_for_partannotation(
         annotated_labels_path=base_labelsTr_dir,
         background_cls=background_cls,
         raw_labels_path=base_labelsTr_dir,
+        additional_label_path=additional_label_path,
     )
     print("Finished Initialization")
     print(strategy)
@@ -275,6 +300,13 @@ def get_patches_for_partannotation(
                 "help": "Suffix for the name of the output dataset",
             },
         ),
+        (
+            "--force",
+            {
+                "action": "store_true",
+                "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
@@ -288,6 +320,7 @@ def main(args: Namespace) -> None:
     id_offset = args.offset
     seed = args.seed
     name_suffx = args.name_suffix
+    force = args.force
 
     if args.patch_size is not None:
         if len(args.patch_size) == 1:
@@ -313,5 +346,6 @@ def main(args: Namespace) -> None:
         num_patches=num_patches,
         seed=seed,
         strategy=strategy,
+        force=force,
     )
     generate_custom_splits_file(target_id, 0, 5)

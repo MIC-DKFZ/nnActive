@@ -47,17 +47,28 @@ def add_ignore_label_to_dataset_json(dataset_json: dict) -> dict:
     return dataset_json
 
 
-def create_empty_mask(image_filename: Path, ignore_label: int, save_filename: Path):
+def create_empty_mask(
+    image_filename: Path,
+    ignore_label: int,
+    save_filename: Path,
+    additional_label_file: Path | None = None,
+):
     """Create an empty label mask for a sitk readable image with ignore label.
 
     Args:
         image_filename (Path): filename of labelmap to be loaded
         ignore_label (int): fill value of new labelmap
         save_filename (Path): path to new filename
+        additional_label_file (Path|None): filename of labelmap from which to take values !=1/255
     """
     img_itk = sitk.ReadImage(image_filename)
     img_npy = sitk.GetArrayFromImage(img_itk)
     img_npy.fill(ignore_label)
+    if additional_label_file is not None:
+        new_label = sitk.ReadImage(additional_label_file)
+        new_label = sitk.GetArrayFromImage(new_label)
+        mask = new_label != 255
+        img_npy[mask] = new_label[mask]
     img_itk_new = sitk.GetImageFromArray(img_npy)
 
     img_itk_new = copy_geometry_sitk(img_itk_new, img_itk)

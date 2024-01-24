@@ -22,7 +22,7 @@ def init_strategy(
     trials_per_img: int,
     file_ending: str = ".nii.gz",
     **kwargs,
-) -> Random:
+) -> AbstractQueryMethod:
     return strategydict[strategy_name](
         dataset_id,
         query_size=query_size,
