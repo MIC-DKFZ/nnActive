@@ -29,6 +29,11 @@ pip install -e '.[dev]'
         ]
         ```
 
+## Additional labels path
+Additional labels can be added in the `addTr` folder, these will then be written to the `labelsTr` folder.
+
+Implementation checking overlap will be implemented in the future version.
+
 ## Active Learning Integration
 
 The annotated data for each loop is saved in the `loop_XXX.json` file situated in $nnUNet_raw.
@@ -79,7 +84,7 @@ Creates folders `imagesVal` and `labelsVal` while taking some images out of the 
 
 2. Obtain nnU-Net preprocessing instructions
 ```bash
-nnUNetv2_extract_fingerprint -d 4 --clean
+nnactive nnunet_extract_fingerprint  -d 4 --clean
 nnUNetv2_plan_experiment -d 4
 ```
 3. Resample images

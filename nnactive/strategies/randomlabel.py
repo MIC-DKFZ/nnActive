@@ -27,6 +27,7 @@ class RandomLabel(Random):
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
         background_cls: int | None = None,
+        additional_label_path: Path | None = None,
         **kwargs,
     ):
         """
@@ -49,6 +50,7 @@ class RandomLabel(Random):
             trials_per_img,
             file_ending,
             raw_labels_path,
+            additional_label_path,
         )
         self.raw_labels_path = raw_labels_path
         if self.raw_labels_path is None:

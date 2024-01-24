@@ -20,9 +20,12 @@ class Random(AbstractQueryMethod):
         trials_per_img: int = 600,
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
+        additional_label_path: Path | None = None,
         **kwargs,
     ):
-        super().__init__(dataset_id, query_size, patch_size, file_ending)
+        super().__init__(
+            dataset_id, query_size, patch_size, file_ending, additional_label_path
+        )
         self.trials_per_img = trials_per_img
         self.rng = np.random.default_rng(seed)
 

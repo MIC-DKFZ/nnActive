@@ -17,8 +17,13 @@ def update_data(
     loop_val: int = None,
     num_folds: int = 5,
     annotated: bool = True,
+    additional_label_path: Path | None = None,
 ):
     """Update Dataset Raw with a novel splits_file in Preprocessed
+
+    Disclaimer:
+        Labels from additional_label_path (if used) are added last and overwrite GT from labelsTr.
+        All areas inside images in additional_label_path that are not 255 = -1 will be written to labelsTr.
 
     Args:
         data_path (Path): raw dataset dir
@@ -28,6 +33,7 @@ def update_data(
         base_dir (Path): path to annotated labels
         target_dir (Path): path to labels to be updated
         loop_val (int, optional): which loop val to use. Defaults to None.
+        additional_label_path (Path, optional): path to files with labels to be added to labelsTr. Defaults to None
     """
     all_patches = get_patches_from_loop_files(data_path, loop_val)
     if annotated:
@@ -36,7 +42,13 @@ def update_data(
         patches = get_loop_patches(data_path, loop_val)
     print(len(patches))
     create_labels_from_patches(
-        patches, ignore_label, file_ending, base_dir, target_dir, overwrite=annotated
+        patches,
+        ignore_label,
+        file_ending,
+        base_dir,
+        target_dir,
+        overwrite=annotated,
+        additional_label_path=additional_label_path,
     )
 
     splits_final = kfold_cv_from_patches(num_folds, all_patches)

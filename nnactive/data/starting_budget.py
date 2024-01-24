@@ -178,9 +178,14 @@ def make_patches_from_ground_truth(
     target_path: Path,
     ignore_label: int,
     overwrite: bool = True,
+    additional_label_path: Path = None,
 ) -> None:
     """Create label files where only some patches are labeled from ground truth
         and the rest are ignored.
+
+        Disclaimer:
+        Labels from additional_label_path (if used) are added last and overwrite GT from labelsTr.
+        All areas inside images in additional_label_path that are not 255 = -1 will be written to labelsTr.
 
     Args:
         patches: list of patches to label
@@ -188,6 +193,7 @@ def make_patches_from_ground_truth(
         target_path: where the patched labels should be stored
         ignore_label: the id for ignored labels
         overwrite: if true, overrides all label maps. If false, it updates existing ones.
+        additional_label_path: path to additional labels obtainable for free (e.g. air in MRI brain scans)
     """
     target_path.mkdir(exist_ok=True)
 
@@ -214,8 +220,15 @@ def make_patches_from_ground_truth(
         for slice_x, slice_y, slice_z in patch_access:
             img_new[slice_x, slice_y, slice_z] = img_gt[slice_x, slice_y, slice_z]
 
+        if additional_label_path is not None:
+            new_label = sitk.ReadImage(additional_label_path / label_file)
+            new_label = sitk.GetArrayFromImage(new_label)
+            mask = new_label != 255
+            img_new[mask] = new_label[mask]
+
         img_new = sitk.GetImageFromArray(img_new)
         img_new = set_geometry(img_new, **geometry)
+
         sitk.WriteImage(
             img_new,
             (target_path / label_file),
@@ -232,8 +245,22 @@ def make_whole_from_ground_truth(
 
 
 def make_empty_from_ground_truth(
-    seg_names: list[str], gt_path: Path, target_path: Path, ignore_label: int
+    seg_names: list[str],
+    gt_path: Path,
+    target_path: Path,
+    ignore_label: int,
+    additional_label_path: Path | None = None,
 ):
     """Creates empty segmentations for all filenames"""
     for seg_name in seg_names:
-        create_empty_mask(gt_path / seg_name, ignore_label, target_path / seg_name)
+        additional_label_file = (
+            additional_label_path
+            if additional_label_path is None
+            else additional_label_path / seg_name
+        )
+        create_empty_mask(
+            gt_path / seg_name,
+            ignore_label,
+            target_path / seg_name,
+            additional_label_file=additional_label_file,
+        )

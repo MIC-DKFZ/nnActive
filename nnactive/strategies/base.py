@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -10,6 +11,7 @@ from nnactive.nnunet.utils import get_raw_path
 from nnactive.utils.patches import get_slices_for_file_from_patch
 
 
+# TODO: clean up handling of additional_labels_path!
 class AbstractQueryMethod(ABC):
     def __init__(
         self,
@@ -17,9 +19,11 @@ class AbstractQueryMethod(ABC):
         query_size: int,
         patch_size: list[int],
         file_ending: str = ".nii.gz",
+        additional_label_path: Path | None = None,
         **kwargs,
     ):
         self.dataset_id = dataset_id
+        self.additional_label_path = additional_label_path
         self.query_size = query_size
         self.patch_size = patch_size
         self.file_ending = file_ending

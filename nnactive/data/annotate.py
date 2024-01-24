@@ -16,9 +16,14 @@ def create_labels_from_patches(
     base_dir: Path,
     target_dir: Path,
     overwrite: bool = True,
+    additional_label_path: Path = None,
 ):
     """Overwrites the labels files in target_dir based on labels in
     base_dir.
+
+    Disclaimer:
+    Labels from additional_label_path (if used) are added last and overwrite GT from labelsTr.
+    All areas inside images in additional_label_path that are not -1 will be written to labelsTr.
 
     Args:
         patches (list[Patch]): Regions to annotate
@@ -27,6 +32,7 @@ def create_labels_from_patches(
         base_dir (Path): Source Directory with labels
         target_dir (Path): Target Directory for labels
         overwrite (bool): If true the whole dataset is overwritten based on loop files and base_dir
+        additional_label_path (Path, optional): path to files with labels to be added to labelsTr. Defaults to None
     """
     whole_label = []
     patch_label = []
@@ -45,6 +51,7 @@ def create_labels_from_patches(
         target_dir,
         ignore_label,
         overwrite=overwrite,
+        additional_label_path=additional_label_path,
     )
 
     if overwrite:
@@ -53,10 +60,10 @@ def create_labels_from_patches(
             for file in os.listdir(base_dir)
             if file.endswith(file_ending) and file not in labeled_files
         ]
-
         make_empty_from_ground_truth(
             empty_segs,
             base_dir,
             target_dir,
             ignore_label,
+            additional_label_path=additional_label_path,
         )
