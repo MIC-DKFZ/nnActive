@@ -16,6 +16,7 @@ dependencies = [
     "rich",
     "pydantic",
     "psutil", # required to get RAM requirements
+    "loguru",
 ]
 
 [project.optional-dependencies]

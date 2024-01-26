@@ -3,6 +3,7 @@ import subprocess
 from argparse import Namespace
 
 import torch
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
@@ -29,7 +30,7 @@ def main(args: Namespace) -> None:
     config = ActiveConfig.get_from_id(dataset_id)
     state = State.get_id_state(dataset_id)
 
-    print(config)
+    logger.info(config)
 
     try:
         os.environ["nnUNet_compile"]

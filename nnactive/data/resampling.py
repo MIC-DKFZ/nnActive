@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import SimpleITK as sitk
+from loguru import logger
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     ConfigurationManager,
     DefaultPreprocessor,
@@ -133,7 +134,7 @@ def resample_dataset(
     img_path.mkdir(exist_ok=True)
     imgs = list((rs_gt_path).glob(f"**/*{dataset_cfg['file_ending']}"))
 
-    print(f"Resampling of {len(imgs)} images.")
+    logger.info(f"Resampling of {len(imgs)} images.")
     names = [path.name.replace(dataset_cfg["file_ending"], "") for path in imgs]
 
     if n_workers == 0:

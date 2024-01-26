@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 import numpy as np
 import SimpleITK as sitk
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
@@ -212,7 +213,7 @@ def get_file_patch_list(
         # Check if the selected patch has the correct size and crop to correct size if this is not the case
         patch_required_size = get_correct_patch_size(data_path)
         if patch.GetSize() != patch_required_size:
-            print(
+            logger.info(
                 f"Patch did not have correct size {patch_required_size}, but {patch.GetSize()}. "
                 f"Cropping the patch using the same origin but the correct size..."
             )
@@ -239,7 +240,7 @@ def get_file_patch_list(
         if not does_overlap(patch_seg, slices):
             patch_seg[tuple(slices)] = 1
         else:
-            print(
+            logger.error(
                 f"Error for file {image_id + file_ending}. Patch does already overlap with a previous patch."
                 f"Please annotate this case again."
             )

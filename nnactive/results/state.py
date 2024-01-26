@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from loguru import logger
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from pydantic.dataclasses import dataclass
 
@@ -51,7 +52,7 @@ class State:
             save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
                 self.dataset_id
             )
-            print(f"Creating Path: {save_path}")
+            logger.info(f"Creating Path: {save_path}")
             save_path.mkdir()
             fn = save_path / FILENAME
         save_dataclass_to_json(self, fn)

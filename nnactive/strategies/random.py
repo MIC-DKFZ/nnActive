@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Generator, Iterable
 
 import numpy as np
+from loguru import logger
 
 from nnactive.data import Patch
 from nnactive.masking import create_patch_mask_for_image, does_overlap
@@ -43,13 +44,13 @@ class Random(AbstractQueryMethod):
     def query(self, verbose: bool = False) -> list[Patch]:
         img_generator = _get_infinte_iter(self.img_names)
         patches = []
-        print("verbose", verbose)
+        logger.info("verbose", verbose)
         for _ in range(self.query_size):
             labeled = False
             while True:
                 img_name = img_generator.__next__()
                 if verbose:
-                    print(f"Loading Image: {img_name}")
+                    logger.debug(f"Loading Image: {img_name}")
                 label_map: np.ndarray = load_label_map(
                     img_name.replace(self.file_ending, ""),
                     self.raw_labels_path,
@@ -80,14 +81,14 @@ class Random(AbstractQueryMethod):
                         patches.append(patch)
                         # print(f"Creating Patch with iteration: {num_tries}")
                         labeled = True
-                        print(num_tries)
+                        logger.info(f"{num_tries=}")
                         break
 
                     # if no new patch could fit inside of img do not consider again
                     if num_tries == self.trials_per_img:
-                        print(f"Could not place patch in image {img_name}")
-                        print(f"PatchCount {len(patches)}")
-                        print(num_tries)
+                        logger.info(f"Could not place patch in image {img_name}")
+                        logger.info(f"PatchCount {len(patches)}")
+                        logger.info(f"{num_tries=}")
                         count = 0
                         for item in self.img_names:
                             if item == img_name:

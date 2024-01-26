@@ -2,6 +2,7 @@ from typing import Iterable, Union
 
 import numpy as np
 import torch
+from loguru import logger
 from scipy.signal import convolve
 
 
@@ -15,15 +16,15 @@ class ConvolveAggScipy:
             raise NotImplementedError("This class only supports stride 1")
 
     def forward(self, data: torch.Tensor) -> tuple[np.array, list[int]]:
-        print("Started forward")
+        logger.info("Started forward")
         kernel_size = [
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))
         ]
-        print("Created kernel")
+        logger.info("Created kernel")
         kernel = np.ones(kernel_size) / np.prod(kernel_size)
         data = data.cpu().numpy()
         aggregated = convolve(data, kernel, mode="valid")
-        print("Done with convolution")
+        logger.info("Done with convolution")
         return aggregated, kernel_size
 
     def backward_index(
@@ -56,11 +57,11 @@ class ConvolveAggTorch:
             self.stride = [stride] * len(self.patch_size)
 
     def forward(self, data: torch.Tensor) -> tuple[np.array, list[int]]:
-        print("Started forward")
+        logger.info("Started forward")
         kernel_size = [
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))
         ]
-        print("Created kernel")
+        logger.info("Created kernel")
         kernel = torch.ones(size=[1, 1] + kernel_size, device=data.device) / np.prod(
             kernel_size
         )

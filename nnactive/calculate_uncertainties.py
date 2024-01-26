@@ -15,6 +15,7 @@ from typing import Set
 import numpy as np
 import SimpleITK as sitk
 import torch
+from loguru import logger
 
 UNCERTAINTIES = ["pred_entropy", "mutual_information", "expected_entropy"]
 
@@ -40,7 +41,7 @@ def get_predicted_image_names(pred_path: Path, num_folds: int) -> Set[str]:
 
     for fold in range(num_folds):
         if not all([lengths[fold] == lengths[fold_s] for fold_s in range(fold + 1)]):
-            print(lengths)
+            logger.info(lengths)
             raise RuntimeError("Every fold must predict every case.")
     return softmax_files[0]
 
@@ -159,9 +160,9 @@ def calculate_uncertainties(
         )
     # make an output directory to store the uncertainties
     os.makedirs(target_path, exist_ok=True)
-    print("Start Calculating Uncertainties")
+    logger.info("Start Calculating Uncertainties")
     for image_name in softmax_file_names:
-        print(f"Calculate uncertainties for file: {image_name}")
+        logger.info(f"Calculate uncertainties for file: {image_name}")
         # load the softmax predictions and calculate the mean
         uncertainty_dict = get_uncertainty_image(
             pred_path, num_folds, image_name, uncertainty
@@ -187,7 +188,7 @@ def calculate_uncertainties(
                 target_path / f"{image_name.split('.')[0]}_{key}.nii.gz",
             )
         del uncertainty_dict
-    print("End Calculating Uncertainties")
+    logger.info("End Calculating Uncertainties")
 
 
 def calculate_uncertainties_from_softmax_preds() -> None:

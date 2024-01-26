@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Union
 
 import numpy as np
+from loguru import logger
 
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
@@ -66,24 +67,24 @@ class RandomLabel(Random):
             self.background_cls = dataset_json["labels"].get("background")
 
     def query(self, verbose: bool = False) -> List[Patch]:
-        print(self.img_names)
+        logger.info(self.img_names)
         img_generator = _get_infinte_iter(self.img_names)
         labeled_patches = self.annotated_patches
         patches = []
         for i in range(self.query_size):
             if verbose:
-                print("-" * 8)
-                print("-" * 8)
-                print(f"Start Creation of Patch {i}")
+                logger.debug("-" * 8)
+                logger.debug("-" * 8)
+                logger.debug(f"Start Creation of Patch {i}")
             labeled = False
             patch_count = 0
             while True:
                 if patch_count > 3 * len(self.img_names):
-                    print(f"WARNING\nPatch {i} could not be created without overlap!")
+                    logger.warning(f"Patch {i} could not be created without overlap!")
                     break
                 img_name = img_generator.__next__()
                 if verbose:
-                    print(f"Loading Image: {img_name}")
+                    logger.debug(f"Loading Image: {img_name}")
                 label_map: np.ndarray = load_label_map(
                     img_name.replace(self.file_ending, ""),
                     self.raw_labels_path,
@@ -93,22 +94,22 @@ class RandomLabel(Random):
                 img_size = label_map.shape
                 # only needed for creation of patches in first iteration
                 if verbose:
-                    print(f"Create Mask: {img_name}")
+                    logger.debug(f"Create Mask: {img_name}")
                 selected_array = [
                     patch for patch in current_patch_list if patch.file == img_name
                 ]
 
                 if verbose:
-                    print("Mask creation succesfull")
+                    logger.debug("Mask creation succesfull")
 
                 area = self.rng.choice(["all", "seg", "border"])
 
                 if verbose:
-                    print(f"Start drawing random patch with strategy: {area}")
+                    logger.debug(f"Start drawing random patch with strategy: {area}")
 
                 if area in ["seg", "border"]:
                     if verbose:
-                        print(f"Get Locations for Style: {area}")
+                        logger.debug(f"Get Locations for Style: {area}")
                     locs = get_locs_from_segmentation(
                         label_map,
                         area,
@@ -116,7 +117,7 @@ class RandomLabel(Random):
                         background_cls=self.background_cls,
                     ).tolist()
                     if verbose:
-                        print("Obtaining Locations was succesful.")
+                        logger.debug("Obtaining Locations was succesful.")
                     if len(locs) == 0:
                         continue
 
@@ -152,9 +153,9 @@ class RandomLabel(Random):
 
                     # if no new patch could fit inside of img do not consider again
                     if num_tries == self.trials_per_img:
-                        print(f"Could not place patch in image {img_name}")
-                        print(f"PatchCount {len(patches)}")
-                        print(num_tries)
+                        logger.info(f"Could not place patch in image {img_name}")
+                        logger.info(f"PatchCount {len(patches)}")
+                        logger.info(f"{num_tries=}")
                         # this is change compared to baseline, but samples where no random patch fits.
                         # no patch at all will fit!
                         if area in ["all"]:

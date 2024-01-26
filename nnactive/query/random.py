@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
+from loguru import logger
 
 from nnactive.data import Patch
 from nnactive.query.get_locs import get_locs_from_segmentation
@@ -56,23 +57,23 @@ def generate_random_patches_labels(
     img_generator = _get_infinte_iter(img_names)
 
     patches = []
-    print("Verbose", verbose)
+    logger.info("Verbose", verbose)
     for i in range(n_patches):
         if verbose:
-            print("-" * 8)
-            print("-" * 8)
-            print(f"Start Creation of Patch {i}")
+            logger.debug("-" * 8)
+            logger.debug("-" * 8)
+            logger.debug(f"Start Creation of Patch {i}")
         labeled = False
         patch_count = 0
         while True:
             if patch_count > 3 * len(img_names):
-                print(f"No more Patches could be Created for Patch {i}!")
+                logger.info(f"No more Patches could be Created for Patch {i}!")
                 break
 
             img_name = img_generator.__next__()
             if verbose:
-                print("-" * 8)
-                print(f"Loading image: {img_name}")
+                logger.debug("-" * 8)
+                logger.debug(f"Loading image: {img_name}")
             label_map = load_label_map(
                 img_name.replace(file_ending, ""), seg_labels_path, file_ending
             )
@@ -80,12 +81,12 @@ def generate_random_patches_labels(
             img_size = label_map.shape
             # only needed for creation of patches in first iteration
             if verbose:
-                print(f"Create Mask: {img_name}")
+                logger.debug(f"Create Mask: {img_name}")
             selected_array = create_patch_mask_for_image(
                 img_name, current_patch_list, img_size
             )
             if verbose:
-                print("Mask creation succesfull")
+                logger.debug("Mask creation succesfull")
 
             area = rng.choice(["all", "seg", "border"])
 
@@ -95,16 +96,16 @@ def generate_random_patches_labels(
             # Let us not do that since for big images it takes ages
 
             if verbose:
-                print(f"Start drawing random patch with strategy: {area}")
+                logger.debug(f"Start drawing random patch with strategy: {area}")
 
             if area in ["seg", "border"]:
                 if verbose:
-                    print(f"Get Locations for Style: {area}")
+                    logger.debug(f"Get Locations for Style: {area}")
                 locs = get_locs_from_segmentation(
                     label_map, area, state=rng, background_cls=background_cls
                 ).tolist()
                 if verbose:
-                    print("Obtaining Locations was succesful.")
+                    logger.debug("Obtaining Locations was succesful.")
                 if len(locs) == 0:
                     continue
 
@@ -114,7 +115,7 @@ def generate_random_patches_labels(
                 # propose a random patch
                 if area in ["seg", "border"]:
                     if verbose:
-                        print("Draw Random Patch")
+                        logger.debug("Draw Random Patch")
                     iter_patch_loc, iter_patch_size = _obtain_random_patch_from_locs(
                         locs, img_size, patch_size, rng
                     )
@@ -132,9 +133,9 @@ def generate_random_patches_labels(
 
                 # if no new patch could fit inside of img do not consider again
                 if num_tries == trials_per_img:
-                    print(f"Could not place patch in image {img_name}")
-                    print(f"PatchCount {len(patches)}")
-                    print(num_tries)
+                    logger.info(f"Could not place patch in image {img_name}")
+                    logger.info(f"PatchCount {len(patches)}")
+                    logger.info(f"{num_tries=}")
                     count = 0
                     for item in img_names:
                         if item == img_name:
@@ -173,7 +174,7 @@ def generate_random_patches(
     """
     rng = np.random.default_rng(seed)
     if verbose:
-        print(f"Initializing RNG with Seed: {seed}")
+        logger.debug(f"Initializing RNG with Seed: {seed}")
     img_names = [path.name for path in raw_labels_path.glob(f"**/*{file_ending}")]
     rng.shuffle(img_names)
 
@@ -186,7 +187,7 @@ def generate_random_patches(
         while True:
             img_name = img_generator.__next__()
             if verbose:
-                print(f"Loading Image: {img_name}")
+                logger.debug(f"Loading Image: {img_name}")
             label_map = load_label_map(
                 img_name.replace(file_ending, ""), raw_labels_path, file_ending
             )
@@ -210,14 +211,14 @@ def generate_random_patches(
                     patches.append(Patch(img_name, iter_patch_loc, iter_patch_size))
                     # print(f"Creating Patch with iteration: {num_tries}")
                     labeled = True
-                    print(num_tries)
+                    logger.info(f"{num_tries=}")
                     break
 
                 # if no new patch could fit inside of img do not consider again
                 if num_tries == trials_per_img:
-                    print(f"Could not place patch in image {img_name}")
-                    print(f"PatchCount {len(patches)}")
-                    print(num_tries)
+                    logger.info(f"Could not place patch in image {img_name}")
+                    logger.info(f"PatchCount {len(patches)}")
+                    logger.info(f"{num_tries=}")
                     count = 0
                     for item in img_names:
                         if item == img_name:

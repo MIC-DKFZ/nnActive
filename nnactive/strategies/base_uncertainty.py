@@ -10,6 +10,7 @@ import numpy as np
 import psutil
 import torch
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
+from loguru import logger
 from nnunetv2.configuration import default_num_processes
 from nnunetv2.inference.export_probs import (
     convert_predicted_logits_to_probs_with_correct_shape,
@@ -54,7 +55,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         else:
             self.aggregation = ConvolveAggTorch(patch_size, stride=agg_stride)
 
-        print(
+        logger.info(
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
         )
 
@@ -101,24 +102,24 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             label_file (str): name of label file
         """
         with torch.no_grad():
-            print("Compute uncertaintes...")
+            logger.info("Compute uncertaintes...")
             uncertainty = self.get_uncertainty(num_folds)
 
             if torch.any(torch.isnan(uncertainty)):
                 # unc_num_nan = torch.sum(torch.isnan(uncertainty))
                 # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
                 raise ValueError(f" NAN values in uncertainties for image {label_file}")
-            print("Aggregate uncertainties...")
+            logger.info("Aggregate uncertainties...")
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
-        print("Initialize selected array...")
+        logger.info("Initialize selected array...")
         selected_array = [patch for patch in self.annotated_patches]
 
-        print("Select patches...")
+        logger.info("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
             kernel_size, agg_uncertainty, selected_array, label_file, self.query_size
         )
-        print("Finished patch selection.")
+        logger.info("Finished patch selection.")
         self.top_patches += selected_patches
 
     @abstractmethod
@@ -143,14 +144,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
     ) -> list[dict]:
         selected_patches = []
         # sort only once since this can take a significant amount of time
-        print("Sort potential queries")
+        logger.info("Sort potential queries")
         flat_aggregated_uncertainties = aggregated.flatten()
 
         sorted_uncertainty_indices = np.flip(np.argsort(flat_aggregated_uncertainties))
         sorted_uncertainty_scores: list[float] = np.take_along_axis(
             flat_aggregated_uncertainties, sorted_uncertainty_indices, axis=0
         ).tolist()
-        print("Start finding non-overlapping patches.")
+        logger.info("Start finding non-overlapping patches.")
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
         iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
@@ -196,7 +197,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 break
         pbar1.close()
         pbar0.close()
-        print("Selected patches")
+        logger.info("Selected patches")
         return selected_patches
 
     def compose_query_of_patches(self):
@@ -229,7 +230,7 @@ class nnActivePredictor(nnUNetPredictor):
 
         """
         process = psutil.Process()
-        print(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
         logits_nf = torch.isfinite(logits) == 0
         if torch.any(logits_nf):
             raise RuntimeError(f"NAN values in logits")
@@ -296,18 +297,18 @@ class nnActivePredictor(nnUNetPredictor):
                             self.network._orig_mod.load_state_dict(params)
 
                         process = psutil.Process()
-                        print(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+                        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
                         logits = self.predict_sliding_window_return_logits(data)
                         out_probs = self.postprocess_logits(logits, properties)
                         self.save_out_probs_temp(out_probs, fold)
 
                 except RuntimeError:
-                    print(
+                    logger.exception(
                         "Prediction with perform_everything_on_gpu=True failed due to insufficient GPU memory. "
                         "Falling back to perform_everything_on_gpu=False. Not a big deal, just slower..."
                     )
-                    print("Error:")
-                    traceback.print_exc()
+                    # print("Error:")
+                    # traceback.print_exc()
                     self.perform_everything_on_device = False
 
             if not self.perform_everything_on_device:
@@ -347,16 +348,18 @@ class nnActivePredictor(nnUNetPredictor):
             ofile = preprocessed["ofile"]
             filename = os.path.basename(ofile)
             if ofile is not None:
-                print(f"\nPredicting {os.path.basename(ofile)}:")
+                logger.info(f"\nPredicting {os.path.basename(ofile)}:")
             else:
-                print(f"\nPredicting image of shape {data.shape}:")
+                logger.info(f"\nPredicting image of shape {data.shape}:")
 
-            print(f"perform_everything_on_gpu: {self.perform_everything_on_device}")
+            logger.info(
+                f"perform_everything_on_gpu: {self.perform_everything_on_device}"
+            )
 
             properties = preprocessed["data_properties"]
             self.predict_fold_logits_from_preprocessed_data(data, properties)
 
-            print("Start Query")
+            logger.info("Start Query")
             query_method.query_from_probs(
                 len(self.list_of_parameters),
                 properties["shape_before_cropping"],

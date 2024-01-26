@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from loguru import logger
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 
 # from nnunetv2.inference.predict_from_raw_data import predict
@@ -118,7 +119,7 @@ def get_performance(dataset_id: int, force: bool = False):
 
     folds = " ".join([f"{fold}" for fold in range(num_folds)])
     ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
-    print(ex_command)
+    logger.info(ex_command)
     # TODO: redo add_validation in config!
     folds = [i for i in range(num_folds)]
 
@@ -144,7 +145,7 @@ def get_performance(dataset_id: int, force: bool = False):
     )
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
-    print("Creating a summary of the cross validation results from training...")
+    logger.info("Creating a summary of the cross validation results from training...")
     num_folds = config.working_folds
     summary_cross_val_dict = {}
 

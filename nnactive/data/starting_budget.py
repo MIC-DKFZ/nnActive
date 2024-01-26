@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import SimpleITK as sitk
+from loguru import logger
 from rich.progress import track
 
 from nnactive.data import Patch
@@ -68,7 +69,7 @@ def _compute_patch_mapping(
             name = path.name.replace(file_ending, "")
             size = img.GetSize()
 
-            print(f"{name}: {size}")
+            logger.info(f"{name}: {size}")
             img_sizes[name] = size
 
         with open(raw_path / "img_sizes.json", "w") as file:

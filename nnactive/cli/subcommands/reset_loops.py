@@ -2,6 +2,8 @@ import os.path
 import shutil
 from argparse import Namespace
 
+from loguru import logger
+
 from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.nnunet_preprocess import preprocess
 from nnactive.cli.subcommands.update_data import update_step
@@ -53,17 +55,17 @@ def main(args: Namespace) -> None:
     update_step(dataset_id, loop_val=reset_loop_nr, annotated=True, force=True)
 
     for loop_file in get_sorted_loop_files(raw_dataset_path)[reset_loop_nr + 1 :]:
-        print("Deleting file ", str(raw_dataset_path / loop_file))
+        logger.info("Deleting file ", str(raw_dataset_path / loop_file))
         os.remove(raw_dataset_path / loop_file)
 
     nnactive_results_folder = get_nnactive_results_folder(dataset_id)
     for folder in os.listdir(nnactive_results_folder):
         if folder.startswith("loop"):
             if int(folder.split("_")[-1]) >= reset_loop_nr:
-                print("Deleting folder ", str(nnactive_results_folder / folder))
+                logger.info("Deleting folder ", str(nnactive_results_folder / folder))
                 shutil.rmtree(nnactive_results_folder / folder)
 
-    print("Resetting State file...")
+    logger.info("Resetting State file...")
     state.reset()
     if reset_loop_nr > 0:
         state.loop = reset_loop_nr

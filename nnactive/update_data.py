@@ -2,6 +2,8 @@ import json
 from argparse import ArgumentParser
 from pathlib import Path
 
+from loguru import logger
+
 from nnactive.data.annotate import create_labels_from_patches
 from nnactive.loops.cross_validation import kfold_cv_from_patches
 from nnactive.loops.loading import get_loop_patches, get_patches_from_loop_files
@@ -40,7 +42,7 @@ def update_data(
         patches = all_patches
     else:
         patches = get_loop_patches(data_path, loop_val)
-    print(len(patches))
+    logger.info(len(patches))
     create_labels_from_patches(
         patches,
         ignore_label,
