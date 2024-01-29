@@ -32,9 +32,6 @@ from nnactive.results.utils import get_results_folder as get_nnactive_results_fo
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.utils.timer import CudaTimer, Timer
 
-# TODO: replace this with a variable which is easier to access!
-NPP = 1
-
 
 class AbstractUncertainQueryMethod(AbstractQueryMethod):
     def __init__(
@@ -43,11 +40,24 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         query_size: int,
         patch_size: list[int],
         agg_stride: Union[int, list[int]],
+        n_patch_per_image: int,
         file_ending: str = ".nii.gz",
+        num_processes_preprocessing: int = 3,
+        use_gaussian: bool = False,
+        use_mirroring: bool = False,
+        tile_step_size: float = 0.75,
+        verbose: bool = False,
         **kwargs,
     ):
         super().__init__(dataset_id, query_size, patch_size, file_ending)
         self.config = ActiveConfig.get_from_id(dataset_id)
+
+        self.verbose = verbose
+        self.num_processes_preprocessing = num_processes_preprocessing
+        self.n_patch_per_image = n_patch_per_image
+        self.use_mirroring = use_mirroring
+        self.use_gaussian = use_gaussian
+        self.tile_step_size = tile_step_size
         if (
             agg_stride == 1
         ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
@@ -59,13 +69,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
         )
 
-    def query(self, verbose=False) -> list[Patch]:
+    def query(self, verbose: bool = False) -> list[Patch]:
         # Initialize Predictor
         predictor = nnActivePredictor(
-            tile_step_size=0.75,
-            use_mirroring=False,
-            verbose=verbose,
-            allow_tqdm=not verbose,
+            tile_step_size=self.tile_step_size,
+            use_mirroring=self.use_mirroring,
+            use_gaussian=self.use_gaussian,
+            verbose=self.verbose,
+            allow_tqdm=not self.verbose,
         )
 
         # Initialize Model for Predictor
@@ -86,7 +97,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         data_iterator = predictor.get_data_iterator_from_folders(
             list_of_lists_or_source_folder=source_folder,
             output_folder_or_list_of_truncated_output_files=output_folder,
-            num_processes_preprocessing=NPP,
+            num_processes_preprocessing=self.num_processes_preprocessing,
         )
         predictor.predict_from_data_iterator(data_iterator, self)
         return self.compose_query_of_patches()
@@ -117,7 +128,11 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
 
         logger.info("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
-            kernel_size, agg_uncertainty, selected_array, label_file, self.query_size
+            patch_size=kernel_size,
+            aggregated=agg_uncertainty,
+            annotated_patches=annotated_patches,
+            label_file=label_file,
+            n=self.n_patch_per_image,
         )
         logger.info("Finished patch selection.")
         self.top_patches += selected_patches
@@ -137,10 +152,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         self,
         patch_size: list[int],
         aggregated: np.ndarray,
-        selected_array: list[Patch],
+        annotated_patches: list[Patch],
         label_file: str,
         n: int,
-        verbose: bool = False,
     ) -> list[dict]:
         selected_patches = []
         # sort only once since this can take a significant amount of time
@@ -155,12 +169,12 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
         iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
-        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=verbose)
+        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=self.verbose)
         pbar1 = tqdm(
             total=len(sorted_uncertainty_scores),
             position=1,
             desc="Possible Patch Search",
-            disable=verbose,
+            disable=self.verbose,
         )
 
         for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
@@ -175,9 +189,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 size=patch_size,
             )
 
-            # coords = np.unravel_index(uncertainty_index, aggregated.shape)
             # Check if coordinated overlap with already queried region
-            if not does_overlap(patch, selected_array):
+            if not does_overlap(patch, annotated_patches):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -187,10 +200,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                         "score": uncertainty_score,
                     }
                 )
-                # selected += 1
                 # Mark region as queried
-                # selected_array = mark_selected(selected_array, coords, patch_size)
-                selected_array.append(patch)
+                annotated_patches.append(patch)
                 # Stop if we reach the maximum number of patches to be queried
                 pbar0.update()
             if n is not None and len(selected_patches) >= n:

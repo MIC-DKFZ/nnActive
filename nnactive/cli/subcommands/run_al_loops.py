@@ -20,7 +20,13 @@ from .update_data import update_step
     "run_al_loops",
     [
         (("-d", "--dataset_id"), {"type": int, "required": True}),
-        (("-v", "--verbose"), {"action": "store_true"}),
+        (
+            ("--verbose"),
+            {
+                "action": "store_true",
+                "help": "Disables progress bars and get more explicit print statements.",
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
@@ -59,27 +65,16 @@ def main(args: Namespace) -> None:
 
             state = State.get_id_state(dataset_id)
 
-            # ex_call = f"nnactive nnunet_preprocess -d {dataset_id} -c {config.model_config} -np {config.num_processes}"
-            # if do_all:
-            #     ex_call += " --do_all"
-            # subprocess.run(
-            #     ex_call,
-            #     shell=True,
-            #     check=True,
-            # )
-            # state = State.get_id_state(dataset_id)
-            # state.preprocess = True
-            # state.save_state()
-
         if state.training is False:
+            # verbose not necessary here.
             train_nnUNet_ensemble(dataset_id)
             state = State.get_id_state(dataset_id)
         if state.get_performance is False:
-            get_performance(dataset_id)
+            get_performance(dataset_id, verbose=verbose)
             state = State.get_id_state(dataset_id)
         if al_iteration < config.query_steps - 1:
             if state.pred_tr is False and state.query is False:
-                query_pool(dataset_id)
+                query_pool(dataset_id, verbose=verbose)
                 state = State.get_id_state(dataset_id)
             if state.update_data is False:
                 update_step(dataset_id, annotated=True)

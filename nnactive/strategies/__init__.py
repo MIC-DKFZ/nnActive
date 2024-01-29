@@ -20,6 +20,7 @@ def init_strategy(
     seed: int,
     agg_stride: Union[int, list[int]],
     trials_per_img: int,
+    n_patch_per_image: int,
     file_ending: str = ".nii.gz",
     **kwargs,
 ) -> AbstractQueryMethod:
@@ -31,6 +32,7 @@ def init_strategy(
         trials_per_img=trials_per_img,
         file_ending=file_ending,
         agg_stride=agg_stride,
+        n_patch_per_image=n_patch_per_image,
         **kwargs,
     )
 
