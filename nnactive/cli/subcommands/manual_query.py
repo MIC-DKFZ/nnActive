@@ -3,6 +3,7 @@ import os
 from argparse import Namespace
 
 import SimpleITK as sitk
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
@@ -36,27 +37,27 @@ def main(args: Namespace) -> None:
 
     patches = get_loop_patches(data_path)
 
-    print(f"Found Patches: {len(patches)}")
+    logger.info(f"Found Patches: {len(patches)}")
 
     img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
-    print(f"Image Names: {len(img_names)}")
+    logger.info(f"Image Names: {len(img_names)}")
     save_path = data_path / "masksTr_boundary"
     os.makedirs(save_path, exist_ok=True)
     for img_name in img_names:
         img_patches = [patch for patch in patches if patch.file == img_name]
         if len(img_patches) == 0:
             continue
-        print("-" * 8)
-        print(f"Start Image: {img_name}")
-        print("Load label...")
+        logger.info("-" * 8)
+        logger.info(f"Start Image: {img_name}")
+        logger.info("Load label...")
         label_shape = load_label_map(
             img_name.replace(file_ending, ""), labels_dir, file_ending
         ).shape
-        print("Create Mask...")
+        logger.info("Create Mask...")
         mask = create_patch_mask_for_image(
             img_name, patches, label_shape, identify_patch=identify_patches
         )
-        print("Save Image...")
+        logger.info("Save Image...")
         img = sitk.ReadImage(labels_dir / img_name)
         mask_bound = create_patch_mask_for_image(
             img_name,

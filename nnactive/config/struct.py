@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Union
 
+from loguru import logger
 from pydantic.dataclasses import dataclass
 
 from nnactive.nnunet.utils import convert_id_to_dataset_name
@@ -56,10 +57,10 @@ class ActiveConfig:
             save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
                 dataset_id
             )
-            print(f"Creating Path: {save_path}")
+            logger.info(f"Creating Path: {save_path}")
             save_path.mkdir()
             save_path = save_path / FILENAME
-        print(f"Saving Config File to {save_path}")
+        logger.info(f"Saving Config File to {save_path}")
 
         save_dataclass_to_json(self, save_path)
 

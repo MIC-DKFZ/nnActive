@@ -6,6 +6,7 @@ from batchgenerators.utilities.file_and_folder_operations import (
     maybe_mkdir_p,
     subfiles,
 )
+from loguru import logger
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
@@ -42,11 +43,11 @@ def preprocess_dataset(
         )
 
     dataset_name = convert_id_to_dataset_name(dataset_id)
-    print(f"Preprocessing dataset {dataset_name}")
+    logger.info(f"Preprocessing dataset {dataset_name}")
     plans_file = join(nnUNet_preprocessed, dataset_name, plans_identifier + ".json")
     plans_manager = PlansManager(plans_file)
     for n, c in zip(num_processes, configurations):
-        print(f"Configuration: {c}...")
+        logger.info(f"Configuration: {c}...")
         if c not in plans_manager.available_configurations:
             raise FileNotFoundError(
                 f"INFO: Configuration {c} not found in plans file {plans_identifier + '.json'} of "

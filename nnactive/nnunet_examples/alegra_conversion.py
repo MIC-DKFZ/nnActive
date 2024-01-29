@@ -9,6 +9,7 @@ import torch
 from acvl_utils.array_manipulation.resampling import maybe_resample_on_gpu
 from acvl_utils.morphology.gpu_binary_morphology import gpu_binary_erosion
 from batchgenerators.utilities.file_and_folder_operations import *
+from loguru import logger
 from nnunet.utilities.sitk_stuff import copy_geometry
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
@@ -27,7 +28,7 @@ def resample_save(
     skip_existing: bool = True,
     export_pool: Pool = None,
 ):
-    print(f"{os.path.basename(source_image)}")
+    logger.info(f"{os.path.basename(source_image)}")
     if skip_existing and isfile(target_label) and isfile(target_image):
         return None, None
 
@@ -46,7 +47,7 @@ def resample_save(
         source_shape, list(source_spacing)[::-1], target_spacing
     )
 
-    print(f"source shape: {source_shape}, target shape {target_shape}")
+    logger.info(f"source shape: {source_shape}, target shape {target_shape}")
 
     # one hot generation is slow af. Let's do it this way:
     seg_source = torch.from_numpy(seg_source)
@@ -63,10 +64,10 @@ def resample_save(
             )[0, 0].cpu()
         del seg_source_gpu
     except RuntimeError:
-        print(
+        logger.exception(
             "GPU wasnt happy with this resampling. Lets give the CPU a chance to sort it out"
         )
-        print(f"source shape {source_shape}, target shape {target_shape}")
+        logger.info(f"source shape {source_shape}, target shape {target_shape}")
         del seg_source_gpu
         device = "cpu"
         with torch.no_grad():
@@ -133,21 +134,21 @@ def sample_starting_budget_patches(
     cudnn.deterministic = False
     cudnn.benchmark = False
 
-    print("computing seg border")
+    logger.info("computing seg border")
     orig_seg_border = orig_seg - gpu_binary_erosion(orig_seg > 0, ball(1))
     border_locs = np.argwhere(orig_seg_border > 0)
     del orig_seg_border
 
     # the following line should be adapted in case more classes are present!
-    print("computing seg locations")
+    logger.info("computing seg locations")
     seg_locs = np.argwhere(orig_seg > 0)
-    print("sampling patches")
+    logger.info("sampling patches")
     for pi in range(num_patches):
         num_attempts = 0
         # random strat
         choice = np.random.uniform(0, 1)
         if choice < 0.33:
-            print(pi, "random patch location")
+            logger.info(pi, "random patch location")
             # random location
             while True:
                 lb = [
@@ -163,7 +164,7 @@ def sample_starting_budget_patches(
 
         elif 0.33 <= choice < 0.67:
             # pick random pixel
-            print(pi, "random pixel is patch center")
+            logger.info(pi, "random pixel is patch center")
             while True:
                 random_loc = seg_locs[np.random.choice(seg_locs.shape[0])]
                 lb = [max(0, i - j // 2) for i, j in zip(random_loc, patch_size)]
@@ -177,7 +178,7 @@ def sample_starting_budget_patches(
 
         else:
             # pick random border pixel
-            print(pi, "random border pixel is patch center")
+            logger.info(pi, "random border pixel is patch center")
             while True:
                 random_loc = border_locs[np.random.choice(border_locs.shape[0])]
                 lb = [max(0, i - j // 2) for i, j in zip(random_loc, patch_size)]
@@ -210,7 +211,7 @@ def generate_dataset_with_only_patched(
     ):
         num_patches_here = round(i - num_patches_taken)
         num_patches_taken += num_patches_here
-        print("num_patches_here", num_patches_here)
+        logger.info("num_patches_here", num_patches_here)
         old_seg = sitk.ReadImage(join(source_dataset_dir, "labelsTr", tr_seg))
         new_seg = sample_starting_budget_patches(
             sitk.GetArrayFromImage(old_seg), num_patches_here, patch_size, ignore_label

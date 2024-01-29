@@ -4,6 +4,7 @@ from argparse import Namespace
 
 import numpy as np
 import SimpleITK as sitk
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
@@ -38,22 +39,22 @@ def main(args: Namespace) -> None:
 
     patches = get_loop_patches(data_path)
 
-    print(f"Found Patches: {len(patches)}")
+    logger.info(f"Found Patches: {len(patches)}")
 
     img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
-    print(f"Image Names: {len(img_names)}")
+    logger.info(f"Image Names: {len(img_names)}")
     save_path = data_path / "predTr_crop"
     os.makedirs(save_path, exist_ok=True)
     for img_name in img_names:
         img_patches = [patch for patch in patches if patch.file == img_name]
         if len(img_patches) == 0:
             continue
-        print("-" * 8)
-        print(f"Start Image: {img_name}")
-        print("Load label...")
+        logger.info("-" * 8)
+        logger.info(f"Start Image: {img_name}")
+        logger.info("Load label...")
         seg = load_label_map(img_name.replace(file_ending, ""), labels_dir, file_ending)
 
-        print("Select region...")
+        logger.info("Select region...")
         seg_crop = np.zeros_like(seg)
 
         for i, img_patch in enumerate(img_patches):
@@ -61,7 +62,7 @@ def main(args: Namespace) -> None:
             for start_index, size in zip(img_patch.coords, img_patch.size):
                 slices.append(slice(start_index, start_index + size))
             seg_crop[tuple(slices)] = seg[tuple(slices)]
-        print("Save image...")
+        logger.info("Save image...")
         img = sitk.ReadImage(labels_dir / img_name)
         seg_save = sitk.GetImageFromArray(seg_crop)
         seg_save = copy_geometry_sitk(seg_save, img)

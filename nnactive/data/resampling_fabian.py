@@ -6,6 +6,7 @@ import SimpleITK as sitk
 import torch
 from acvl_utils.array_manipulation.resampling import maybe_resample_on_gpu
 from batchgenerators.utilities.file_and_folder_operations import *
+from loguru import logger
 from nnunetv2.preprocessing.resampling.default_resampling import compute_new_shape
 from torch.nn import functional as F
 
@@ -19,7 +20,7 @@ def resample_save(
     skip_existing: bool = True,
     export_pool: Pool = None,
 ):
-    print(f"{os.path.basename(source_image)}")
+    logger.info(f"{os.path.basename(source_image)}")
     if skip_existing and isfile(target_label) and isfile(target_image):
         return None, None
 
@@ -38,7 +39,7 @@ def resample_save(
         source_shape, list(source_spacing)[::-1], target_spacing
     )
 
-    print(f"source shape: {source_shape}, target shape {target_shape}")
+    logger.info(f"source shape: {source_shape}, target shape {target_shape}")
 
     # one hot generation is slow af. Let's do it this way:
     seg_source = torch.from_numpy(seg_source)
@@ -55,10 +56,10 @@ def resample_save(
             )[0, 0].cpu()
         del seg_source_gpu
     except RuntimeError:
-        print(
+        logger.exception(
             "GPU wasnt happy with this resampling. Lets give the CPU a chance to sort it out"
         )
-        print(f"source shape {source_shape}, target shape {target_shape}")
+        logger.info(f"source shape {source_shape}, target shape {target_shape}")
         del seg_source_gpu
         device = "cpu"
         with torch.no_grad():

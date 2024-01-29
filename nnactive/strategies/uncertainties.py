@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from loguru import logger
 
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 
@@ -26,7 +27,7 @@ def prob_pred_entropy(
     Args:
         probs (torch.Tensor): M x C x ...
     """
-    print("Calc pred entropy")
+    logger.info("Calc pred entropy")
     mean_prob = None
     for fold in range(num_folds):
         prob_path = str(
@@ -48,7 +49,7 @@ def prob_exp_entropy(
     Args:
         probs (torch.Tensor): M x C x ...
     """
-    print("Calc exp entropy")
+    logger.info("Calc exp entropy")
     ee = None
     for fold in range(num_folds):
         prob_path = str(
@@ -61,7 +62,7 @@ def prob_exp_entropy(
         else:
             ee += torch.sum(probs * log_entropy(probs), dim=0).to(device)
     ee /= num_folds
-    print("Calculated exp entropy")
+    logger.info("Calculated exp entropy")
     return ee
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
@@ -56,11 +57,15 @@ def create_test_datasets(
         for image_name in image_names
         if _return_true_if_file_in_list_set(image_name, val_segs)
     ]
-    print(
+    logger.info(
         f"Moving {len(val_segs)} out {len(val_segs)+len(seg_names)} Label Maps to Validation Data"
     )
-    print(f"Moving images from folder {base_imagesTr_dir} to {target_imagesVal_dir}")
-    print(f"Moving labels from folder {base_labelsTr_dir} to {target_labelsVal_dir}")
+    logger.info(
+        f"Moving images from folder {base_imagesTr_dir} to {target_imagesVal_dir}"
+    )
+    logger.info(
+        f"Moving labels from folder {base_labelsTr_dir} to {target_labelsVal_dir}"
+    )
 
     if move:
         move_files(base_labelsTr_dir, target_labelsVal_dir, val_segs, file_ending)

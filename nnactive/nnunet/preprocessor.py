@@ -6,6 +6,7 @@ from typing import Union
 
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import *
+from loguru import logger
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     DefaultPreprocessor,
@@ -51,9 +52,11 @@ class nnActivePreprocessor(DefaultPreprocessor):
         configuration_manager = plans_manager.get_configuration(configuration_name)
 
         if self.verbose:
-            print(f"Preprocessing the following configuration: {configuration_name}")
+            logger.debug(
+                f"Preprocessing the following configuration: {configuration_name}"
+            )
         if self.verbose:
-            print(configuration_manager)
+            logger.debug(configuration_manager)
 
         dataset_json_file = join(nnUNet_preprocessed, dataset_name, "dataset.json")
         dataset_json = load_json(dataset_json_file)

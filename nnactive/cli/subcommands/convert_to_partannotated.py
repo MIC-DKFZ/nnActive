@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Optional, Union
 
 import numpy as np
+from loguru import logger
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
@@ -52,20 +53,20 @@ def convert_dataset_to_partannotated(
     already_exists = False
     try:
         exists_name = convert_id_to_dataset_name(target_id)
-        print(
+        logger.info(
             f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
         )
         already_exists = True
     except RuntimeError:
-        print("No naming conflict with nnU-Net")
+        logger.info("No naming conflict with nnU-Net")
     try:
         exists_name = nnactive_id_to_dataset_name(target_id)
-        print(
+        logger.info(
             f"Dataset with ID {target_id} already exists in nnActive under name {exists_name}."
         )
         already_exists = True
     except FileNotFoundError:
-        print("No naming conflict with nnActive")
+        logger.info("No naming conflict with nnActive")
 
     if already_exists and not force:
         raise NotImplementedError(
@@ -109,7 +110,7 @@ def convert_dataset_to_partannotated(
                     base_dir / copy_folder, target_dir / copy_folder, dirs_exist_ok=True
                 )
             else:
-                print(
+                logger.info(
                     "Skip Path for copying into target:\n{}".format(
                         base_dir / copy_folder
                     )
@@ -204,7 +205,7 @@ def get_patches_for_partannotation(
         Patch(file=seg_names.pop(), coords=[0, 0, 0], size="whole")
         for i in range(full_images)
     ]
-    print(f"# whole image patches: {len(patches)}")
+    logger.info(f"# whole image patches: {len(patches)}")
 
     strategy = init_strategy(
         strategy_name,
@@ -219,10 +220,10 @@ def get_patches_for_partannotation(
         raw_labels_path=base_labelsTr_dir,
         additional_label_path=additional_label_path,
     )
-    print("Finished Initialization")
-    print(strategy)
+    logger.info("Finished Initialization")
+    logger.info(strategy)
     patches_partial = strategy.query(verbose=get_verbose(True))
-    print(f"#{strategy_name} based patches: {patches_partial}")
+    logger.info(f"#{strategy_name} based patches: {patches_partial}")
     patches = patches_partial + patches
 
     return patches
@@ -335,8 +336,8 @@ def main(args: Namespace) -> None:
 
     if not isinstance(target_id, int):
         target_id = base_dataset_id + id_offset
-    print(f"output_id is {target_id}")
-    print(args)
+    logger.info(f"output_id is {target_id}")
+    logger.info(args)
     convert_dataset_to_partannotated(
         base_dataset_id,
         target_id,
