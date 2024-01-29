@@ -1,13 +1,8 @@
-# TODO: Split this into two different files, s.a. in other folders
 import hashlib
-import json
 import os
 import shutil
 import subprocess
-from argparse import Namespace
-from copy import deepcopy
 from pathlib import Path
-from typing import Callable, Optional, Union
 
 import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
@@ -21,19 +16,6 @@ from nnactive.cli.subcommands.nnunet_extract_fingerprint import (
     extract_fingerprint_dataset,
 )
 from nnactive.cli.subcommands.resample_nnunet_dataset import resample_nnunet_dataset
-from nnactive.data.annotate import create_labels_from_patches
-from nnactive.data.create_empty_masks import (
-    add_ignore_label_to_dataset_json,
-    read_dataset_json,
-)
-from nnactive.loops.loading import save_loop
-from nnactive.nnunet.io import generate_custom_splits_file
-from nnactive.nnunet.utils import get_patch_size
-from nnactive.results.utils import (
-    convert_id_to_dataset_name as nnactive_id_to_dataset_name,
-)
-from nnactive.strategies import init_strategy
-from nnactive.utils.hostutils import get_verbose
 from nnactive.utils.io import load_json
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
