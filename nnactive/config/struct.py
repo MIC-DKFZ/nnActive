@@ -20,21 +20,29 @@ FILENAME = "config.json"
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
     starting_budget: str = "standard"  # how was starting budget created?
-    trainer: str = "nnUNetTrainer_200epochs"  # e.g. nnUNetDebugTrainer
+    trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
     model_config: str = "3d_fullres"  # 3d_fullres
-    uncertainty: str = "random"  # mutual_information
+    uncertainty: str = (
+        "random"  # mutual_information TODO: rename this to query_strategy!
+    )
     aggregation: str = "patch"  # patch Currently holds no meaning
     query_size: int = 20  # how many samples are queried
     query_steps: int = 10  # how many query steps are supposed to be made
-    agg_stride: Union[int, list[int]] = 1  # stride for the aggregation function
+    agg_stride: int | list[int] = 1  # stride for the aggregation function
+    _n_patch_per_image: int | None = (
+        None  # how many potential queries per image are allowed
+    )
     seed: int = 12345  # seed to be used for everything random in the experiment
-    num_processes: int = 4  # how many processes are used within nnU-Net
+    num_processes: int = 4  # how many processes are used within nnU-Net TODO: this value is dependent on data and machine --> Autoconfig
     full_folds: int = 5  # the amount of folds used in the split
-    train_folds: Union[int, None] = None  # if specified, use subset of folds
+    train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
-    add_uncertainty: str = ""  # e.g. --disable_tta
-    add_validation: str = ""  # e.g. --disable_tta
-    # overlap
+    use_mirroring: bool = False  # use mirroring during query prediction
+    use_gaussian: bool = False  # use gaussian during query predition
+    tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
+    add_uncertainty: str = ""  # deprecated argument!
+    add_validation: str = ""  # deprecated argument!
+    # overlap : float = 0 # percentage of allowed overlap of patch with already annotated regions TODO: introduce this variable
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:
@@ -71,3 +79,11 @@ class ActiveConfig:
     @property
     def working_folds(self):
         return self.train_folds if self.train_folds is not None else self.full_folds
+
+    @property
+    def n_patch_per_image(self):
+        return (
+            self._n_patch_per_image
+            if self._n_patch_per_image is not None
+            else self.query_size
+        )

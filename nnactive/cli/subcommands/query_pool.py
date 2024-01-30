@@ -38,6 +38,13 @@ from nnactive.query_pool import query_pool
                 "Be Careufl with this one!",
             },
         ),
+        (
+            ("--verbose"),
+            {
+                "action": "store_true",
+                "help": "Disables progress bars and get more explicit print statements.",
+            },
+        ),
     ],
 )
 def main(args: Namespace):
@@ -45,10 +52,11 @@ def main(args: Namespace):
     patch_size = args.patch_size
     query_size = args.num_patches
     force = args.force
+    verbose = args.verbose
 
     config = ActiveConfig.get_from_id(dataset_id)
     if patch_size is not None:
         config.patch_size = patch_size
     if query_size is not None:
         config.query_size = query_size
-    query_pool(dataset_id, force=force)
+    query_pool(dataset_id, force=force, verbose=verbose)

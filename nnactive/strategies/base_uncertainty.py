@@ -32,9 +32,6 @@ from nnactive.results.utils import get_results_folder as get_nnactive_results_fo
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.utils.timer import CudaTimer, Timer
 
-# TODO: replace this with a variable which is easier to access!
-NPP = 1
-
 
 class AbstractUncertainQueryMethod(AbstractQueryMethod):
     def __init__(
@@ -43,11 +40,24 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         query_size: int,
         patch_size: list[int],
         agg_stride: Union[int, list[int]],
+        n_patch_per_image: int,
         file_ending: str = ".nii.gz",
+        num_processes_preprocessing: int = 3,
+        use_gaussian: bool = False,
+        use_mirroring: bool = False,
+        tile_step_size: float = 0.75,
+        verbose: bool = False,
         **kwargs,
     ):
         super().__init__(dataset_id, query_size, patch_size, file_ending)
         self.config = ActiveConfig.get_from_id(dataset_id)
+
+        self.verbose = verbose
+        self.num_processes_preprocessing = num_processes_preprocessing
+        self.n_patch_per_image = n_patch_per_image
+        self.use_mirroring = use_mirroring
+        self.use_gaussian = use_gaussian
+        self.tile_step_size = tile_step_size
         if (
             agg_stride == 1
         ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
@@ -59,13 +69,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
         )
 
-    def query(self, verbose=False) -> list[Patch]:
+    def query(self, verbose: bool = False) -> list[Patch]:
         # Initialize Predictor
         predictor = nnActivePredictor(
-            tile_step_size=0.75,
-            use_mirroring=False,
-            verbose=verbose,
-            allow_tqdm=not verbose,
+            tile_step_size=self.tile_step_size,
+            use_mirroring=self.use_mirroring,
+            use_gaussian=self.use_gaussian,
+            verbose=self.verbose,
+            allow_tqdm=not self.verbose,
         )
 
         # Initialize Model for Predictor
@@ -86,7 +97,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         data_iterator = predictor.get_data_iterator_from_folders(
             list_of_lists_or_source_folder=source_folder,
             output_folder_or_list_of_truncated_output_files=output_folder,
-            num_processes_preprocessing=NPP,
+            num_processes_preprocessing=self.num_processes_preprocessing,
         )
         predictor.predict_from_data_iterator(data_iterator, self)
         return self.compose_query_of_patches()
@@ -113,11 +124,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
         logger.info("Initialize selected array...")
-        selected_array = [patch for patch in self.annotated_patches]
+        annotated_patches = [patch for patch in self.annotated_patches]
 
         logger.info("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
-            kernel_size, agg_uncertainty, selected_array, label_file, self.query_size
+            patch_size=kernel_size,
+            aggregated=agg_uncertainty,
+            annotated_patches=annotated_patches,
+            label_file=label_file,
+            n=self.n_patch_per_image,
         )
         logger.info("Finished patch selection.")
         self.top_patches += selected_patches
@@ -137,10 +152,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         self,
         patch_size: list[int],
         aggregated: np.ndarray,
-        selected_array: list[Patch],
+        annotated_patches: list[Patch],
         label_file: str,
         n: int,
-        verbose: bool = False,
     ) -> list[dict]:
         selected_patches = []
         # sort only once since this can take a significant amount of time
@@ -155,12 +169,12 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
         iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
-        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=verbose)
+        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=self.verbose)
         pbar1 = tqdm(
             total=len(sorted_uncertainty_scores),
             position=1,
             desc="Possible Patch Search",
-            disable=verbose,
+            disable=self.verbose,
         )
 
         for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
@@ -175,9 +189,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 size=patch_size,
             )
 
-            # coords = np.unravel_index(uncertainty_index, aggregated.shape)
             # Check if coordinated overlap with already queried region
-            if not does_overlap(patch, selected_array):
+            if not does_overlap(patch, annotated_patches):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -187,10 +200,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                         "score": uncertainty_score,
                     }
                 )
-                # selected += 1
                 # Mark region as queried
-                # selected_array = mark_selected(selected_array, coords, patch_size)
-                selected_array.append(patch)
+                annotated_patches.append(patch)
                 # Stop if we reach the maximum number of patches to be queried
                 pbar0.update()
             if n is not None and len(selected_patches) >= n:
@@ -229,8 +240,9 @@ class nnActivePredictor(nnUNetPredictor):
             np.ndarray: output probabilities
 
         """
-        process = psutil.Process()
-        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+        logger.info(
+            f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss * 1e-9}GB"
+        )
         logits_nf = torch.isfinite(logits) == 0
         if torch.any(logits_nf):
             raise RuntimeError(f"NAN values in logits")
@@ -238,7 +250,7 @@ class nnActivePredictor(nnUNetPredictor):
 
         conversion_timer = CudaTimer()
         conversion_timer.start()
-        print(f"Shape before postprocessing: {logits.shape}")
+        logger.info(f"Shape before postprocessing: {logits.shape}")
         out_prob = convert_predicted_logits_to_probs_with_correct_shape(
             logits,
             self.plans_manager,
@@ -246,8 +258,8 @@ class nnActivePredictor(nnUNetPredictor):
             self.label_manager,
             properties,
         )
-        print(f"Shape after postprocessing: {out_prob.shape}")
-        print(f"Time for conversion: {conversion_timer.stop()/1000}s")
+        logger.info(f"Shape after postprocessing: {out_prob.shape}")
+        logger.info(f"Time for conversion: {conversion_timer.stop()/1000}s")
 
         # fastest way to check if nan in np array
         # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
@@ -269,7 +281,7 @@ class nnActivePredictor(nnUNetPredictor):
         temp_path = get_nnactive_results_folder(dataset_id) / "temp"
         os.makedirs(temp_path, exist_ok=True)
         np.save(str(temp_path / f"probs_fold{fold}"), out_probs)
-        print(f"Time for saving: {save_timer.stop()/1000}s")
+        logger.info(f"Time for saving: {save_timer.stop()/1000}s")
 
     def delete_temp_path(self):
         """Delete temp files to not mess up in subsequent query steps"""
@@ -296,8 +308,9 @@ class nnActivePredictor(nnUNetPredictor):
                         else:
                             self.network._orig_mod.load_state_dict(params)
 
-                        process = psutil.Process()
-                        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+                        logger.info(
+                            f"RAM used before sliding window prediction:~{psutil.Process().memory_info().rss * 1e-9}GB"
+                        )
                         logits = self.predict_sliding_window_return_logits(data)
                         out_probs = self.postprocess_logits(logits, properties)
                         self.save_out_probs_temp(out_probs, fold)
@@ -339,6 +352,9 @@ class nnActivePredictor(nnUNetPredictor):
         # set up multiprocessing for spawning
 
         for preprocessed in data_iterator:
+            # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
+            # if os.path.basename(preprocessed["ofile"]) != "case_00223":
+            #     continue
             data = preprocessed["data"]
             if isinstance(data, str):
                 delfile = data

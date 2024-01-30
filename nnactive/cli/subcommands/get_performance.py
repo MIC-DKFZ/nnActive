@@ -88,15 +88,23 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
             ("-f", "--force"),
             {"action": "store_true", "help": "Ignores the internal State."},
         ),
+        (
+            ("--verbose"),
+            {
+                "action": "store_true",
+                "help": "Disables progress bars and get more explicit print statements.",
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     force = args.force
-    get_performance(dataset_id, force)
+    verbose = args.verbose
+    get_performance(dataset_id, force, verbose)
 
 
-def get_performance(dataset_id: int, force: bool = False):
+def get_performance(dataset_id: int, force: bool = False, verbose: bool = False):
     state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
     images_path = get_raw_path(dataset_id) / "imagesVal"
@@ -130,6 +138,8 @@ def get_performance(dataset_id: int, force: bool = False):
         train_identifier=config.trainer,
         configuration_identifier=config.model_config,
         folds=folds,
+        verbose=verbose,
+        disable_progress_bar=not verbose,
     )
 
     os.makedirs(loop_results_path, exist_ok=True)

@@ -28,8 +28,9 @@ from tqdm import tqdm
 
 class NNActiveDatasetFingerprintExtractor(DatasetFingerprintExtractor):
     """
-    Fingerprint Extractor with all functionality from nnU-Net. However it saves out data to folder addTr if `use_mask_for_norm` will be true in Plans.
-    In this case it then adds the flag `use_mask_for_norm` to the dataset.json.
+    Fingerprint Extractor with all functionality from nnU-Net. It saves out data to folder addTr if `use_mask_for_norm` is true in dataset.json.
+    dataset.json gets rewrittten with `use_mask_for_nrom` value in convert_to_partannotated if plans would use it.
+
     """
 
     @property
@@ -63,7 +64,7 @@ class NNActiveDatasetFingerprintExtractor(DatasetFingerprintExtractor):
         # here we create a label folder filled with labels that come for free e.g. for BraTS.
         # regions where there is no brain are easy to detect and label -- we take these for nnActive datasets.
         # values that are filled with -1 are background and will be added to labelsTr with label 0.
-        if self.dataset_json["use_mask_for_norm"] is True:
+        if self.dataset_json.get("use_mask_for_norm") is True:
             save_path = os.path.join(self.input_folder, self.save_addTr_folder)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)

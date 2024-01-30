@@ -8,8 +8,6 @@ from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import get_raw_path, get_results_path
 from nnactive.results.state import State
 
-TIMEOUT_S = 60 * 60
-
 
 @register_subcommand(
     "predict_nnUNet_ensemble", [(("-d", "--dataset_id"), {"type": int})]
