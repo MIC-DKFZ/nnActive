@@ -42,7 +42,9 @@ def update_data(
         patches = all_patches
     else:
         patches = get_loop_patches(data_path, loop_val)
-    logger.info(len(patches))
+    logger.info(
+        "Updating Data for loop {} with {} patches".format(loop_val, len(patches))
+    )
     create_labels_from_patches(
         patches,
         ignore_label,
@@ -52,7 +54,11 @@ def update_data(
         overwrite=annotated,
         additional_label_path=additional_label_path,
     )
-
+    logger.info(
+        "Creating splits file {} with {} patches".format(
+            save_splits_file, len(all_patches)
+        )
+    )
     splits_final = kfold_cv_from_patches(num_folds, all_patches)
 
     with open(save_splits_file, "w") as file:

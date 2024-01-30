@@ -29,7 +29,17 @@ from nnactive.update_data import update_data
         ),
         (
             ("-f", "--force"),
-            {"action": "store_true", "help": "Ignores the internal State."},
+            {
+                "action": "store_true",
+                "help": "Ignores the internal State.",
+            },
+        ),
+        (
+            "--no_state",
+            {
+                "action": "store_true",
+                "help": "Does not require internal State.",
+            },
         ),
     ],
 )
@@ -37,8 +47,15 @@ def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     loop_val = args.loop
     force = args.force
+    no_state = args.no_state
 
-    update_step(dataset_id, loop_val=loop_val, annotated=args.annotated, force=force)
+    update_step(
+        dataset_id,
+        loop_val=loop_val,
+        annotated=args.annotated,
+        force=force,
+        no_state=no_state,
+    )
 
 
 def update_step(
@@ -47,6 +64,7 @@ def update_step(
     loop_val: int = None,
     annotated: bool = True,
     force: bool = False,
+    no_state: bool = False,
 ):
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
@@ -59,9 +77,10 @@ def update_step(
     if annotated:
         base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
     else:
-        base_dir = get_raw_path(dataset_id) / "predTr"
+        base_dir = get_raw_path(dataset_id) / f"annoTr_{loop_val:02}"
 
-    state = State.get_id_state(dataset_id, verify=not force)
+    if not no_state:
+        state = State.get_id_state(dataset_id, verify=not force)
 
     update_data(
         data_path,
@@ -75,7 +94,7 @@ def update_step(
         annotated=annotated,
     )
 
-    if not force:
+    if not force and not no_state:
         state.update_data = True
         state.new_loop()
         state.save_state()
