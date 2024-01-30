@@ -1,23 +1,39 @@
 from argparse import ArgumentParser, Namespace
-from copy import deepcopy
 from itertools import product
 
 from nnactive.config import ActiveConfig
-from nnactive.loops.loading import get_loop_patches, get_sorted_loop_files, save_loop
+from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import get_raw_path
-from nnactive.results.state import State
 from nnactive.strategies import init_strategy
-from nnactive.utils.io import save_json
 
 parser = ArgumentParser()
-parser.add_argument("-d", "--dataset_id", type=int, required=True)
-parser.add_argument("--verbose", action="store_true")
-parser.add_argument("--query_strategy", default=None, type=str)
+parser.add_argument(
+    "-d",
+    "--dataset_id",
+    type=int,
+    required=True,
+    help="Which dataset ID to use. Make sure that models are trained",
+)
+parser.add_argument(
+    "--verbose",
+    action="store_true",
+    help="Whether to disable TQDM and make printing more explicit.",
+)
+parser.add_argument(
+    "--query_strategy", default=None, type=str, help="Which query strategy to use."
+)
+parser.add_argument(
+    "--num_queries",
+    default=None,
+    type=int,
+    help="How many queries out of the settings are used.",
+)
 
 
 def main(args: Namespace):
     dataset_id = args.dataset_id
     verbose = args.verbose
+    num_queries = args.num_queries
     config = ActiveConfig.get_from_id(dataset_id)
 
     raw_dataset_path = get_raw_path(dataset_id)
@@ -25,7 +41,7 @@ def main(args: Namespace):
     seed = config.seed + loop_val
 
     value_dict = {
-        "query_strategy": [
+        "uncertainty": [
             (
                 args.query_strategy
                 if args.query_strategy is not None
@@ -36,8 +52,8 @@ def main(args: Namespace):
         "use_gaussian": [False, True],
         "tile_step_size": [
             1.0,  # CUDA oom error
-            # 0.75,
-            # 0.5,
+            0.75,
+            0.5,
         ],
         "_n_patch_per_image": [
             config.query_size,
@@ -48,10 +64,14 @@ def main(args: Namespace):
 
     value_product = list(product(*list(value_dict.values())))
     dict_list = [dict(zip(value_dict.keys(), values)) for values in value_product]
+    if num_queries is None:
+        num_queries = len(dict_list)
 
     queries = []
     strategies = []
-    for dictionary in dict_list:
+    for i, dictionary in enumerate(dict_list):
+        if i >= num_queries:
+            continue
         for key, val in dictionary.items():
             setattr(config, key, val)
         print("Config:")

@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from acvl_utils.morphology.gpu_binary_morphology import gpu_binary_erosion
 from dynamic_network_architectures.building_blocks.helper import convert_dim_to_conv_op
+from loguru import logger
 
 
 def maybe_gpu_binary_erosion(
@@ -61,6 +62,51 @@ def cpu_binary_erosion(
         out = out.numpy()
     # revert changes to cudnn.benchmark
     return out
+
+
+def get_tensor_memory_usage(tensor: torch.Tensor):
+    """Get the memory usage of a PyTorch tensor in gigabytes (GB)."""
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError("Input must be a PyTorch tensor")
+
+    # Get the size of each element in bytes
+    element_size = tensor.element_size()
+
+    # Get the total number of elements in the tensor
+    total_elements = tensor.numel()
+
+    # Calculate memory usage in bytes
+    memory_usage_bytes = element_size * total_elements
+
+    # Convert bytes to gigabytes
+    memory_usage_gb = memory_usage_bytes / (1024**3)
+
+    return memory_usage_gb
+
+
+def estimate_free_cuda_memory(device=0) -> float:
+    """Returns unallocated memory for device in GB"""
+    total_memory = torch.cuda.get_device_properties(device).total_memory / (
+        1024**3
+    )  # Convert to gigabytes
+    memory_allocated = torch.cuda.memory_allocated(device) / (1024**3)
+    return total_memory - memory_allocated
+
+
+def log_cuda_memory_info():
+    total_memory = torch.cuda.get_device_properties(0).total_memory / (
+        1024**3
+    )  # Convert to gigabytes
+    memory_allocated = torch.cuda.memory_allocated() / (1024**3)
+    max_memory_allocated = torch.cuda.max_memory_allocated() / (1024**3)
+    memory_cached = torch.cuda.memory_reserved() / (1024**3)
+
+    logger.debug("-" * 8)
+    logger.debug("Before Compute")
+    logger.debug(f"\tMemory allocated: {memory_allocated}")
+    logger.debug(f"\tMax Memory allocated: {max_memory_allocated}")
+    logger.debug(f"\tMemory cached: {memory_cached}")
+    logger.debug(f"\tMemory free: {total_memory-memory_allocated}")
 
 
 if __name__ == "__main__":

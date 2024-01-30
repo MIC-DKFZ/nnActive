@@ -124,7 +124,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
         logger.info("Initialize selected array...")
-        selected_array = [patch for patch in self.annotated_patches]
+        annotated_patches = [patch for patch in self.annotated_patches]
 
         logger.info("Select patches...")
         selected_patches = self.select_top_n_non_overlapping_patches(
@@ -240,8 +240,9 @@ class nnActivePredictor(nnUNetPredictor):
             np.ndarray: output probabilities
 
         """
-        process = psutil.Process()
-        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+        logger.info(
+            f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss * 1e-9}GB"
+        )
         logits_nf = torch.isfinite(logits) == 0
         if torch.any(logits_nf):
             raise RuntimeError(f"NAN values in logits")
@@ -249,7 +250,7 @@ class nnActivePredictor(nnUNetPredictor):
 
         conversion_timer = CudaTimer()
         conversion_timer.start()
-        print(f"Shape before postprocessing: {logits.shape}")
+        logger.info(f"Shape before postprocessing: {logits.shape}")
         out_prob = convert_predicted_logits_to_probs_with_correct_shape(
             logits,
             self.plans_manager,
@@ -257,8 +258,8 @@ class nnActivePredictor(nnUNetPredictor):
             self.label_manager,
             properties,
         )
-        print(f"Shape after postprocessing: {out_prob.shape}")
-        print(f"Time for conversion: {conversion_timer.stop()/1000}s")
+        logger.info(f"Shape after postprocessing: {out_prob.shape}")
+        logger.info(f"Time for conversion: {conversion_timer.stop()/1000}s")
 
         # fastest way to check if nan in np array
         # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
@@ -280,7 +281,7 @@ class nnActivePredictor(nnUNetPredictor):
         temp_path = get_nnactive_results_folder(dataset_id) / "temp"
         os.makedirs(temp_path, exist_ok=True)
         np.save(str(temp_path / f"probs_fold{fold}"), out_probs)
-        print(f"Time for saving: {save_timer.stop()/1000}s")
+        logger.info(f"Time for saving: {save_timer.stop()/1000}s")
 
     def delete_temp_path(self):
         """Delete temp files to not mess up in subsequent query steps"""
@@ -307,8 +308,9 @@ class nnActivePredictor(nnUNetPredictor):
                         else:
                             self.network._orig_mod.load_state_dict(params)
 
-                        process = psutil.Process()
-                        logger.info(f"RAM used:~{process.memory_info().rss * 1e-9}GB")
+                        logger.info(
+                            f"RAM used before sliding window prediction:~{psutil.Process().memory_info().rss * 1e-9}GB"
+                        )
                         logits = self.predict_sliding_window_return_logits(data)
                         out_probs = self.postprocess_logits(logits, properties)
                         self.save_out_probs_temp(out_probs, fold)
@@ -350,6 +352,9 @@ class nnActivePredictor(nnUNetPredictor):
         # set up multiprocessing for spawning
 
         for preprocessed in data_iterator:
+            # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
+            # if os.path.basename(preprocessed["ofile"]) != "case_00223":
+            #     continue
             data = preprocessed["data"]
             if isinstance(data, str):
                 delfile = data
