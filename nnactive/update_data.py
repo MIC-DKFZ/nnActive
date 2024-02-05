@@ -43,7 +43,9 @@ def update_data(
     else:
         patches = get_loop_patches(data_path, loop_val)
     logger.info(
-        "Updating Data for loop {} with {} patches".format(loop_val, len(patches))
+        "Updating Data for loop {} with {} patches".format(
+            "max" if loop_val is None else loop_val, len(patches)
+        )
     )
     create_labels_from_patches(
         patches,
