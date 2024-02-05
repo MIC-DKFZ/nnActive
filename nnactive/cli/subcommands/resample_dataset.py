@@ -4,6 +4,7 @@ from pathlib import Path
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.resampling import resample_dataset
+from nnactive.utils.io import load_json, save_json
 
 
 def get_target_spacing(path: Path) -> tuple[int]:
@@ -19,15 +20,16 @@ def get_target_spacing(path: Path) -> tuple[int]:
         ("--target_preprocessed", {"type": str}),
         ("--target_raw", {"type": str}),
         ("--num_processes", {"type": int, "default": 4}),
+        ("--configuration", {"type": str, "default": "3d_fullres"}),
     ],
 )
 def main(args: Namespace) -> None:
     target_preprocessed = Path(args.target_preprocessed)
     target_raw = Path(args.target_raw)
     n_workers = args.num_processes
+    configuration: str = args.configuration
 
-    with open(target_raw / "dataset.json", "r") as file:
-        dataset_json = json.load(file)
+    dataset_json = load_json(target_raw / "dataset.json")
 
     resample_dataset(
         dataset_cfg=dataset_json,
@@ -37,6 +39,7 @@ def main(args: Namespace) -> None:
         gt_path=target_raw / "labelsTr",
         preprocessed_path=target_preprocessed,
         n_workers=n_workers,
+        configuration=configuration,
     )
 
     resample_dataset(
@@ -47,4 +50,11 @@ def main(args: Namespace) -> None:
         gt_path=target_raw / "labelsVal",
         preprocessed_path=target_preprocessed,
         n_workers=n_workers,
+        configuration=configuration,
     )
+
+    nnUNet_plans = load_json(target_preprocessed / "nnUNetPlans.json")
+    if any(nnUNet_plans["configurations"][configuration]["use_mask_for_norm"]):
+        dataset_json["use_mask_for_norm"] = True
+
+    save_json(dataset_json, target_raw / "dataset.json")
