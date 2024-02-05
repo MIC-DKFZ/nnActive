@@ -108,7 +108,8 @@ def main(args: Namespace) -> None:
     # TODO: here the config would be useful!
     # TODO: save the split to a split file which can be loaded. (avoid unnecessary seed problems)
     raw_folder = get_raw_path(dataset_id)
-    file_ending = read_dataset_json(dataset_id)["file_ending"]
+    dataset_json = read_dataset_json(dataset_id)
+    file_ending = dataset_json["file_ending"]
     imagesTr = raw_folder / "imagesTr"
     imagesVal = raw_folder / "imagesVal"
     labelsTr = raw_folder / "labelsTr"
@@ -120,8 +121,7 @@ def main(args: Namespace) -> None:
     num_train, num_val = create_test_datasets(
         labelsTr, imagesTr, labelsVal, imagesVal, file_ending, test_size=test_size
     )
-    dataset_json = read_dataset_json(dataset_id)
     dataset_json["numTraining"] = num_train
-    dataset_json["numValidation"] = num_val
+    dataset_json["numVal"] = num_val
 
     save_json(dataset_json, raw_folder / "dataset.json")
