@@ -8,42 +8,47 @@ from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
-from nnactive.loops.loading import get_loop_patches
+from nnactive.loops.loading import get_current_loop, get_loop_patches
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.query.random import create_patch_mask_for_image, load_label_map
 
 
-# TODO: rename this to manual_query
 @register_subcommand(
     "manual_crop_pred",
     [
         (("-d", "--dataset_id"), {"type": int, "required": True}),
         (
-            ("-i", "--input_folder"),
+            ("-l", "--loop"),
             {
-                "type": str,
-                "required": True,
-                "help": "Path to folder containing predictions used for filling areas within patches.",
+                "type": int,
+                "default": None,
             },
         ),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
+    loop = args.loop
 
     data_path = get_raw_path(dataset_id)
-    labels_dir = data_path / "predTr_00"
 
     dataset_json = read_dataset_json(dataset_id)
     file_ending = dataset_json["file_ending"]
 
-    patches = get_loop_patches(data_path)
+    if loop is None:
+        loop = get_current_loop(data_path)
 
-    logger.info(f"Found Patches: {len(patches)}")
+    patches = get_loop_patches(data_path, loop_val=loop)
+    labels_dir = data_path / f"predTr_{loop-1:02d}"
+
+    logger.info(
+        f"Creation of cropped predictions for loop {loop} with {len(patches)} Patches"
+    )
 
     img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
-    logger.info(f"Image Names: {len(img_names)}")
-    save_path = data_path / "predTr_crop"
+    logger.info(f"Found images {len(img_names)} in {labels_dir}")
+    save_path = data_path / f"predTr_crop_{loop-1:02d}"
+    logger.info(f"Saving images to: {save_path}")
     os.makedirs(save_path, exist_ok=True)
     for img_name in img_names:
         img_patches = [patch for patch in patches if patch.file == img_name]
