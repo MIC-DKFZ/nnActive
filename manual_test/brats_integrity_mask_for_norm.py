@@ -84,8 +84,6 @@ def main():
     subprocess.run(fingerprint_call.format(src_id), shell=True, check=True)
     subprocess.run(plan_call.format(src_id), shell=True, check=True)
     src_raw_dir = NNUNET_RAW / src_name
-
-    resample_name = "Dataset139_BraTSTempResample"
     try:
         convert_id_to_dataset_name(resample_id)
         shutil.rmtree(NNUNET_RAW / resample_name)

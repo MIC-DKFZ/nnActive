@@ -1,8 +1,6 @@
-import shutil
 from argparse import Namespace
-from typing import List, Optional, Tuple, Type, Union
+from typing import Type
 
-import nnunetv2
 from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.configuration import default_num_processes
 from nnunetv2.experiment_planning.dataset_fingerprint.fingerprint_extractor import (
@@ -15,9 +13,7 @@ from nnunetv2.paths import nnUNet_raw
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.data.resampling import resample_dataset
 from nnactive.nnunet.fingerprint_extractor import NNActiveDatasetFingerprintExtractor
-from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 
 
 def extract_fingerprint_dataset(
