@@ -22,6 +22,7 @@ def create_test_datasets(
     file_ending: str,
     test_size: Union[int, float] = 0.25,
     move: bool = True,
+    level_seperator: None | str = None,
 ) -> tuple[int, int]:
     seg_names = os.listdir(base_labelsTr_dir)
     seg_names = [seg_name for seg_name in seg_names if seg_name.endswith(file_ending)]
@@ -31,14 +32,55 @@ def create_test_datasets(
         return file_names
 
     seg_names = _clean_file_ending(seg_names)
-
     rng = np.random.default_rng(random_seed)
-    rng.shuffle(seg_names)
-    if test_size < 1:
-        test_size = test_size * len(seg_names)
-    test_size = int(test_size)
 
-    val_segs = [seg_names.pop() for _ in range(test_size)]
+    if level_seperator is not None:
+        levels = [seg_name.split(level_seperator) for seg_name in seg_names]
+        num_levels = len(levels[0])
+        logger.info(
+            f"Creating validation split using {num_levels} levels sepearted by {level_seperator}"
+        )
+        logger.info(
+            f"For the split the first dimension is used and the second ignored. e.g. {levels[0]}"
+        )
+        for l in levels:
+            if len(l) != num_levels:
+                raise RuntimeError(
+                    f"Number of levels in Dataset seperated by level_separator ({level_seperator})is not conistently {num_levels}."
+                )
+        if num_levels > 2:
+            raise NotImplementedError(
+                "More than 2 levels of e.g. patient and frame are currently not supported."
+            )
+        split_names = [l[0] for l in levels]
+        split_names: list[str] = np.unique(split_names).tolist()
+        rng.shuffle(split_names)
+        if test_size < 1:
+            test_size = test_size * len(split_names)
+        test_size = int(test_size)
+        val_split = split_names[:test_size]
+
+        def _return_true_if_string_startswith_list_set(
+            string: str, list_set: list[str]
+        ) -> bool:
+            for list_string in list_set:
+                if string.startswith(list_string):
+                    return True
+            return False
+
+        val_segs = [
+            seg_name
+            for seg_name in seg_names
+            if _return_true_if_string_startswith_list_set(seg_name, val_split)
+        ]
+
+    else:
+        rng.shuffle(seg_names)
+        if test_size < 1:
+            test_size = test_size * len(seg_names)
+        test_size = int(test_size)
+
+        val_segs = seg_names[:test_size]
 
     image_names = os.listdir(base_imagesTr_dir)
     image_names = [
@@ -58,7 +100,7 @@ def create_test_datasets(
         if _return_true_if_file_in_list_set(image_name, val_segs)
     ]
     logger.info(
-        f"Moving {len(val_segs)} out {len(val_segs)+len(seg_names)} Label Maps to Validation Data"
+        f"Moving {len(val_segs)} out {len(seg_names)} Label Maps to Validation Data"
     )
     logger.info(
         f"Moving images from folder {base_imagesTr_dir} to {target_imagesVal_dir}"
@@ -74,7 +116,7 @@ def create_test_datasets(
         copy_files(base_labelsTr_dir, target_labelsVal_dir, val_segs, file_ending)
         copy_files(base_imagesTr_dir, target_imagesVal_dir, val_images, file_ending)
 
-    return len(seg_names) - test_size, test_size
+    return len(seg_names) - len(val_segs), len(val_segs)
 
 
 def move_files(
@@ -100,15 +142,28 @@ def copy_files(
     [
         (("-d", "--dataset_id"), {"type": int}),
         ("--test_size", {"default": 0.25, "type": float}),
+        (
+            (
+                "--level_seperator",
+                {
+                    "default": None,
+                    "type": str,
+                    "help": "Sperator by which multiple images coming from the same subgroup can be identified to have no overlap in the split."
+                    "E.g. 'patient1_img2' with seperator '_' will be split according to patientX while imgX the images are added according to splits.",
+                },
+            )
+        ),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     test_size = args.test_size
+    level_seperator = args.level_seperator
     # TODO: here the config would be useful!
     # TODO: save the split to a split file which can be loaded. (avoid unnecessary seed problems)
     raw_folder = get_raw_path(dataset_id)
     dataset_json = read_dataset_json(dataset_id)
+
     file_ending = dataset_json["file_ending"]
     imagesTr = raw_folder / "imagesTr"
     imagesVal = raw_folder / "imagesVal"
@@ -119,7 +174,13 @@ def main(args: Namespace) -> None:
             f"It seems as if the splits have already been created. Check:\n{labelsTr} \n{labelsVal} "
         )
     num_train, num_val = create_test_datasets(
-        labelsTr, imagesTr, labelsVal, imagesVal, file_ending, test_size=test_size
+        labelsTr,
+        imagesTr,
+        labelsVal,
+        imagesVal,
+        file_ending,
+        test_size=test_size,
+        level_seperator=level_seperator,
     )
     dataset_json["numTraining"] = num_train
     dataset_json["numVal"] = num_val
