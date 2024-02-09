@@ -433,8 +433,10 @@ def select_top_n_non_overlapping_patches(
     n: int,
     uncertainty_scores: np.ndarray,
     patch_size: tuple[int, int, int],
-    selected_patches: list[Patch],
-    overlap_test: Callable[[Patch, list[Patch]], bool] = does_overlap,
+    annotated_patches: list[Patch],
+    overlap_test: Callable[[Patch, list[Patch]], bool] = lambda x, y: not does_overlap(
+        x, y
+    ),
 ) -> list[dict]:
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -468,7 +470,7 @@ def select_top_n_non_overlapping_patches(
             coords=coords,
             size=patch_size,
         )
-        if overlap_test(patch, selected_patches):
+        if overlap_test(patch, annotated_patches):
             # If it is a non-overlapping region, append this patch to be queried
             selected_patches.append(
                 {
@@ -480,7 +482,7 @@ def select_top_n_non_overlapping_patches(
             )
             # selected += 1
             # Mark region as queried
-            selected_patches.append(patch)
+            annotated_patches.append(patch)
         # Stop if we reach the maximum number of patches to be queried
         if n is not None and len(selected_patches) >= n:
             break
