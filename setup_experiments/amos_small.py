@@ -20,7 +20,7 @@ if __name__ == "__main__":
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label"
     num_processes = 4
-    train_folds = 1
+    train_folds = 5
 
     # Experiments with whole Images as Patches
     setter = DatasetSetup(
