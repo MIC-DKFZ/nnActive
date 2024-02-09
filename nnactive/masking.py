@@ -30,7 +30,7 @@ def create_patch_mask_for_image(
 
     for i, img_patch in enumerate(img_patches):
         slices = []
-        # TODO: this could be changed if img_size is changed!
+        # TODO: check code and delete this -- we only allow size being equal to integers now!
         if img_patch.size == "whole":
             selected_array.fill(1)
         else:
@@ -86,6 +86,47 @@ def mark_already_annotated_patches(
     """
     selected_array[labeled_array != ignore_label] = 1
     return selected_array
+
+
+def percentage_overlap_array(ipatch: Patch, selected_array: np.ndarray) -> bool:
+    """
+    Check if a patch overlaps with an already annotated region
+    Args:
+        start_indices (Tuple[str]): start indices of the patch
+        patch_size (np.ndarray): patch size to determine end indices
+        selected_array (np.ndarray): array containing the already annotated regions
+
+    Returns:
+        bool: True if the patch overlaps with an already annotated region, False if not
+    """
+    # Convert the indices to slices, makes indexing of selected_array possible without being dependent on dimensions
+    slices = []
+
+    for start_index, size in zip(ipatch.coords, ipatch.size):
+        slices.append(slice(start_index, start_index + size))
+    return selected_array[tuple(slices)].sum() / np.prod(ipatch.size)
+
+
+def percentage_overlap(ipatch: Patch, patches: list[Patch]):
+    num_dims = len(ipatch.coords)
+    overlap = 0
+    vol_patch = np.prod(ipatch.size)
+    for patch in patches:
+        overlap_patch = np.prod(
+            [
+                max(
+                    0,
+                    min(
+                        ipatch.coords[i] + ipatch.size[i],
+                        patch.coords[i] + patch.coords[i],
+                    )
+                    - max(ipatch.coords[i], patch.coords[i]),
+                )
+                for i in range(num_dims)
+            ]
+        )
+        overlap += overlap_patch
+    return overlap_patch / vol_patch
 
 
 def does_overlap(

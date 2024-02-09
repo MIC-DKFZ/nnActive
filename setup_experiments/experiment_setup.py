@@ -37,6 +37,8 @@ class DatasetSetup:
         train_folds: int = 5,
         force_override: bool = False,
         agg_stride: Union[int, list[int]] = 1,
+        patch_overlap: float = 0,
+        additional_overlap: float = 0.2,
     ):
         self.base_id = base_id
         # standard values
@@ -47,6 +49,8 @@ class DatasetSetup:
         self.add_uncertainty = add_uncertainty
         self.add_validation = add_validation
         self.agg_stride = agg_stride
+        self.patch_overlap = patch_overlap
+        self.additional_overlap = additional_overlap
 
         # standard values iterated over
         self.seeds = seeds
@@ -162,6 +166,8 @@ class DatasetSetup:
             add_uncertainty=self.add_uncertainty,
             add_validation=self.add_validation,
             agg_stride=self.agg_stride,
+            patch_overlap=self.patch_overlap,
+            additional_overlap=self.additional_overlap,
         )
         config.save_id(dataset_id)
         state = State(dataset_id=dataset_id)
