@@ -7,7 +7,7 @@ from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.utils import copy_geometry_sitk
-from nnactive.loops.loading import get_loop_patches
+from nnactive.loops.loading import get_current_loop, get_loop_patches
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.query.random import create_patch_mask_for_image, load_label_map
 
@@ -23,11 +23,19 @@ from nnactive.query.random import create_patch_mask_for_image, load_label_map
                 "help": "multiple patches within the same input get different labels for identification.",
             },
         ),
+        (
+            ("-l", "--loop"),
+            {
+                "type": int,
+                "default": None,
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     identify_patches = args.identify_patches
+    loop = args.loop
 
     data_path = get_raw_path(dataset_id)
     labels_dir = data_path / "labelsTr"
@@ -35,13 +43,17 @@ def main(args: Namespace) -> None:
     dataset_json = read_dataset_json(dataset_id)
     file_ending = dataset_json["file_ending"]
 
-    patches = get_loop_patches(data_path)
+    if loop is None:
+        loop = get_current_loop(data_path)
+
+    patches = get_loop_patches(data_path, loop_val=loop)
 
     logger.info(f"Found Patches: {len(patches)}")
 
     img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
     logger.info(f"Image Names: {len(img_names)}")
-    save_path = data_path / "masksTr_boundary"
+    save_path = data_path / f"masksTr_boundary_{loop:02d}"
+    logger.info(f"Saving boundaries of patches to: {save_path}")
     os.makedirs(save_path, exist_ok=True)
     for img_name in img_names:
         img_patches = [patch for patch in patches if patch.file == img_name]

@@ -19,7 +19,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     seeds = [12345, 12346, 12347]
-    uncertainties = ["random", "mutual_information", "pred_entropy"]
+    uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 4
     first_d_set = 500
     query_size = 5
@@ -47,8 +47,8 @@ if __name__ == "__main__":
 
     # Experiments with smaller Patch Size
     first_d_set = first_d_set + len(setter.vals)
-    # uncertainties = ["random", "mutual_information", "pred_entropy", "random-label"]
-    uncertainties = ["mutual_information"]
+    uncertainties = ["pred_entropy", "mutual_information", "random-label", "random"]
+    # uncertainties = ["mutual_information"]
     patch_size = [20, 20, 20]
     query_steps = 20
     query_size = 10

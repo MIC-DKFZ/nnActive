@@ -103,6 +103,7 @@ def resample_dataset(
     gt_path: Path,
     preprocessed_path: Path,
     n_workers: int,
+    configuration: str = "3d_fullres",
 ) -> None:
     """Convert all images and labels to target spacing
 
@@ -116,7 +117,6 @@ def resample_dataset(
         n_workers: number of parallel processes
     """
 
-    configuration = "3d_fullres"
     plans_file = preprocessed_path / "nnUNetPlans.json"
 
     with plans_file.open() as file:

@@ -219,6 +219,7 @@ def get_patches_for_partannotation(
         background_cls=background_cls,
         raw_labels_path=base_labelsTr_dir,
         additional_label_path=additional_label_path,
+        n_patch_per_image=1,  # this value does not affect Random Queries
     )
     logger.info("Finished Initialization")
     logger.info(strategy)

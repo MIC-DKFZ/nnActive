@@ -78,7 +78,7 @@ nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
 
 1. Create Validation Split
 ```bash
-python nnactive create_val_split.py -d 4
+nnactive create_val_split.py -d 4
 ```
 Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
 
@@ -89,14 +89,15 @@ nnUNetv2_plan_experiment -d 4
 ```
 3. Resample images
 ```bash
-python nnactive resample_dataset --target_preprocessed ${nnUNet_preprocessed}/Dataset004_Hippocampus --target_raw ${nnUNet_raw}/Dataset004_Hippocampus
-```
-Alternatively:
-```bash
-python nnactive resample_nnunet_dataset -d 4
+nnactive resample_nnunet_dataset -d 4
 ```
 resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
 Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
+4. Redo nnU-Net preprocessing instructions
+```bash
+nnactive nnunet_extract_fingerprint  -d 4 --clean
+nnUNetv2_plan_experiment -d 4
+```
 ### Create Partially annotated dataset
 4. Create Dataset
 ```bash

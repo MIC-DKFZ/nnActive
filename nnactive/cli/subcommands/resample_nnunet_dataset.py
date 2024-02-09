@@ -4,6 +4,7 @@ from argparse import Namespace
 from nnactive.cli.registry import register_subcommand
 from nnactive.data.resampling import resample_dataset
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
+from nnactive.utils.io import load_json, save_json
 
 
 @register_subcommand(
@@ -11,15 +12,17 @@ from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_data
     [
         (("-d", "--dataset_id"), {"type": int}),
         (("-np", "--num-processes"), {"type": int, "default": 4}),
+        (("--configuration"), {"type": str, "default": "3d_fullres"}),
     ],
 )
 def main(args: Namespace) -> None:
     workers: int = args.num_processes
     dataset_id: int = args.dataset_id
-    resample_nnunet_dataset(dataset_id, workers)
+    configuration: str = args.configuration
+    resample_nnunet_dataset(dataset_id, workers, configuration)
 
 
-def resample_nnunet_dataset(dataset_id: int, workers: int):
+def resample_nnunet_dataset(dataset_id: int, workers: int, configuration: str):
     dataset_json = read_dataset_json(dataset_id)
     raw_path = get_raw_path(dataset_id)
     preprocessed_path = get_preprocessed_path(dataset_id)
@@ -44,7 +47,13 @@ def resample_nnunet_dataset(dataset_id: int, workers: int):
             gt_path=gt_path,
             preprocessed_path=preprocessed_path,
             n_workers=workers,
+            configuration=configuration,
         )
+        nnUNet_plans = load_json(preprocessed_path / "nnUNetPlans.json")
+        if any(nnUNet_plans["configurations"][configuration]["use_mask_for_norm"]):
+            dataset_json["use_mask_for_norm"] = True
+
+        save_json(dataset_json, raw_path / "dataset.json")
 
     rs_img_path = raw_path / "imagesVal_original"
     rs_gt_path = raw_path / "labelsVal_original"
@@ -68,4 +77,5 @@ def resample_nnunet_dataset(dataset_id: int, workers: int):
             gt_path=gt_path,
             preprocessed_path=preprocessed_path,
             n_workers=workers,
+            configuration=configuration,
         )

@@ -9,17 +9,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random-label", "random"]
-    dataset_id = 216
-    first_d_set = 800
-    # patch_size = []
-    query_size = 20
+    dataset_id = 27
+    first_d_set = 650
+    query_size = 15
     query_steps = 10
-    agg_stride = 8
     trainer = "nnActiveTrainer_200epochs"
     starting_budget = "random-label"
-    pre_suffix = "__patch-full_patch"
+    num_processes = 8
     train_folds = 5
-    num_processes = 4
+    patch_size = None
+    pre_suffix = "__patch-full"
     add_validation = ""
     add_uncertainty = ""
 
@@ -29,13 +28,14 @@ if __name__ == "__main__":
         uncertainties=uncertainties,
         query_size=query_size,
         trainer=trainer,
+        patch_size=patch_size,
         starting_budget=starting_budget,
         num_processes=num_processes,
         train_folds=train_folds,
         force_override=args.force_override,
-        agg_stride=agg_stride,
         pre_suffix=pre_suffix,
         add_validation=add_validation,
         add_uncertainty=add_uncertainty,
     )
+
     setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)

@@ -48,6 +48,12 @@ def get_sorted_loop_files(data_path: Path) -> list[str]:
     return loop_files
 
 
+def get_current_loop(data_path: Path) -> int:
+    loop_val = len(get_sorted_loop_files(data_path)) - 1
+    assert loop_val >= 0
+    return loop_val
+
+
 def get_loop_patches(data_path: Path, loop_val: int = None) -> list[Patch]:
     """Returns patches in one loop, if loop_val is None, the most recent loop is selected."""
     if loop_val is None:
