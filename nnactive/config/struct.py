@@ -33,7 +33,9 @@ class ActiveConfig:
         None  # how many potential queries per image are allowed
     )
     seed: int = 12345  # seed to be used for everything random in the experiment
-    num_processes: int = 4  # how many processes are used within nnU-Net TODO: this value is dependent on data and machine --> Autoconfig
+    num_processes: int = (
+        4  # how many processes are used within nnU-Net TODO: this value is dependent on data and machine --> Autoconfig
+    )
     full_folds: int = 5  # the amount of folds used in the split
     train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
@@ -42,6 +44,11 @@ class ActiveConfig:
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
     add_uncertainty: str = ""  # deprecated argument!
     add_validation: str = ""  # deprecated argument!
+    patch_overlap: float = 0  # how much overlap is allowed for patchs
+    additional_overlap: float = (
+        0.2  # how much overlap is allowed with freely annotated regions e.g. BraTS air areas only used for Random
+    )
+
     # overlap : float = 0 # percentage of allowed overlap of patch with already annotated regions TODO: introduce this variable
 
     @classmethod

@@ -5,7 +5,7 @@ import numpy as np
 from loguru import logger
 
 from nnactive.data import Patch
-from nnactive.masking import create_patch_mask_for_image, does_overlap
+from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.utils.io import load_label_map
@@ -22,10 +22,16 @@ class Random(AbstractQueryMethod):
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
         additional_label_path: Path | None = None,
+        additional_overlap: float = 0.1,
         **kwargs,
     ):
         super().__init__(
-            dataset_id, query_size, patch_size, file_ending, additional_label_path
+            dataset_id,
+            query_size,
+            patch_size,
+            file_ending,
+            additional_label_path,
+            additional_overlap,
         )
         self.trials_per_img = trials_per_img
         self.rng = np.random.default_rng(seed)
@@ -59,9 +65,18 @@ class Random(AbstractQueryMethod):
                 current_patch_list = self.annotated_patches + patches
                 img_size = label_map.shape
                 # only needed for creation of patches in first iteration
-                selected_array = [
+                selected_image_patches = [
                     patch for patch in current_patch_list if patch.file == img_name
                 ]
+
+                additional_label = None
+                if self.additional_label_path is not None:
+                    additional_label = load_label_map(
+                        img_name.replace(self.file_ending, ""),
+                        self.additional_label_path,
+                        self.file_ending,
+                    )
+                    additional_label: np.ndarray = additional_label != 255
 
                 num_tries = 0
                 while True:
@@ -77,12 +92,21 @@ class Random(AbstractQueryMethod):
                     )
 
                     # check if patch is valid
-                    if not does_overlap(patch, selected_array):
-                        patches.append(patch)
-                        # print(f"Creating Patch with iteration: {num_tries}")
-                        labeled = True
-                        logger.info(f"{num_tries=}")
-                        break
+                    if self.check_overlap(patch, selected_image_patches):
+                        if additional_label is None:
+                            patches.append(patch)
+                            # print(f"Creating Patch with iteration: {num_tries}")
+                            labeled = True
+                            break
+                        else:
+                            if (
+                                percentage_overlap_array(patch, additional_label)
+                                <= self.additional_overlap
+                            ):
+                                patches.append(patch)
+                                # print(f"Creating Patch with iteration: {num_tries}")
+                                labeled = True
+                                break
 
                     # if no new patch could fit inside of img do not consider again
                     if num_tries == self.trials_per_img:

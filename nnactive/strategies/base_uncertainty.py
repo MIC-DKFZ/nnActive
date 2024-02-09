@@ -4,7 +4,7 @@ import os
 import shutil
 import traceback
 from abc import abstractmethod
-from typing import Dict, Iterable, Union
+from typing import Callable, Dict, Iterable, Union
 
 import numpy as np
 import psutil
@@ -190,7 +190,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             )
 
             # Check if coordinated overlap with already queried region
-            if not does_overlap(patch, annotated_patches):
+            if self.check_overlap(patch, annotated_patches):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -433,7 +433,10 @@ def select_top_n_non_overlapping_patches(
     n: int,
     uncertainty_scores: np.ndarray,
     patch_size: tuple[int, int, int],
-    selected_array: list[Patch],
+    annotated_patches: list[Patch],
+    overlap_test: Callable[[Patch, list[Patch]], bool] = lambda x, y: not does_overlap(
+        x, y
+    ),
 ) -> list[dict]:
     """
     Get the most n uncertain non-overlapping patches for one image based on the aggregated uncertainty map
@@ -444,6 +447,7 @@ def select_top_n_non_overlapping_patches(
         uncertainty_scores (np.ndarray): the aggregated uncertainty map
         patch_size (np.ndarray): patch size that was used to aggregate the uncertainties
         selected_array (np.ndarray): array with already labeled patches
+        overlap_test: Callable[[Patch, list[Patch]], bool]: returns True if overlap is allowed
 
     Returns:
         list[dict]: the most n uncertain non-overlapping patches for one image
@@ -466,7 +470,7 @@ def select_top_n_non_overlapping_patches(
             coords=coords,
             size=patch_size,
         )
-        if not does_overlap(patch, selected_array):
+        if overlap_test(patch, annotated_patches):
             # If it is a non-overlapping region, append this patch to be queried
             selected_patches.append(
                 {
@@ -478,7 +482,7 @@ def select_top_n_non_overlapping_patches(
             )
             # selected += 1
             # Mark region as queried
-            selected_array.append(patch)
+            annotated_patches.append(patch)
         # Stop if we reach the maximum number of patches to be queried
         if n is not None and len(selected_patches) >= n:
             break

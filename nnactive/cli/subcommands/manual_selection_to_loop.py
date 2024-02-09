@@ -237,6 +237,7 @@ def get_file_patch_list(
             slices.append(slice(start_index, start_index + size))
 
         # check if patch overlaps with previous patches
+        # TODO: allow possibility for overlap here for manual annotation
         if not does_overlap(patch_seg, slices):
             patch_seg[tuple(slices)] = 1
         else:
