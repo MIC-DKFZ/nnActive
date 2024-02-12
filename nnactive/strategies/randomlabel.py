@@ -68,12 +68,17 @@ class RandomLabel(Random):
             dataset_json = read_dataset_json(annotated_id)
             self.background_cls = dataset_json["labels"].get("background")
 
-    def query(self, verbose: bool = False) -> List[Patch]:
+    def query(
+        self, verbose: bool = False, already_annotated_patches=None
+    ) -> List[Patch]:
         logger.info(self.img_names)
         img_generator = _get_infinte_iter(self.img_names)
         labeled_patches = self.annotated_patches
-        patches = []
-        for i in range(self.query_size):
+        if already_annotated_patches is None:
+            patches = []
+        else:
+            patches = already_annotated_patches
+        for i in range(self.query_size - len(patches)):
             if verbose:
                 logger.debug("-" * 8)
                 logger.debug("-" * 8)

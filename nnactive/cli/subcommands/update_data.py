@@ -41,6 +41,14 @@ from nnactive.update_data import update_data
                 "help": "Does not require internal State.",
             },
         ),
+        (
+            "--not_ensure_classes_in_folds",
+            {
+                "action": "store_false",
+                "help": "Do not check if all classes are represented in each fold."
+                "Normally, you do not want to specify this.",
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
@@ -56,6 +64,7 @@ def main(args: Namespace) -> None:
         annotated=annotated,
         force=force,
         no_state=no_state,
+        ensure_classes_in_folds=not args.not_ensure_classes_in_folds,
     )
 
 
@@ -66,6 +75,7 @@ def update_step(
     annotated: bool = True,
     force: bool = False,
     no_state: bool = False,
+    ensure_classes_in_folds: bool = True,
 ):
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
@@ -87,6 +97,13 @@ def update_step(
     if not no_state:
         state = State.get_id_state(dataset_id, verify=not force)
 
+    if ensure_classes_in_folds:
+        ensure_classes = [
+            val for key, val in dataset_json["labels"].items() if key != "ignore"
+        ]
+    else:
+        ensure_classes = None
+
     update_data(
         data_path,
         save_splits_file,
@@ -98,6 +115,7 @@ def update_step(
         num_folds=num_folds,
         annotated=annotated,
         additional_label_path=additional_label_path,
+        ensure_classes=ensure_classes,
     )
 
     if not force and not no_state:
