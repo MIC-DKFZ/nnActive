@@ -24,6 +24,7 @@ def query_starting_budget_all_classes(
     trials_per_img: int = 600,
     verbose: bool = False,
     num_per_label: int = 2,
+    additional_label_path: Path | None = None,
 ) -> list[Patch]:
     dataset_json = read_dataset_json(annotated_id)
     label_dict_dataset_json = dataset_json["labels"]
@@ -153,6 +154,7 @@ class RandomLabelAllClasses(RandomLabel):
             patch_size=self.patch_size,
             rng=self.rng,
             trials_per_img=self.trials_per_img,
+            additional_label_path=self.additional_label_path,
             verbose=verbose,
         )
         return super().query(verbose, selected_patches)
@@ -195,6 +197,7 @@ class RandomAllClasses(Random):
             patch_size=self.patch_size,
             rng=self.rng,
             trials_per_img=self.trials_per_img,
+            additional_label_path=self.additional_label_path,
             verbose=verbose,
         )
         return super().query(verbose, selected_patches)
