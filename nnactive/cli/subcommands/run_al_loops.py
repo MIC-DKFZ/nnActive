@@ -71,7 +71,7 @@ def main(args: Namespace) -> None:
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(dataset_id, monitor=monitor)
+                train_nnUNet_ensemble(dataset_id)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
