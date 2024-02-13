@@ -8,6 +8,7 @@ from nnunetv2.run.run_training import run_training
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
+from nnactive.logger import monitor
 from nnactive.results.state import State
 
 
@@ -52,6 +53,7 @@ def train_nnUNet_ensemble(dataset_id: int, force: bool = False):
             fold,
             trainer_class_name=config.trainer,
             device=device,
+            logger=monitor.get_logger(),
         )
         # ex_command = f"nnUNetv2_train {dataset_id} {config.model_config} {fold} -tr {config.trainer}"
         # print(ex_command)
