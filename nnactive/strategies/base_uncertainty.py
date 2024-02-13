@@ -26,6 +26,7 @@ from tqdm import tqdm
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
+from nnactive.logger import monitor
 from nnactive.masking import does_overlap, mark_selected
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
@@ -112,30 +113,33 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             image_shape (Iterable[int]): shape of image
             label_file (str): name of label file
         """
-        with torch.no_grad():
-            logger.info("Compute uncertaintes...")
-            uncertainty = self.get_uncertainty(num_folds)
+        with monitor.timer("query_from_probs"):
+            with torch.no_grad():
+                logger.info("Compute uncertaintes...")
+                uncertainty = self.get_uncertainty(num_folds)
 
-            if torch.any(torch.isnan(uncertainty)):
-                # unc_num_nan = torch.sum(torch.isnan(uncertainty))
-                # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
-                raise ValueError(f" NAN values in uncertainties for image {label_file}")
-            logger.info("Aggregate uncertainties...")
-            agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
+                if torch.any(torch.isnan(uncertainty)):
+                    # unc_num_nan = torch.sum(torch.isnan(uncertainty))
+                    # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
+                    raise ValueError(
+                        f" NAN values in uncertainties for image {label_file}"
+                    )
+                logger.info("Aggregate uncertainties...")
+                agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
-        logger.info("Initialize selected array...")
-        annotated_patches = [patch for patch in self.annotated_patches]
+            logger.info("Initialize selected array...")
+            annotated_patches = [patch for patch in self.annotated_patches]
 
-        logger.info("Select patches...")
-        selected_patches = self.select_top_n_non_overlapping_patches(
-            patch_size=kernel_size,
-            aggregated=agg_uncertainty,
-            annotated_patches=annotated_patches,
-            label_file=label_file,
-            n=self.n_patch_per_image,
-        )
-        logger.info("Finished patch selection.")
-        self.top_patches += selected_patches
+            logger.info("Select patches...")
+            selected_patches = self.select_top_n_non_overlapping_patches(
+                patch_size=kernel_size,
+                aggregated=agg_uncertainty,
+                annotated_patches=annotated_patches,
+                label_file=label_file,
+                n=self.n_patch_per_image,
+            )
+            logger.info("Finished patch selection.")
+            self.top_patches += selected_patches
 
     @abstractmethod
     def get_uncertainty(self, num_folds: int) -> torch.Tensor:
@@ -212,19 +216,20 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         return selected_patches
 
     def compose_query_of_patches(self):
-        sorted_top_patches = sorted(
-            self.top_patches, key=lambda d: d["score"], reverse=True
-        )[: self.query_size]
-        patches = [
-            {
-                "file": patch["file"],
-                "coords": patch["coords"],
-                "size": patch["size"],
-            }
-            for patch in sorted_top_patches
-        ]
-        patches = [Patch(**patch) for patch in patches]
-        return patches
+        with monitor.timer("compose_query_of_patches"):
+            sorted_top_patches = sorted(
+                self.top_patches, key=lambda d: d["score"], reverse=True
+            )[: self.query_size]
+            patches = [
+                {
+                    "file": patch["file"],
+                    "coords": patch["coords"],
+                    "size": patch["size"],
+                }
+                for patch in sorted_top_patches
+            ]
+            patches = [Patch(**patch) for patch in patches]
+            return patches
 
 
 class nnActivePredictor(nnUNetPredictor):
@@ -351,7 +356,9 @@ class nnActivePredictor(nnUNetPredictor):
         """
         # set up multiprocessing for spawning
 
-        for preprocessed in data_iterator:
+        for preprocessed in monitor.itertimer(
+            data_iterator, name="predict_from_data_iterator"
+        ):
             # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
             # if os.path.basename(preprocessed["ofile"]) != "case_00223":
             #     continue
