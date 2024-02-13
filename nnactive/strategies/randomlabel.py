@@ -69,7 +69,7 @@ class RandomLabel(Random):
             self.background_cls = dataset_json["labels"].get("background")
 
     def query(
-        self, verbose: bool = False, already_annotated_patches=None
+        self, verbose: bool = False, already_annotated_patches: list[Patch] = None
     ) -> List[Patch]:
         logger.info(self.img_names)
         img_generator = _get_infinte_iter(self.img_names)

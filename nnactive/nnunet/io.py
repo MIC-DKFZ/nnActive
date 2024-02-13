@@ -12,6 +12,7 @@ def generate_custom_splits_file(
     loop_count: Optional[int] = None,
     num_folds: int = 5,
     ensure_all_classes: bool = True,
+    verify: bool = False,
 ):
     """Generates a custom split file in NNUNET_PREPROCESSED folder which only has labeled data.
 
@@ -29,6 +30,9 @@ def generate_custom_splits_file(
         dataset_json = read_dataset_json(dataset_id)
         file_ending = dataset_json["file_ending"]
         dataset_classes = dataset_json["labels"]
+        for label in dataset_classes:
+            if isinstance(dataset_classes[label], (list, tuple)):
+                dataset_classes[label] = dataset_classes[label][0]
         ensure_classes = [
             val for key, val in dataset_classes.items() if key != "ignore"
         ]
@@ -43,6 +47,7 @@ def generate_custom_splits_file(
         ensure_classes=ensure_classes,
         labels_path=labels_path,
         file_ending=file_ending,
+        verify=verify,
     )
 
     # Create path if not exists

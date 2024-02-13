@@ -1,9 +1,12 @@
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
-from medpy.io import load
+from loguru import logger
 
 from nnactive.data import Patch
+from nnactive.utils.io import load_label_map
+from nnactive.utils.pyutils import invert_dict
 
 
 def kfold_cv(
@@ -22,9 +25,17 @@ def kfold_cv(
     folds = [[] for _ in range(k)]
     rand_np_state = np.random.RandomState(random_seed)
 
-    if label_dict is not None:
-        # in this case we want to make sure that each label is present in at least two folds
-        for label, images in label_dict.items():
+    label_dict_use = deepcopy(label_dict)
+
+    if label_dict_use is not None:
+        # in this case we want to make sure that each label is present in at least two folds and folds are filled equally
+        # this functionality is test in manual_test/label_in_split_check.py
+        while len(label_dict_use) > 0:
+            label_use = [(key, len(v)) for key, v in label_dict_use.items()]
+            label_use.sort(key=lambda x: x[1])
+
+            label = label_use[0][0]
+            images = label_dict_use.pop(label)
             if len(images) < 2 and label != -1:
                 raise ValueError(
                     f"Label {label} has less than 2 images. Cannot ensure that all train folds contain all classes."
@@ -32,11 +43,23 @@ def kfold_cv(
             if label == -1:
                 continue
             rand_np_state.shuffle(images)
-            # We need to add label here because otherwise the random seed would be the same for all classes
-            rng = np.random.default_rng(seed=random_seed + label)
-            folds_for_class = rng.choice(k, 2, replace=False)
+
+            # assure that folds are equally filled with data for low label regime.
+            fold_lens = np.array([len(fold) for fold in folds])
+            fold_choice = fold_lens == (fold_lens.max() - 1)
+            fold_choice = np.arange(k)[fold_choice]
+            if len(fold_choice) <= 1:
+                fold_choice = np.arange(k)
+            folds_for_class = rand_np_state.choice(fold_choice, 2, replace=False)
             for fold_for_class in folds_for_class:
-                folds[fold_for_class].append(images.pop())
+                fold_class_image = images.pop()
+                labeled_images.remove(fold_class_image)
+                for label in label_dict_use:
+                    if fold_class_image in label_dict_use[label]:
+                        label_dict_use[label].remove(fold_class_image)
+
+                folds[fold_for_class].append(fold_class_image)
+
     rand_np_state.shuffle(labeled_images)
 
     i = 0
@@ -78,6 +101,7 @@ def kfold_cv_from_patches(
     ensure_classes: list[int] = None,
     labels_path: Path = None,
     file_ending: str = None,
+    verify: bool = False,
 ) -> list[dict[str, list[str]]]:
     """Create K Fold CV splits with patches as inputs
 
@@ -99,9 +123,9 @@ def kfold_cv_from_patches(
     ):
         label_dict = {}
         for labeled_image in labeled_images:
-            label_path = labels_path / f"{labeled_image}{file_ending}"
-            label_map, _ = load(str(label_path))
+            label_map = load_label_map(labeled_image, labels_path, file_ending)
             unique_labels = set(np.unique(label_map))
+            logger.info(f"Unique labels for image {labeled_image}: {unique_labels}")
             for label in unique_labels:
                 if label not in ensure_classes:
                     continue
@@ -109,6 +133,9 @@ def kfold_cv_from_patches(
                     label_dict[label] = [labeled_image]
                 else:
                     label_dict[label].append(labeled_image)
+
+        if verify:
+            logger.debug(label_dict)
 
         assert sorted(ensure_classes) == sorted(
             list(label_dict.keys())
@@ -120,4 +147,25 @@ def kfold_cv_from_patches(
     splits_final = kfold_cv(
         num_folds, labeled_images, random_seed, label_dict=label_dict
     )
+
+    if label_dict is not None and verify:
+        image_label_dict = invert_dict(label_dict)
+
+        # counts in many folds each label appears.
+        occurences = {key: 0 for key in label_dict}
+
+        for split in splits_final:
+            fold = split["val"]
+            labels_fold = []
+            for file in fold:
+                labels_fold += image_label_dict[file]
+            labels_fold: list = np.unique(labels_fold).tolist()
+            for l in labels_fold:
+                occurences[l] += 1
+
+        for l in occurences:
+            logger.debug(f"Label {l} occurs in {occurences[l]} folds")
+            if occurences[l] < 2:
+                raise RuntimeError(f"Label {l} does not occur in less than two folds.")
+
     return splits_final
