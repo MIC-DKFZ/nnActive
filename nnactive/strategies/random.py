@@ -47,11 +47,16 @@ class Random(AbstractQueryMethod):
         ]
         self.rng.shuffle(self.img_names)
 
-    def query(self, verbose: bool = False) -> list[Patch]:
+    def query(
+        self, verbose: bool = False, already_annotated_patches=None
+    ) -> list[Patch]:
         img_generator = _get_infinte_iter(self.img_names)
-        patches = []
+        if already_annotated_patches is None:
+            patches = []
+        else:
+            patches = already_annotated_patches
         logger.info("verbose", verbose)
-        for _ in range(self.query_size):
+        for _ in range(self.query_size - len(patches)):
             labeled = False
             while True:
                 img_name = img_generator.__next__()

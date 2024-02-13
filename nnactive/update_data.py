@@ -1,6 +1,7 @@
 import json
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import List
 
 from loguru import logger
 
@@ -20,6 +21,7 @@ def update_data(
     num_folds: int = 5,
     annotated: bool = True,
     additional_label_path: Path | None = None,
+    ensure_classes: List[int] = None,
 ):
     """Update Dataset Raw with a novel splits_file in Preprocessed
 
@@ -36,6 +38,8 @@ def update_data(
         target_dir (Path): path to labels to be updated
         loop_val (int, optional): which loop val to use. Defaults to None.
         additional_label_path (Path, optional): path to files with labels to be added to labelsTr. Defaults to None
+        ensure_classes (List[int], optional): classes that should be in each training split.
+                                    Defaults to None, meaning it is not controlled which classes are in which split.
     """
     all_patches = get_patches_from_loop_files(data_path, loop_val)
     if annotated:
@@ -62,7 +66,16 @@ def update_data(
             save_splits_file, len(all_patches)
         )
     )
-    splits_final = kfold_cv_from_patches(num_folds, all_patches)
+    if ensure_classes is None:
+        splits_final = kfold_cv_from_patches(num_folds, all_patches)
+    else:
+        splits_final = kfold_cv_from_patches(
+            num_folds,
+            all_patches,
+            ensure_classes=ensure_classes,
+            labels_path=target_dir,
+            file_ending=file_ending,
+        )
 
     with open(save_splits_file, "w") as file:
         json.dump(splits_final, file, indent=4)

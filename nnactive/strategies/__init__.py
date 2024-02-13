@@ -8,6 +8,10 @@ from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PredictiveEntropy
 from nnactive.strategies.random import Random
 from nnactive.strategies.randomlabel import RandomLabel
+from nnactive.strategies.randomlabel_all_classes import (
+    RandomAllClasses,
+    RandomLabelAllClasses,
+)
 
 
 def get_strategy(strategy_name: str, dataset_id: int, **kwargs) -> AbstractQueryMethod:
@@ -48,4 +52,6 @@ strategydict = {
     "exp_entropy": ExpectedEntropy,
     "random": Random,
     "random-label": RandomLabel,
+    "random-all-classes": RandomAllClasses,
+    "random-label-all-classes": RandomLabelAllClasses,
 }
