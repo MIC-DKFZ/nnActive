@@ -6,6 +6,7 @@ from typing import Any, Generator, Iterable, TypeVar
 
 from loguru import logger
 from nnunetv2.training.logging.nnunet_logger import nnUNetLogger
+from wandb.errors import CommError
 
 import wandb
 
@@ -44,7 +45,11 @@ class nnActiveMonitor:
         if self._wandb_active:
             wandb.finish()
 
-        wandb.init(project=project, name=name, config=config)
+        try:
+            wandb.init(project=project, name=name, config=config)
+        except CommError:
+            wandb.init(project=project, name=name, config=config, mode="offline")
+
         self._wandb_active = True
 
         def _inner():
