@@ -7,7 +7,7 @@ from loguru import logger
 from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_to_id
 
 from nnactive.data import Patch
-from nnactive.masking import does_overlap
+from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import read_dataset_json
 from nnactive.strategies.random import Random
 from nnactive.strategies.randomlabel import RandomLabel, _obtain_random_patch_from_locs
@@ -25,6 +25,7 @@ def query_starting_budget_all_classes(
     verbose: bool = False,
     num_per_label: int = 2,
     additional_label_path: Path | None = None,
+    additional_overlap: float = 0.8,
 ) -> list[Patch]:
     dataset_json = read_dataset_json(annotated_id)
     label_dict_dataset_json = dataset_json["labels"]
@@ -65,6 +66,15 @@ def query_starting_budget_all_classes(
         for sample in samples:
             labeled = False
             num_tries = 0
+            additional_label = None
+            if additional_label_path is not None:
+                additional_label = load_label_map(
+                    sample,
+                    additional_label_path,
+                    file_ending,
+                )
+                additional_label: np.ndarray = additional_label != 255
+
             while not labeled:
                 if verbose:
                     logger.debug(f"Loading Image: {sample} for label {label}")
@@ -87,19 +97,29 @@ def query_starting_budget_all_classes(
                     size=iter_patch_size,
                 )
                 # check if patch is valid
-                # TODO: Add here check for BraTS that no free labels are queried for background!
                 if not does_overlap(patch, selected_patches_image):
-                    for label_rm in label_dict_files:
-                        if sample in label_dict_files[label_rm]:
-                            label_dict_files[label_rm].remove(sample)
-                    # only temporary for patchsize = 1
-                    labeled_val = label_map[patch.coords]
-                    logger.debug(
-                        f"Annotated Patch {patch} for Label {label_dict_dataset_json[label]} and it consists of label {labeled_val}"
-                    )
-                    patches.append(patch)
-                    labeled = True
-                    label_per_class_counter += 1
+                    if additional_label is not None:
+                        if (
+                            percentage_overlap_array(patch, additional_label)
+                            <= additional_overlap
+                        ):
+                            patches.append(patch)
+                            # print(f"Creating Patch with iteration: {num_tries}")
+                            labeled = True
+                            label_per_class_counter += 1
+
+                    else:
+                        for label_rm in label_dict_files:
+                            if sample in label_dict_files[label_rm]:
+                                label_dict_files[label_rm].remove(sample)
+                        # only temporary for patchsize = 1
+                        labeled_val = label_map[patch.coords]
+                        logger.debug(
+                            f"Annotated Patch {patch} for Label {label_dict_dataset_json[label]} and it consists of label {labeled_val}"
+                        )
+                        patches.append(patch)
+                        labeled = True
+                        label_per_class_counter += 1
 
                 # if no new patch could fit inside of img do not consider again
                 if num_tries == trials_per_img:
@@ -127,6 +147,7 @@ class RandomLabelAllClasses(RandomLabel):
         raw_labels_path: Path | None = None,
         background_cls: int | None = None,
         additional_label_path: Path | None = None,
+        additional_overlap: float = 0.1,
         **kwargs,
     ):
         super().__init__(
@@ -139,6 +160,7 @@ class RandomLabelAllClasses(RandomLabel):
             raw_labels_path,
             background_cls,
             additional_label_path,
+            additional_overlap,
             **kwargs,
         )
         random.seed(seed)
@@ -155,6 +177,7 @@ class RandomLabelAllClasses(RandomLabel):
             rng=self.rng,
             trials_per_img=self.trials_per_img,
             additional_label_path=self.additional_label_path,
+            additional_overlap=self.additional_overlap,
             verbose=verbose,
         )
         return super().query(verbose, selected_patches)
@@ -171,6 +194,7 @@ class RandomAllClasses(Random):
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
         additional_label_path: Path | None = None,
+        additional_overlap: float = 0.1,
         **kwargs,
     ):
         super().__init__(
@@ -182,6 +206,7 @@ class RandomAllClasses(Random):
             file_ending,
             raw_labels_path,
             additional_label_path,
+            additional_overlap,
             **kwargs,
         )
         random.seed(seed)
@@ -198,6 +223,7 @@ class RandomAllClasses(Random):
             rng=self.rng,
             trials_per_img=self.trials_per_img,
             additional_label_path=self.additional_label_path,
+            additional_overlap=self.additional_overlap,
             verbose=verbose,
         )
         return super().query(verbose, selected_patches)

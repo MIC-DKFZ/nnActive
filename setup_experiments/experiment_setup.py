@@ -6,6 +6,9 @@ from itertools import product
 from pathlib import Path
 from typing import Union
 
+from nnactive.cli.subcommands.convert_to_partannotated import (
+    convert_dataset_to_partannotated,
+)
 from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import get_patch_size
 from nnactive.results.state import State
@@ -122,16 +125,22 @@ class DatasetSetup:
 
     def convert_dset(self, dataset_id: int, seed: int, uncertainty: str):
         print("Converting Dataset")
-        ex_command = "nnactive convert"
+
         past_suffix = f"__unc-{uncertainty}__seed-{seed}"
         name_suffix = self.pre_suffix + past_suffix
-        # DO all of this based on dictionaries!
-        patch_call = str(self.patch_size)
-        for rm in ["(", ")", "[", "]", ","]:
-            patch_call = patch_call.replace(rm, "")
-        ex_call = f"{ex_command} -d {self.base_id} -o {dataset_id} --strategy {self.starting_budget} --seed {seed} --num-patches {self.query_size} --name-suffix {name_suffix} --patch-size {patch_call}"
-        print(ex_call)
-        subprocess.run(ex_call, shell=True, check=True)
+
+        convert_dataset_to_partannotated(
+            self.base_id,
+            dataset_id,
+            0,
+            self.query_size,
+            self.patch_size,
+            name_suffix,
+            {},
+            self.starting_budget,
+            seed,
+            self.additional_overlap,
+        )
 
     def prepare_dset(self, datset_id: int):
         subprocess.run(

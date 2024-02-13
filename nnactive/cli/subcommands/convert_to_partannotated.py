@@ -45,6 +45,7 @@ def convert_dataset_to_partannotated(
     patch_kwargs: Optional[dict] = None,
     strategy: str = "random",
     seed: int = 12345,
+    additional_overlap: float = 0.6,
     force: bool = False,
 ):
     """
@@ -143,6 +144,7 @@ def convert_dataset_to_partannotated(
             background_cls=background_cls,
             dataset_id=target_id,
             additional_label_path=additional_label_path,
+            additional_overlap=additional_overlap,
         )
 
         # Create labels from patches
@@ -173,6 +175,7 @@ def get_patches_for_partannotation(
     seed: int = 12345,
     background_cls: Union[int, None] = None,
     additional_label_path: Union[Path, None] = None,
+    additional_overlap: float = 0.5,
 ) -> list[Patch]:
     """Creates patches based on annotation strategies.
 
@@ -219,6 +222,7 @@ def get_patches_for_partannotation(
         background_cls=background_cls,
         raw_labels_path=base_labelsTr_dir,
         additional_label_path=additional_label_path,
+        additional_overlap=additional_overlap,
         n_patch_per_image=1,  # this value does not affect Random Queries
     )
     logger.info("Finished Initialization")
@@ -295,6 +299,14 @@ def get_patches_for_partannotation(
             },
         ),
         (
+            "--additional_overlap",
+            {
+                "type": float,
+                "default": 0.4,
+                "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
+            },
+        ),
+        (
             "--name-suffix",
             {
                 "type": str,
@@ -322,6 +334,7 @@ def main(args: Namespace) -> None:
     id_offset = args.offset
     seed = args.seed
     name_suffx = args.name_suffix
+    additional_overlap = args.additional_overlap
     force = args.force
 
     if args.patch_size is not None:
@@ -348,6 +361,7 @@ def main(args: Namespace) -> None:
         num_patches=num_patches,
         seed=seed,
         strategy=strategy,
+        additional_overlap=additional_overlap,
         force=force,
     )
     generate_custom_splits_file(target_id, 0, 5)
