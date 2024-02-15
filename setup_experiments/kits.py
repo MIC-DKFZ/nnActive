@@ -6,6 +6,7 @@ parser = ArgumentParser()
 parser = DatasetSetup.add_args(parser)
 
 if __name__ == "__main__":
+    # Ready for initial run!
     args = parser.parse_args()
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random-label", "random"]
@@ -15,10 +16,12 @@ if __name__ == "__main__":
     query_size = 10
     query_steps = 10
     trainer = "nnActiveTrainer_200epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     pre_suffix = "__patch-full_patch"
     train_folds = 5
+    patch_size = [64, 64, 64]
     num_processes = 4
+    agg_stride = 8
     add_validation = ""
     add_uncertainty = ""
 
@@ -31,6 +34,8 @@ if __name__ == "__main__":
         starting_budget=starting_budget,
         num_processes=num_processes,
         train_folds=train_folds,
+        patch_size=patch_size,
+        agg_stride=agg_stride,
         force_override=args.force_override,
         pre_suffix=pre_suffix,
         add_validation=add_validation,

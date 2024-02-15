@@ -13,10 +13,10 @@ if __name__ == "__main__":
     # uncertainties = ["pred_entropy"]
     dataset_id = 137
     first_d_set = 750
-    query_size = 50
-    query_steps = 20
+    query_size = 20
+    query_steps = 10
     trainer = "nnActiveTrainer_200epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     num_processes = 8
     train_folds = 5
     patch_size = [20, 20, 20]

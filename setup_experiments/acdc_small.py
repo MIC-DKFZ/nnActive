@@ -14,7 +14,7 @@ if __name__ == "__main__":
     query_size = 25
     query_steps = 5
     trainer = "nnActiveTrainer_5epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     num_processes = 8
     train_folds = 5
     patch_size = None

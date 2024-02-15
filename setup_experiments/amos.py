@@ -6,17 +6,17 @@ parser = ArgumentParser()
 parser = DatasetSetup.add_args(parser)
 
 if __name__ == "__main__":
+    # Ready for initial run!
     args = parser.parse_args()
     seeds = [12345, 12346, 12347]
     uncertainties = ["pred_entropy", "mutual_information", "random-label", "random"]
     dataset_id = 216
     first_d_set = 800
-    # patch_size = []
-    query_size = 20
+    query_size = 32
     query_steps = 10
     agg_stride = 8
     trainer = "nnActiveTrainer_200epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     pre_suffix = "__patch-full_patch"
     train_folds = 5
     num_processes = 4

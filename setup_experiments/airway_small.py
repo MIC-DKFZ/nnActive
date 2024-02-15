@@ -17,7 +17,7 @@ if __name__ == "__main__":
     trainer = "nnActiveTrainer_airway_5epochs"
     num_processes = 4
     train_folds = 1
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     agg_stride = 8
 
     pre_suffix = f"__patch-std_patch__sb-{starting_budget}"

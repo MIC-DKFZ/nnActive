@@ -14,10 +14,10 @@ if __name__ == "__main__":
     query_size = 15
     query_steps = 10
     trainer = "nnActiveTrainer_200epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     num_processes = 8
+    patch_size = [4, 40, 40]
     train_folds = 5
-    patch_size = None
     pre_suffix = "__patch-full"
     add_validation = ""
     add_uncertainty = ""

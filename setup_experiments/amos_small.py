@@ -18,7 +18,7 @@ if __name__ == "__main__":
     query_steps = 3
     agg_stride = 8
     trainer = "nnActiveTrainer_5epochs"
-    starting_budget = "random-label"
+    starting_budget = "random-label-all-classes"
     num_processes = 4
     train_folds = 5
 

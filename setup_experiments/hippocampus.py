@@ -25,7 +25,7 @@ if __name__ == "__main__":
     query_size = 5
     query_steps = 20
     trainer = "nnActiveTrainer_5epochs"
-    starting_budget = "random"
+    starting_budget = "random-label-all-classes"
     num_processes = 10
     train_folds = 5
     pre_suffix = "__patch-full_patch"
