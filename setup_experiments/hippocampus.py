@@ -43,7 +43,7 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
+    # setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
 
     # Experiments with smaller Patch Size
     first_d_set = first_d_set + len(setter.vals)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         force_override=args.force_override,
         pre_suffix=pre_suffix,
     )
-    setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
+    # setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)
 
     # Experiments with smaller Patch Size & bigger Query Size
 
