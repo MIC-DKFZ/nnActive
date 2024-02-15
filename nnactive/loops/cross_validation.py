@@ -46,11 +46,17 @@ def kfold_cv(
 
             # assure that folds are equally filled with data for low label regime.
             fold_lens = np.array([len(fold) for fold in folds])
-            fold_choice = fold_lens == (fold_lens.max() - 1)
-            fold_choice = np.arange(k)[fold_choice]
-            if len(fold_choice) <= 1:
-                fold_choice = np.arange(k)
-            folds_for_class = rand_np_state.choice(fold_choice, 2, replace=False)
+            fold_valid = fold_lens == fold_lens.max()
+            if fold_valid.sum() <= 1:
+                fold_choice = np.arange(k)[~fold_valid]
+                folds_for_class = np.concatenate(
+                    np.arange(k)[fold_valid],
+                    rand_np_state.choice(fold_choice, 1, replace=False),
+                )
+            else:
+                fold_choice = np.arange(k)[fold_valid]
+                folds_for_class = rand_np_state.choice(fold_choice, 2, replace=False)
+
             for fold_for_class in folds_for_class:
                 fold_class_image = images.pop()
                 labeled_images.remove(fold_class_image)
