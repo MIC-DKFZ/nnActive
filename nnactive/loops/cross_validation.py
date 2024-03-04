@@ -46,14 +46,22 @@ def kfold_cv(
 
             # assure that folds are equally filled with data for low label regime.
             fold_lens = np.array([len(fold) for fold in folds])
-            fold_valid = fold_lens == fold_lens.max()
-            if fold_valid.sum() <= 1:
+            # folds can only be filled with value max or max-1
+            # folds that have value of max-1 are valid
+            fold_valid = fold_lens < fold_lens.max()
+            if fold_valid.sum() == 0:
+                # if all folds have value of max, then all folds are valid
+                fold_choice = np.arange(k)
+                folds_for_class = rand_np_state.choice(fold_choice, 2, replace=False)
+            elif fold_valid.sum() == 1:
+                # if only one fold is left with val max-1, then select it by default and draw rest random
                 fold_choice = np.arange(k)[~fold_valid]
                 folds_for_class = np.concatenate(
                     np.arange(k)[fold_valid],
                     rand_np_state.choice(fold_choice, 1, replace=False),
                 )
             else:
+                # if more than 1 fold is valid then draw randomly
                 fold_choice = np.arange(k)[fold_valid]
                 folds_for_class = rand_np_state.choice(fold_choice, 2, replace=False)
 
