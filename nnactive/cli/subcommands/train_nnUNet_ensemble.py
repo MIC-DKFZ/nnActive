@@ -1,5 +1,4 @@
 import os
-import subprocess
 import time
 from argparse import Namespace
 
@@ -55,9 +54,6 @@ def train_nnUNet_ensemble(dataset_id: int, force: bool = False):
             device=device,
             logger=monitor.get_logger(),
         )
-        # ex_command = f"nnUNetv2_train {dataset_id} {config.model_config} {fold} -tr {config.trainer}"
-        # print(ex_command)
-        # subprocess.run(ex_command, shell=True, check=True)
 
     if not force:
         state.training = True

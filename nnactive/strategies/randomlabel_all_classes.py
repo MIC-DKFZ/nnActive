@@ -148,6 +148,7 @@ class RandomLabelAllClasses(RandomLabel):
         background_cls: int | None = None,
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
+        verbose: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -161,6 +162,7 @@ class RandomLabelAllClasses(RandomLabel):
             background_cls,
             additional_label_path,
             additional_overlap,
+            verbose=verbose,
             **kwargs,
         )
         random.seed(seed)
@@ -195,6 +197,7 @@ class RandomAllClasses(Random):
         raw_labels_path: Path | None = None,
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
+        verbose: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -207,6 +210,7 @@ class RandomAllClasses(Random):
             raw_labels_path,
             additional_label_path,
             additional_overlap,
+            verbose=verbose,
             **kwargs,
         )
         random.seed(seed)

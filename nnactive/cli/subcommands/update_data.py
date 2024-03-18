@@ -1,5 +1,7 @@
 from argparse import Namespace
 
+from loguru import logger
+
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 from nnactive.results.state import State
@@ -44,7 +46,7 @@ from nnactive.update_data import update_data
         (
             "--not_ensure_classes_in_folds",
             {
-                "action": "store_false",
+                "action": "store_true",
                 "help": "Do not check if all classes are represented in each fold."
                 "Normally, you do not want to specify this.",
             },
@@ -57,6 +59,7 @@ def main(args: Namespace) -> None:
     force: bool = args.force
     no_state: bool = args.no_state
     annotated: bool = args.annotated
+    ensure_classes_in_folds: bool = not args.not_ensure_classes_in_folds
 
     update_step(
         dataset_id,
@@ -64,7 +67,7 @@ def main(args: Namespace) -> None:
         annotated=annotated,
         force=force,
         no_state=no_state,
-        ensure_classes_in_folds=not args.not_ensure_classes_in_folds,
+        ensure_classes_in_folds=ensure_classes_in_folds,
     )
 
 
@@ -98,10 +101,20 @@ def update_step(
         state = State.get_id_state(dataset_id, verify=not force)
 
     if ensure_classes_in_folds:
+        logger.info("Ensure every class in all train folds.")
+        file_ending = dataset_json["file_ending"]
+        dataset_classes = dataset_json["labels"]
+        for label in dataset_classes:
+            if isinstance(dataset_classes[label], (list, tuple)):
+                dataset_classes[label] = dataset_classes[label][0]
         ensure_classes = [
-            val for key, val in dataset_json["labels"].items() if key != "ignore"
+            val for key, val in dataset_classes.items() if key != "ignore"
         ]
+
     else:
+        logger.info(
+            "Standard splits creation. Possibly not every class in all train folds."
+        )
         ensure_classes = None
 
     update_data(

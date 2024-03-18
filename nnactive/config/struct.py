@@ -46,10 +46,8 @@ class ActiveConfig:
     add_validation: str = ""  # deprecated argument!
     patch_overlap: float = 0  # how much overlap is allowed for patchs
     additional_overlap: float = (
-        0.4  # how much overlap is allowed with freely annotated regions e.g. BraTS air areas only used for Random
+        0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
     )
-
-    # overlap : float = 0 # percentage of allowed overlap of patch with already annotated regions TODO: introduce this variable
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:

@@ -88,16 +88,17 @@ def mark_already_annotated_patches(
     return selected_array
 
 
-def percentage_overlap_array(ipatch: Patch, selected_array: np.ndarray) -> bool:
+def percentage_overlap_array(ipatch: Patch, selected_array: np.ndarray) -> float:
     """
-    Check if a patch overlaps with an already annotated region
+    Compute overlap in percent of ipatch with areas being 1 in selected array
+
     Args:
         start_indices (Tuple[str]): start indices of the patch
         patch_size (np.ndarray): patch size to determine end indices
-        selected_array (np.ndarray): array containing the already annotated regions
+        selected_array (np.ndarray): 0,1 array containing the already annotated regions
 
     Returns:
-        bool: True if the patch overlaps with an already annotated region, False if not
+        float: Percentage overlap
     """
     # Convert the indices to slices, makes indexing of selected_array possible without being dependent on dimensions
     slices = []

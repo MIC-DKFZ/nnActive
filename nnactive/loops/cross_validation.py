@@ -57,8 +57,10 @@ def kfold_cv(
                 # if only one fold is left with val max-1, then select it by default and draw rest random
                 fold_choice = np.arange(k)[~fold_valid]
                 folds_for_class = np.concatenate(
-                    np.arange(k)[fold_valid],
-                    rand_np_state.choice(fold_choice, 1, replace=False),
+                    [
+                        np.arange(k)[fold_valid],
+                        rand_np_state.choice(fold_choice, 1, replace=False),
+                    ]
                 )
             else:
                 # if more than 1 fold is valid then draw randomly

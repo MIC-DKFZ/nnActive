@@ -23,6 +23,7 @@ class Random(AbstractQueryMethod):
         raw_labels_path: Path | None = None,
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
+        verbose: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -32,6 +33,7 @@ class Random(AbstractQueryMethod):
             file_ending,
             additional_label_path,
             additional_overlap,
+            verbose=verbose,
         )
         self.trials_per_img = trials_per_img
         self.rng = np.random.default_rng(seed)
@@ -97,21 +99,16 @@ class Random(AbstractQueryMethod):
                     )
 
                     # check if patch is valid
-                    if self.check_overlap(patch, selected_image_patches):
-                        if additional_label is None:
-                            patches.append(patch)
-                            # print(f"Creating Patch with iteration: {num_tries}")
-                            labeled = True
-                            break
-                        else:
-                            if (
-                                percentage_overlap_array(patch, additional_label)
-                                <= self.additional_overlap
-                            ):
-                                patches.append(patch)
-                                # print(f"Creating Patch with iteration: {num_tries}")
-                                labeled = True
-                                break
+
+                    if self.check_overlap(
+                        patch, selected_image_patches, additional_label
+                    ):
+                        patches.append(patch)
+                        logger.info(
+                            f"Creating Patch in image {img_name} with iteration: {num_tries}"
+                        )
+                        labeled = True
+                        break
 
                     # if no new patch could fit inside of img do not consider again
                     if num_tries == self.trials_per_img:

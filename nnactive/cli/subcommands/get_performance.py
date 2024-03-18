@@ -1,11 +1,9 @@
 import json
 import os
-import subprocess
 from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
-import torch
 from loguru import logger
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 
@@ -126,8 +124,6 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
 
     folds = " ".join([f"{fold}" for fold in range(num_folds)])
-    ex_command = f"nnUNetv2_predict -d {dataset_id} -c {config.model_config} -i {images_path} -o {pred_path} -tr {config.trainer} -f {folds} {config.add_validation}"
-    logger.info(ex_command)
     # TODO: redo add_validation in config!
     folds = [i for i in range(num_folds)]
 
@@ -143,8 +139,6 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
     )
 
     os.makedirs(loop_results_path, exist_ok=True)
-    ex_command = f"nnUNetv2_evaluate_folder -djfile {dataset_json_path} -pfile {plans_path} -o {loop_summary_json} {labels_path} {pred_path}"
-    # subprocess.run(ex_command, shell=True, check=True)
     compute_metrics_on_folder2(
         folder_ref=str(labels_path),
         folder_pred=str(pred_path),

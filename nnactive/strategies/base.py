@@ -3,11 +3,12 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+from loguru import logger
 
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
 from nnactive.loops.loading import get_patches_from_loop_files
-from nnactive.masking import does_overlap, percentage_overlap
+from nnactive.masking import does_overlap, percentage_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.utils.patches import get_slices_for_file_from_patch
 
@@ -22,6 +23,7 @@ class AbstractQueryMethod(ABC):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         patch_overlap: float = 0,
+        verbose: bool = False,
         **kwargs,
     ):
         self.dataset_id = dataset_id
@@ -32,6 +34,7 @@ class AbstractQueryMethod(ABC):
         self.top_patches: list[dict] = []
         self.additional_overlap = additional_overlap
         self.patch_overlap = patch_overlap
+        self.verbose = verbose
 
     @abstractmethod
     def query(self, verbose=False) -> list[Patch]:
@@ -41,11 +44,37 @@ class AbstractQueryMethod(ABC):
     def annotated_patches(self) -> list[Patch]:
         return get_patches_from_loop_files(get_raw_path(self.dataset_id))
 
-    def check_overlap(self, ipatch: Patch, patches: list[Patch]) -> bool:
+    def check_overlap(
+        self,
+        ipatch: Patch,
+        patches: list[Patch],
+        additional_label: None | np.ndarray = None,
+        verbose: bool = False,
+    ) -> bool:
+        # start with checking overlap compared to other patches
+        allow_patch = False
         if self.patch_overlap > 0:
-            return percentage_overlap(ipatch, patches) <= self.patch_overlap
+            patch_overlap = percentage_overlap(ipatch, patches)
+            allow_patch = patch_overlap <= self.patch_overlap
+            if verbose and allow_patch:
+                logger.debug(
+                    f"Patch creation succesful with patch overlap: {patch_overlap} <= {self.patch_overlap} overlap with additional labels."
+                )
         else:
-            return not does_overlap(ipatch, patches)
+            allow_patch = not does_overlap(ipatch, patches)
+
+        # check overlap with additional labels
+        if additional_label is not None and allow_patch:
+            additional_overlap = percentage_overlap_array(ipatch, additional_label)
+            if additional_overlap <= self.additional_overlap:
+                if verbose:
+                    logger.debug(
+                        f"Patch creation succesful with additional labels overlap: {additional_overlap} <= {self.additional_overlap} overlap with additional labels."
+                    )
+                return True
+            else:
+                allow_patch = False
+        return allow_patch
 
     def initialize_selected_array(
         self,
@@ -77,4 +106,13 @@ class AbstractQueryMethod(ABC):
         config = ActiveConfig.get_from_id(dataset_id)
         config_kwargs = config.to_dict()
         config_kwargs.pop("seed")
-        return cls(dataset_id=dataset_id, **config_kwargs, **kwargs)
+
+        additional_label_path: Path = get_raw_path(dataset_id) / "addTr"
+        if not additional_label_path.is_dir():
+            additional_label_path = None
+        return cls(
+            dataset_id=dataset_id,
+            additional_label_path=additional_label_path,
+            **config_kwargs,
+            **kwargs,
+        )

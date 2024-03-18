@@ -2,6 +2,7 @@ from argparse import Namespace
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
+from nnactive.logger import monitor
 from nnactive.query_pool import query_pool
 
 
@@ -59,4 +60,5 @@ def main(args: Namespace):
         config.patch_size = patch_size
     if query_size is not None:
         config.query_size = query_size
-    query_pool(dataset_id, force=force, verbose=verbose)
+    with monitor.active_run(config=config.to_dict()):
+        query_pool(dataset_id, force=force, verbose=verbose)

@@ -30,6 +30,7 @@ class RandomLabel(Random):
         background_cls: int | None = None,
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
+        verbose: bool = False,
         **kwargs,
     ):
         """
@@ -54,6 +55,7 @@ class RandomLabel(Random):
             raw_labels_path,
             additional_label_path,
             additional_overlap,
+            verbose=verbose,
         )
         self.raw_labels_path = raw_labels_path
         if self.raw_labels_path is None:
@@ -163,27 +165,15 @@ class RandomLabel(Random):
                     )
 
                     # check if patch is valid
-                    if self.check_overlap(patch, selected_image_patches):
-                        if additional_label is None:
-                            if verbose:
-                                logger.debug("Patch creation succesful.")
-                            patches.append(patch)
-                            # print(f"Creating Patch with iteration: {num_tries}")
-                            labeled = True
-                            break
-                        else:
-                            if (
-                                percentage_overlap_array(patch, additional_label)
-                                <= self.additional_overlap
-                            ):
-                                if verbose:
-                                    logger.debug(
-                                        f"Patch creation succesful and less than {self.additional_overlap} overlap with additional labels."
-                                    )
-                                patches.append(patch)
-                                # print(f"Creating Patch with iteration: {num_tries}")
-                                labeled = True
-                                break
+                    if self.check_overlap(
+                        patch, selected_image_patches, additional_label, verbose
+                    ):
+                        patches.append(patch)
+                        logger.info(
+                            f"Creating Patch in image {img_name} with iteration: {num_tries}"
+                        )
+                        labeled = True
+                        break
 
                     # if no new patch could fit inside of img do not consider again
                     if num_tries == self.trials_per_img:

@@ -4,6 +4,7 @@ import os
 import shutil
 import traceback
 from abc import abstractmethod
+from pathlib import Path
 from typing import Callable, Dict, Iterable, Union
 
 import numpy as np
@@ -27,10 +28,11 @@ from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.logger import monitor
-from nnactive.masking import does_overlap, mark_selected
+from nnactive.masking import does_overlap
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.utils.io import load_label_map
 from nnactive.utils.timer import CudaTimer, Timer
 
 
@@ -47,13 +49,22 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         use_gaussian: bool = False,
         use_mirroring: bool = False,
         tile_step_size: float = 0.75,
+        additional_label_path: Path | None = None,
+        additional_overlap: float = 0.1,
         verbose: bool = False,
         **kwargs,
     ):
-        super().__init__(dataset_id, query_size, patch_size, file_ending)
+        super().__init__(
+            dataset_id,
+            query_size,
+            patch_size,
+            file_ending,
+            additional_label_path,
+            additional_overlap,
+            verbose=verbose,
+        )
         self.config = ActiveConfig.get_from_id(dataset_id)
 
-        self.verbose = verbose
         self.num_processes_preprocessing = num_processes_preprocessing
         self.n_patch_per_image = n_patch_per_image
         self.use_mirroring = use_mirroring
@@ -181,6 +192,17 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             disable=self.verbose,
         )
 
+        additional_label = None
+        if self.additional_label_path is not None:
+            if self.verbose:
+                logger.debug("Create additional label map.")
+            additional_label = load_label_map(
+                label_file,
+                self.additional_label_path,
+                self.file_ending,
+            )
+            additional_label: np.ndarray = additional_label != 255
+
         for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
             pbar1.update()
             # get coordinates in image space from aggregated indices
@@ -194,7 +216,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             )
 
             # Check if coordinated overlap with already queried region
-            if self.check_overlap(patch, annotated_patches):
+            if self.check_overlap(
+                patch, annotated_patches, additional_label, verbose=self.verbose
+            ):
                 # If it is a non-overlapping region, append this patch to be queried
                 selected_patches.append(
                     {
@@ -212,7 +236,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 break
         pbar1.close()
         pbar0.close()
-        logger.info("Selected patches")
+        logger.info(f"Finished patch selection for image {label_file}")
         return selected_patches
 
     def compose_query_of_patches(self):
