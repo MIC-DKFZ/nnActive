@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import re
 from typing import Union
 
 from loguru import logger
+from nnunetv2 import paths
 from pydantic.dataclasses import dataclass
 
 from nnactive.nnunet.utils import convert_id_to_dataset_name
-from nnactive.paths import get_nnActive_results
+from nnactive.paths import get_nnActive_results, nnActive_data
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -40,6 +43,7 @@ class ActiveConfig:
     full_folds: int = 5  # the amount of folds used in the split
     train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
+    pre_suffix: str = ""
     use_mirroring: bool = False  # use mirroring during query prediction
     use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
@@ -49,6 +53,28 @@ class ActiveConfig:
     additional_overlap: float = (
         0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
     )
+
+    # TODO: nnUNet env var setter
+    # TODO: path getters
+    def set_nnunet_env(self, override_id: int | None = None):
+        assert nnActive_data is not None
+        dataset = self.dataset
+        if override_id is not None:
+            dataset = re.sub(r"Dataset\d{3}", f"Dataset{override_id:03d}", dataset)
+
+        experiment_path = nnActive_data / (
+            dataset
+            + self.pre_suffix
+            + f"__unc-{self.uncertainty}__seed-{self.seed}"
+        )
+        os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
+        os.environ["nnUNet_preprocessed"] = str(experiment_path / "nnUNet_preprocessed")
+        os.environ["nnUNet_results"] = str(experiment_path / "nnUNet_results")
+        paths.set_paths(
+            nnUNet_raw=str(experiment_path / "nnUNet_raw"),
+            nnUNet_preprocessed=str(experiment_path / "nnUNet_preprocessed"),
+            nnUNet_results=str(experiment_path / "nnUNet_results"),
+        )
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:

@@ -1,19 +1,20 @@
 import shutil
 from typing import List, Tuple, Union
 
+import nnunetv2.paths
 from batchgenerators.utilities.file_and_folder_operations import (
     join,
     maybe_mkdir_p,
     subfiles,
 )
 from loguru import logger
-from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 
 def preprocess_dataset(
@@ -25,6 +26,13 @@ def preprocess_dataset(
     do_all: bool = False,
     force: bool = False,
 ) -> None:
+    p = get_results_folder(dataset_id)
+    nnunetv2.paths.set_paths(
+        nnUNet_raw=p / "nnUNet_raw",
+        nnUNet_preprocessed=p / "nnUNet_preprocessed",
+        nnUNet_results=p / "nnUNet_results",
+    )
+
     try:
         state = State.get_id_state(dataset_id, verify=not force)
     except FileNotFoundError:
@@ -44,7 +52,9 @@ def preprocess_dataset(
 
     dataset_name = convert_id_to_dataset_name(dataset_id)
     logger.info(f"Preprocessing dataset {dataset_name}")
-    plans_file = join(nnUNet_preprocessed, dataset_name, plans_identifier + ".json")
+    plans_file = join(
+        nnunetv2.paths.nnUNet_preprocessed, dataset_name, plans_identifier + ".json"
+    )
     plans_manager = PlansManager(plans_file)
     for n, c in zip(num_processes, configurations):
         logger.info(f"Configuration: {c}...")
@@ -59,12 +69,19 @@ def preprocess_dataset(
         preprocessor.run(
             dataset_id, c, plans_identifier, num_processes=n, do_all=do_all
         )
-    maybe_mkdir_p(join(nnUNet_preprocessed, dataset_name, "gt_segmentations"))
+    maybe_mkdir_p(
+        join(nnunetv2.paths.nnUNet_preprocessed, dataset_name, "gt_segmentations")
+    )
     [
         shutil.copy(
-            i, join(join(nnUNet_preprocessed, dataset_name, "gt_segmentations"))
+            i,
+            join(
+                join(
+                    nnunetv2.paths.nnUNet_preprocessed, dataset_name, "gt_segmentations"
+                )
+            ),
         )
-        for i in subfiles(join(nnUNet_raw, dataset_name, "labelsTr"))
+        for i in subfiles(join(nnunetv2.paths.nnUNet_raw, dataset_name, "labelsTr"))
     ]
 
     if not force:

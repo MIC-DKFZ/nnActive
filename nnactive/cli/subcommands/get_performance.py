@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
+import nnunetv2.paths
 import numpy as np
 import torch
 from loguru import logger
@@ -27,6 +28,7 @@ from nnactive.nnunet.utils import (
 )
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 nnActive_results = get_nnActive_results()
 TIMEOUT_S = 60 * 60
@@ -143,6 +145,12 @@ def wrap_prediction(
 def get_performance(
     dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
 ):
+    p = get_results_folder(dataset_id)
+    nnunetv2.paths.set_paths(
+        nnUNet_raw=p / "nnUNet_raw",
+        nnUNet_preprocessed=p / "nnUNet_preprocessed",
+        nnUNet_results=p / "nnUNet_results",
+    )
     state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
     images_path = get_raw_path(dataset_id) / "imagesVal"

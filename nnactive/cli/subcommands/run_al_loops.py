@@ -44,7 +44,10 @@ def main(args: Namespace) -> None:
     n_gpus = args.n_gpus
 
     config = ActiveConfig.get_from_id(dataset_id)
+    config.set_nnunet_env(override_id=dataset_id)
     state = State.get_id_state(dataset_id)
+
+    # TODO: update nnUNet env vars based on config
 
     with monitor.active_run(config=config.to_dict()):
         logger.info(config)

@@ -1,10 +1,12 @@
 from argparse import Namespace
 
+import nnunetv2.paths
 from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
 
 
@@ -80,6 +82,12 @@ def update_step(
     no_state: bool = False,
     ensure_classes_in_folds: bool = True,
 ):
+    p = get_results_folder(dataset_id)
+    nnunetv2.paths.set_paths(
+        nnUNet_raw=p / "nnUNet_raw",
+        nnUNet_preprocessed=p / "nnUNet_preprocessed",
+        nnUNet_results=p / "nnUNet_results",
+    )
     data_path = get_raw_path(dataset_id)
     save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
     target_dir = data_path / "labelsTr"

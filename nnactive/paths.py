@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-KEY = "nnActive_results"
-nnActive_results = Path(value) if (value := os.environ.get(KEY)) else None
+nnActive_results = Path(value) if (value := os.environ.get("nnActive_results")) else None
+nnActive_raw = Path(value) if (value := os.environ.get("nnActive_raw")) else None
+nnActive_data = Path(value) if (value := os.environ.get("nnActive_data")) else None
 
 
 def get_nnActive_results() -> Path | None:

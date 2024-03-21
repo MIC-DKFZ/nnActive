@@ -1,9 +1,12 @@
 from pathlib import Path
 
+import nnunetv2.paths
+
 from nnactive.config import ActiveConfig
 from nnactive.loops.loading import get_loop_patches, get_sorted_loop_files, save_loop
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 from nnactive.strategies import get_strategy
 from nnactive.utils.io import save_json
 
@@ -11,6 +14,12 @@ from nnactive.utils.io import save_json
 def query_pool(
     dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
 ):
+    p = get_results_folder(dataset_id)
+    nnunetv2.paths.set_paths(
+        nnUNet_raw=p / "nnUNet_raw",
+        nnUNet_preprocessed=p / "nnUNet_preprocessed",
+        nnUNet_results=p / "nnUNet_results",
+    )
     state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
 

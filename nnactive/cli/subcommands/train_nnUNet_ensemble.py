@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import Iterable
 
+import nnunetv2.paths
 import torch
 from loguru import logger
 from nnunetv2.run.run_training import run_training
@@ -18,6 +19,7 @@ from nnactive.config import ActiveConfig
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_preprocessed_path
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 
 @register_subcommand(
@@ -68,6 +70,13 @@ def wrap_training(
 
 
 def train_nnUNet_ensemble(dataset_id: int, n_gpus=1, force: bool = False):
+    p = get_results_folder(dataset_id)
+    nnunetv2.paths.set_paths(
+        nnUNet_raw=p / "nnUNet_raw",
+        nnUNet_preprocessed=p / "nnUNet_preprocessed",
+        nnUNet_results=p / "nnUNet_results",
+    )
+
     # ensure that set_num_interop is not executed twice
     # multithreading in torch doesn't help nnU-Net if run on GPU
     try:

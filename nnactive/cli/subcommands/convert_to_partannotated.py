@@ -9,7 +9,7 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 from loguru import logger
-from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
+from nnunetv2 import paths
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
 from nnactive.cli.registry import register_subcommand
@@ -22,17 +22,17 @@ from nnactive.data.create_empty_masks import (
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_patch_size
+from nnactive.paths import nnActive_data, nnActive_raw
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
 from nnactive.strategies import init_strategy
 from nnactive.utils.hostutils import get_verbose
 
-NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
-NNUNET_PREPROCESSED = (
-    Path(nnUNet_preprocessed) if nnUNet_preprocessed is not None else None
-)
-NNUNET_RESULTS = Path(nnUNet_results) if nnUNet_results is not None else None
+NNACTIVE_RAW = nnActive_raw
+assert NNACTIVE_RAW is not None
+NNACTIVE_DATA = nnActive_data
+assert NNACTIVE_DATA is not None
 
 
 def convert_dataset_to_partannotated(
@@ -52,18 +52,18 @@ def convert_dataset_to_partannotated(
     force: only use for development!
     """
     already_exists = False
+    # try:
+    #     exists_name = convert_id_to_dataset_name(target_id)
+    #     logger.info(
+    #         f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
+    #     )
+    #     already_exists = True
+    # except RuntimeError:
+    #     logger.info("No naming conflict with nnU-Net")
     try:
-        exists_name = convert_id_to_dataset_name(target_id)
+        exists_name = nnactive_id_to_dataset_name(base_id)
         logger.info(
-            f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
-        )
-        already_exists = True
-    except RuntimeError:
-        logger.info("No naming conflict with nnU-Net")
-    try:
-        exists_name = nnactive_id_to_dataset_name(target_id)
-        logger.info(
-            f"Dataset with ID {target_id} already exists in nnActive under name {exists_name}."
+            f"Dataset with ID {base_id} already exists in nnActive under name {exists_name}."
         )
         already_exists = True
     except FileNotFoundError:
@@ -75,9 +75,12 @@ def convert_dataset_to_partannotated(
         )
     if not already_exists or force:
         # load base_dataset_json
+        temp = paths.nnUNet_raw
+        paths.set_paths(nnUNet_raw=NNACTIVE_RAW)
         base_dataset: str = convert_id_to_dataset_name(base_id)
         base_dataset_json: dict = read_dataset_json(base_dataset)
-        base_dir = NNUNET_RAW / base_dataset
+        paths.set_paths(nnUNet_raw=temp)
+        base_dir = NNACTIVE_RAW / base_dataset
 
         # rewrite target_dataset_json and save
         target_dataset_json = deepcopy(base_dataset_json)
@@ -87,8 +90,8 @@ def convert_dataset_to_partannotated(
         target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = NNUNET_RAW / target_dataset
-        os.makedirs(target_dir, exist_ok=True)
+        target_dir = NNACTIVE_DATA / target_dataset / "nnUNet_raw" / target_dataset
+        target_dir.mkdir(exist_ok=True, parents=True)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
             json.dump(target_dataset_json, file, indent=4)
@@ -107,14 +110,12 @@ def convert_dataset_to_partannotated(
         ]
         for copy_folder in copy_folders:
             if copy_folder in os.listdir(base_dir):
-                shutil.copytree(
-                    base_dir / copy_folder, target_dir / copy_folder, dirs_exist_ok=True
+                (target_dir / copy_folder).symlink_to(
+                    base_dir / copy_folder, target_is_directory=True
                 )
             else:
                 logger.info(
-                    "Skip Path for copying into target:\n{}".format(
-                        base_dir / copy_folder
-                    )
+                    f"Skip Path for copying into target:\n{base_dir / copy_folder}"
                 )
 
         # Create labelstTr for target dataset

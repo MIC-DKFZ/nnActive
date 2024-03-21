@@ -1,3 +1,4 @@
+import json
 import random
 from pathlib import Path
 from typing import List
@@ -27,8 +28,9 @@ def query_starting_budget_all_classes(
     additional_label_path: Path | None = None,
     additional_overlap: float = 0.8,
 ) -> list[Patch]:
-    # logger.debug(f"Additional overlap {additional_overlap}")
-    dataset_json = read_dataset_json(annotated_id)
+    # dataset_json = read_dataset_json(annotated_id)
+    with (raw_labels_path.parent / "dataset.json").open() as file:
+        dataset_json = json.load(file)
     label_dict_dataset_json = dataset_json["labels"]
     # Take first value if multi-region training e.g. BraTS
     for label in label_dict_dataset_json:
