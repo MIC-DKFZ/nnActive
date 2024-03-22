@@ -207,7 +207,7 @@ class DatasetSetup:
             # TODO: Subprocess this for env separation
 
             output_id = start_id + i
-            config.set_nnunet_env(override_id=output_id)
+            config.set_nnunet_env()
             if self.check_dataset_id(output_id):
                 if debug:
                     print(f"Creating Dataset{output_id:3d}....")

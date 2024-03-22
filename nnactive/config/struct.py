@@ -56,17 +56,10 @@ class ActiveConfig:
 
     # TODO: nnUNet env var setter
     # TODO: path getters
-    def set_nnunet_env(self, override_id: int | None = None):
+    def set_nnunet_env(self):
         assert nnActive_data is not None
-        dataset = self.dataset
-        if override_id is not None:
-            dataset = re.sub(r"Dataset\d{3}", f"Dataset{override_id:03d}", dataset)
 
-        experiment_path = nnActive_data / (
-            dataset
-            + self.pre_suffix
-            + f"__unc-{self.uncertainty}__seed-{self.seed}"
-        )
+        experiment_path = nnActive_data / self.dataset
         os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
         os.environ["nnUNet_preprocessed"] = str(experiment_path / "nnUNet_preprocessed")
         os.environ["nnUNet_results"] = str(experiment_path / "nnUNet_results")

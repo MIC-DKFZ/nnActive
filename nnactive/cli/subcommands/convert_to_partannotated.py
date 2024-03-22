@@ -60,19 +60,19 @@ def convert_dataset_to_partannotated(
     #     already_exists = True
     # except RuntimeError:
     #     logger.info("No naming conflict with nnU-Net")
-    try:
-        exists_name = nnactive_id_to_dataset_name(base_id)
-        logger.info(
-            f"Dataset with ID {base_id} already exists in nnActive under name {exists_name}."
-        )
-        already_exists = True
-    except FileNotFoundError:
-        logger.info("No naming conflict with nnActive")
+    # try:
+    #     exists_name = nnactive_id_to_dataset_name(base_id)
+    #     logger.info(
+    #         f"Dataset with ID {base_id} already exists in nnActive under name {exists_name}."
+    #     )
+    #     already_exists = True
+    # except FileNotFoundError:
+    #     logger.info("No naming conflict with nnActive")
 
-    if already_exists and not force:
-        raise NotImplementedError(
-            "Dataset ID already exists, check corresponding folders."
-        )
+    # if already_exists and not force:
+    #     raise NotImplementedError(
+    #         "Dataset ID already exists, check corresponding folders."
+    #     )
     if not already_exists or force:
         # load base_dataset_json
         temp = paths.nnUNet_raw
@@ -90,7 +90,7 @@ def convert_dataset_to_partannotated(
         target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = NNACTIVE_DATA / target_dataset / "nnUNet_raw" / target_dataset
+        target_dir = NNACTIVE_DATA / base_dataset / "nnUNet_raw" / target_dataset
         target_dir.mkdir(exist_ok=True, parents=True)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
