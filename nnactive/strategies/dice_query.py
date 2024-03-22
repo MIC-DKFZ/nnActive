@@ -16,7 +16,7 @@ from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.base_uncertainty import nnActivePredictor
 from nnactive.utils.io import load_label_map
 
-DEVICE = "cuda:0"
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 class PatchDice:
