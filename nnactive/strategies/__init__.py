@@ -4,6 +4,7 @@ from loguru import logger
 
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.strategies.dice_query import DiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PredictiveEntropy
 from nnactive.strategies.random import Random
@@ -50,6 +51,7 @@ strategydict = {
     "mutual_information": BALD,
     "pred_entropy": PredictiveEntropy,
     "exp_entropy": ExpectedEntropy,
+    "dice": DiceQuery,
     "random": Random,
     "random-label": RandomLabel,
     "random-all-classes": RandomAllClasses,
