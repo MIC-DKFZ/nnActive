@@ -139,7 +139,11 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
             logger.info("Initialize selected array...")
-            annotated_patches = [patch for patch in self.annotated_patches]
+            annotated_patches = [
+                patch
+                for patch in self.annotated_patches
+                if patch.file == label_file + ".nii.gz"
+            ]
 
             logger.info("Select patches...")
             selected_patches = self.select_top_n_non_overlapping_patches(
@@ -171,6 +175,18 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         label_file: str,
         n: int,
     ) -> list[dict]:
+        """Select top-n non overlapping patches in image.
+
+        Args:
+            patch_size (list[int]): size of patch
+            aggregated (np.ndarray): aggregated uncertainty
+            annotated_patches (list[Patch]): list of annotated patches per image
+            label_file (str): name of label_file without ending (.nii.gz)
+            n (int): number of patches to select
+
+        Returns:
+            list[dict]: dict contains all values required to build a Patch
+        """
         selected_patches = []
         # sort only once since this can take a significant amount of time
         logger.info("Sort potential queries")
@@ -253,6 +269,10 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 for patch in sorted_top_patches
             ]
             patches = [Patch(**patch) for patch in patches]
+            if len(patches) < self.query_size:
+                raise RuntimeError(
+                    f"Not enough patches could be queried, {len(patches)} instead of {self.query_size}"
+                )
             return patches
 
 
@@ -393,9 +413,9 @@ class nnActivePredictor(nnUNetPredictor):
                 os.remove(delfile)
 
             ofile = preprocessed["ofile"]
-            filename = os.path.basename(ofile)
             if ofile is not None:
-                logger.info(f"\nPredicting {os.path.basename(ofile)}:")
+                filename: str = os.path.basename(ofile)
+                logger.info(f"\nPredicting {filename}:")
             else:
                 logger.info(f"\nPredicting image of shape {data.shape}:")
 
