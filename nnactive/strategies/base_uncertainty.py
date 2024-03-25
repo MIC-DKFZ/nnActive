@@ -22,6 +22,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_t
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
+from torch.backends import cudnn
 from tqdm import tqdm
 
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
@@ -404,7 +405,11 @@ class nnActivePredictor(nnUNetPredictor):
             data_iterator, name="predict_from_data_iterator"
         ):
             # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
-            # if os.path.basename(preprocessed["ofile"]) != "case_00223":
+            # if os.path.basename(preprocessed["ofile"]) not in [
+            #     "case_00223",
+            #     "case_00210",
+            # ]:
+            #     print("Skipping file:", preprocessed["ofile"])
             #     continue
             data = preprocessed["data"]
             if isinstance(data, str):
@@ -424,9 +429,15 @@ class nnActivePredictor(nnUNetPredictor):
             )
 
             properties = preprocessed["data_properties"]
+            if torch.cuda.is_available():
+                cudnn.benchmark = True
             self.predict_fold_logits_from_preprocessed_data(data, properties)
 
             logger.info("Start Query")
+            # Benchmark = True can lead to problems during inference with convolutions
+            # illegal memory access
+            if torch.cuda.is_available():
+                cudnn.benchmark = False
             query_method.query_from_probs(
                 len(self.list_of_parameters),
                 properties["shape_before_cropping"],

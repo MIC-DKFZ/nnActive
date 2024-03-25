@@ -56,7 +56,7 @@ class ConvolveAggTorch:
         if isinstance(stride, int):
             self.stride = [stride] * len(self.patch_size)
 
-    def forward(self, data: torch.Tensor) -> tuple[np.array, list[int]]:
+    def forward(self, data: torch.Tensor) -> tuple[np.ndarray, list[int]]:
         logger.info("Started forward")
         kernel_size = [
             min(self.patch_size[i], data.shape[i]) for i in range(len(self.patch_size))

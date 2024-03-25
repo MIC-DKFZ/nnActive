@@ -4,6 +4,7 @@ from experiment_setup import DatasetSetup
 
 parser = ArgumentParser()
 parser = DatasetSetup.add_args(parser)
+parser.add_argument("--first_d_set", default=None, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -11,13 +12,15 @@ if __name__ == "__main__":
     uncertainties = ["pred_entropy", "mutual_information", "random"]
     dataset_id = 982
     first_d_set = 992
+    if args.first_d_set is not None:
+        first_d_set = args.first_d_set
     # patch_size = []
     query_size = 10
     query_steps = 3
     trainer = "nnActiveTrainer_5epochs"
     starting_budget = "random-label-all-classes"
     num_processes = 4
-    train_folds = 2
+    train_folds = 5
     pre_suffix = "__patch-full_patch"
     add_validation = "--disable_tta"
     add_uncertainty = "--diable_tta"
