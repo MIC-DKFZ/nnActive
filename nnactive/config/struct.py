@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Union
 
 from loguru import logger
@@ -22,6 +22,8 @@ FILENAME = "config.json"
 @dataclass
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
+    id: int = 0
+    base_id: int = 0
     starting_budget: str = "standard"  # how was starting budget created?
     trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
     model_plans: str = "nnUNetPlans"
@@ -33,7 +35,7 @@ class ActiveConfig:
     query_size: int = 20  # how many samples are queried
     query_steps: int = 10  # how many query steps are supposed to be made
     agg_stride: int | list[int] = 1  # stride for the aggregation function
-    _n_patch_per_image: int | None = (
+    n_patch_per_image: int | None = (
         None  # how many potential queries per image are allowed
     )
     seed: int = 12345  # seed to be used for everything random in the experiment
@@ -53,6 +55,10 @@ class ActiveConfig:
     additional_overlap: float = (
         0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
     )
+
+    def __post_init__(self):
+        if self.n_patch_per_image is None:
+            self.n_patch_per_image = self.query_size
 
     # TODO: nnUNet env var setter
     # TODO: path getters
@@ -104,11 +110,3 @@ class ActiveConfig:
     @property
     def working_folds(self):
         return self.train_folds if self.train_folds is not None else self.full_folds
-
-    @property
-    def n_patch_per_image(self):
-        return (
-            self._n_patch_per_image
-            if self._n_patch_per_image is not None
-            else self.query_size
-        )

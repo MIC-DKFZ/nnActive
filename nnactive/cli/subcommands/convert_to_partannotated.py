@@ -235,95 +235,95 @@ def get_patches_for_partannotation(
     return patches
 
 
-@register_subcommand(
-    "convert",
-    [
-        (
-            ("-d", "--dataset-id"),
-            {
-                "type": int,
-                "required": True,
-                "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
-            },
-        ),
-        (
-            ("-o", "--output-id"),
-            {
-                "type": int,
-                "default": None,
-                "help": "target dataset ID for nnU-Net, default base on offset",
-            },
-        ),
-        (
-            "--offset",
-            {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
-        ),
-        (
-            "--seed",
-            {
-                "default": 12345,
-                "type": int,
-                "help": "Random seed for creation of datasets",
-            },
-        ),
-        (
-            "--full-labeled",
-            {
-                "type": float,
-                "default": 0,
-                "help": "0.X = percentage, int = full number of completely annotated images",
-            },
-        ),  # how to make float and integers
-        (
-            "--strategy",
-            {
-                "type": str,
-                "default": "random",
-                "help": "strategy employed to select random patches",
-            },
-        ),
-        (
-            "--num-patches",
-            {
-                "type": int,
-                "default": 0,
-                "help": "Number of randomly drawn patches",
-            },
-        ),  # how to make float and integers
-        (
-            "--patch-size",
-            {
-                "type": int,
-                "nargs": "+",
-                "default": None,
-                "help": "patch size of the object, default is nnU-Net Patch Size",
-            },
-        ),
-        (
-            "--additional_overlap",
-            {
-                "type": float,
-                "default": 0.4,
-                "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
-            },
-        ),
-        (
-            "--name-suffix",
-            {
-                "type": str,
-                "default": "partanno",
-                "help": "Suffix for the name of the output dataset",
-            },
-        ),
-        (
-            "--force",
-            {
-                "action": "store_true",
-                "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
-            },
-        ),
-    ],
-)
+# @register_subcommand(
+#     "convert",
+#     [
+#         (
+#             ("-d", "--dataset-id"),
+#             {
+#                 "type": int,
+#                 "required": True,
+#                 "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
+#             },
+#         ),
+#         (
+#             ("-o", "--output-id"),
+#             {
+#                 "type": int,
+#                 "default": None,
+#                 "help": "target dataset ID for nnU-Net, default base on offset",
+#             },
+#         ),
+#         (
+#             "--offset",
+#             {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
+#         ),
+#         (
+#             "--seed",
+#             {
+#                 "default": 12345,
+#                 "type": int,
+#                 "help": "Random seed for creation of datasets",
+#             },
+#         ),
+#         (
+#             "--full-labeled",
+#             {
+#                 "type": float,
+#                 "default": 0,
+#                 "help": "0.X = percentage, int = full number of completely annotated images",
+#             },
+#         ),  # how to make float and integers
+#         (
+#             "--strategy",
+#             {
+#                 "type": str,
+#                 "default": "random",
+#                 "help": "strategy employed to select random patches",
+#             },
+#         ),
+#         (
+#             "--num-patches",
+#             {
+#                 "type": int,
+#                 "default": 0,
+#                 "help": "Number of randomly drawn patches",
+#             },
+#         ),  # how to make float and integers
+#         (
+#             "--patch-size",
+#             {
+#                 "type": int,
+#                 "nargs": "+",
+#                 "default": None,
+#                 "help": "patch size of the object, default is nnU-Net Patch Size",
+#             },
+#         ),
+#         (
+#             "--additional_overlap",
+#             {
+#                 "type": float,
+#                 "default": 0.4,
+#                 "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
+#             },
+#         ),
+#         (
+#             "--name-suffix",
+#             {
+#                 "type": str,
+#                 "default": "partanno",
+#                 "help": "Suffix for the name of the output dataset",
+#             },
+#         ),
+#         (
+#             "--force",
+#             {
+#                 "action": "store_true",
+#                 "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
+#             },
+#         ),
+#     ],
+# )
 def main(args: Namespace) -> None:
     full_images = args.full_labeled
 
