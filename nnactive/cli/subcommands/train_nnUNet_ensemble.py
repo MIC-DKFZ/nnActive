@@ -22,29 +22,6 @@ from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 
 
-@register_subcommand(
-    "train_nnUNet_ensemble",
-    [
-        (("-d", "--dataset_id"), {"type": int}),
-        (
-            ("-f", "--force"),
-            {"action": "store_true", "help": "Ignores the internal State."},
-        ),
-        (("--n_gpus"), {"default": 1, "type": int}),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    force = args.force
-    n_gpus = args.n_gpus
-    config = ActiveConfig.get_from_id(dataset_id)
-
-    with monitor.active_run(config=config.to_dict()):
-        logger.info(config)
-
-        train_nnUNet_ensemble(dataset_id, n_gpus, force)
-
-
 def wrap_training(
     dataset_id: int,
     config: ActiveConfig,
@@ -69,13 +46,9 @@ def wrap_training(
         )
 
 
-def train_nnUNet_ensemble(dataset_id: int, n_gpus=1, force: bool = False):
-    p = get_results_folder(dataset_id)
-    nnunetv2.paths.set_paths(
-        nnUNet_raw=p / "nnUNet_raw",
-        nnUNet_preprocessed=p / "nnUNet_preprocessed",
-        nnUNet_results=p / "nnUNet_results",
-    )
+@register_subcommand("train_nnUNet_ensemble")
+def train_nnUNet_ensemble(config: ActiveConfig, force: bool = False, n_gpus: int = 1):
+    config.set_nnunet_env()
 
     # ensure that set_num_interop is not executed twice
     # multithreading in torch doesn't help nnU-Net if run on GPU
@@ -86,13 +59,12 @@ def train_nnUNet_ensemble(dataset_id: int, n_gpus=1, force: bool = False):
         torch.set_num_interop_threads(1)
         os.environ["torchset"] = "True"
 
-    config = ActiveConfig.get_from_id(dataset_id)
     num_folds = config.working_folds
-    state = State.get_id_state(dataset_id, verify=not force)
+    state = State.get_id_state(config.id, verify=not force)
 
     unpack_dataset(
         folder=str(
-            get_preprocessed_path(dataset_id)
+            get_preprocessed_path(config.id)
             / "_".join([config.model_plans, config.model_config])
         ),
         unpack_segmentation=True,
@@ -106,7 +78,7 @@ def train_nnUNet_ensemble(dataset_id: int, n_gpus=1, force: bool = False):
         for fold in range(num_folds):
             run_training(
                 str(
-                    dataset_id
+                    config.id
                 ),  # TODO: fix this bug in nnU-Net requiring input to be string.
                 config.model_config,
                 fold,
@@ -124,7 +96,7 @@ def train_nnUNet_ensemble(dataset_id: int, n_gpus=1, force: bool = False):
             with ProcessPoolExecutor(max_workers=n_gpus) as executor:
                 for _ in executor.map(
                     wrap_training,
-                    [dataset_id] * num_folds,
+                    [config.id] * num_folds,
                     [config] * num_folds,
                     folds,
                     devices,

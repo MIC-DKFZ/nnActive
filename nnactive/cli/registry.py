@@ -1,10 +1,10 @@
-from pathlib import Path
 import types
 import typing
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, is_dataclass
-from typing import Callable
+from pathlib import Path
+from typing import Callable, ParamSpec, TypeVar
 
 from jsonargparse import ArgumentParser, Namespace
 from jsonargparse._common import Action
@@ -71,9 +71,11 @@ class ActionExperiment(Action):
 
 __subcommands = {}
 
+P = ParamSpec("P")
 
-def register_subcommand(name: str):
-    def decorator(fn: Callable[..., None]):
+
+def register_subcommand(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
+    def decorator(fn: Callable[P, None]) -> Callable[P, None]:
         __subcommands[name] = fn
         return fn
 
@@ -136,7 +138,9 @@ def _dict_to_dataclass(cfg: dict) -> ActiveConfig:
             raise
         return cfg
 
-    return __dict_to_dataclass(cfg, ActiveConfig, "")  # pyright: ignore [reportReturnType]
+    return __dict_to_dataclass(
+        cfg, ActiveConfig, ""
+    )  # pyright: ignore [reportReturnType]
 
 
 def run_subcommand(args: Namespace):

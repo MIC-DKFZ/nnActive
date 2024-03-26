@@ -85,34 +85,6 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-@register_subcommand(
-    "get_performance",
-    [
-        (("-d", "--dataset_id"), {"type": int}),
-        (
-            ("-f", "--force"),
-            {"action": "store_true", "help": "Ignores the internal State."},
-        ),
-        (
-            ("--verbose"),
-            {
-                "action": "store_true",
-                "help": "Disables progress bars and get more explicit print statements.",
-            },
-        ),
-        (("--n_gpus"), {"default": 1, "type": int}),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    force = args.force
-    verbose = args.verbose
-    n_gpus = args.n_gpus
-    config = ActiveConfig.get_from_id(dataset_id)
-    with monitor.active_run(config=config.to_dict()):
-        get_performance(dataset_id, force, verbose, n_gpus)
-
-
 def wrap_prediction(
     input_folder: str,
     output_folder: str,
@@ -142,28 +114,23 @@ def wrap_prediction(
     )
 
 
-def get_performance(
-    dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
-):
-    p = get_results_folder(dataset_id)
-    nnunetv2.paths.set_paths(
-        nnUNet_raw=p / "nnUNet_raw",
-        nnUNet_preprocessed=p / "nnUNet_preprocessed",
-        nnUNet_results=p / "nnUNet_results",
-    )
-    state = State.get_id_state(dataset_id, verify=not force)
-    config = ActiveConfig.get_from_id(dataset_id)
-    images_path = get_raw_path(dataset_id) / "imagesVal"
-    labels_path = get_raw_path(dataset_id) / "labelsVal"
-    loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
-    pred_path = get_results_path(dataset_id) / "predVal"
-    dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
-    plans_path = get_preprocessed_path(dataset_id) / f"{config.model_plans}.json"
+@register_subcommand("get_performance")
+def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = False, n_gpus: int = 1):
+    config.set_nnunet_env()
+    state = State.get_id_state(config.id, verify=not force)
+    config = ActiveConfig.get_from_id(config.id)
+    images_path = get_raw_path(config.id) / "imagesVal"
+    labels_path = get_raw_path(config.id) / "labelsVal"
+    loop_val = len(get_sorted_loop_files(get_raw_path(config.id))) - 1
+    pred_path = get_results_path(config.id) / "predVal"
+    dataset_json_path = get_raw_path(config.id) / "dataset.json"
+    plans_identifier = "nnUNetPlans"
+    plans_path = get_preprocessed_path(config.id) / f"{plans_identifier}.json"
 
     num_folds = config.working_folds
     loop_results_path: Path = (
         nnActive_results
-        / convert_id_to_dataset_name(dataset_id)
+        / convert_id_to_dataset_name(config.id)
         / f"loop_{loop_val:03d}"
     )
 
@@ -224,7 +191,7 @@ def get_performance(
     # first save the individual cross val dicts by simply appending them with key fold_X
     for fold in range(num_folds):
         trained_model_path = get_output_folder(
-            dataset_id, config.trainer, config.model_plans, config.model_config, fold
+            config.id, config.trainer, plans_identifier, config.model_config, fold
         )
 
         os.makedirs(loop_results_path, exist_ok=True)

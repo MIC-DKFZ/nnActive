@@ -11,24 +11,17 @@ from nnactive.strategies import get_strategy
 from nnactive.utils.io import save_json
 
 
-def query_pool(
-    dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
-):
-    p = get_results_folder(dataset_id)
-    nnunetv2.paths.set_paths(
-        nnUNet_raw=p / "nnUNet_raw",
-        nnUNet_preprocessed=p / "nnUNet_preprocessed",
-        nnUNet_results=p / "nnUNet_results",
-    )
-    state = State.get_id_state(dataset_id, verify=not force)
-    config = ActiveConfig.get_from_id(dataset_id)
+def query_pool(config: ActiveConfig, force: bool = False, verbose: bool = False, n_gpus: int = 1):
+    config.set_nnunet_env()
+    state = State.get_id_state(config.id, verify=not force)
+    config = ActiveConfig.get_from_id(config.id)
 
-    raw_dataset_path = get_raw_path(dataset_id)
+    raw_dataset_path = get_raw_path(config.id)
     loop_val = len(get_sorted_loop_files(raw_dataset_path))
     seed = config.seed + loop_val
     strategy = get_strategy(
         config.uncertainty,
-        dataset_id,
+        config.id,
         seed=seed,
         n_patch_per_image=config.n_patch_per_image,
         verbose=verbose,

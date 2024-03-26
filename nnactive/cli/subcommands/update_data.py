@@ -4,77 +4,16 @@ import nnunetv2.paths
 from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
+from nnactive.config.struct import ActiveConfig
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
 
 
-@register_subcommand(
-    "update_data",
-    [
-        (("-d", "--dataset_id"), {"type": int, "required": True}),
-        (
-            ("-l", "--loop"),
-            {
-                "type": int,
-                "default": None,
-                "help": "iteration step to update (which loop_XXX file)",
-            },
-        ),
-        (
-            "--annotated",
-            {
-                "dest": "annotated",
-                "action": "store_true",
-                "help": "If an annotated version of the dataset exists, update with annotated ground truth. "
-                "If not specified, uses predTr folder in raw dataset folder.",
-            },
-        ),
-        (
-            ("-f", "--force"),
-            {
-                "action": "store_true",
-                "help": "Ignores the internal State.",
-            },
-        ),
-        (
-            "--no_state",
-            {
-                "action": "store_true",
-                "help": "Does not require internal State.",
-            },
-        ),
-        (
-            "--not_ensure_classes_in_folds",
-            {
-                "action": "store_true",
-                "help": "Do not check if all classes are represented in each fold."
-                "Normally, you do not want to specify this.",
-            },
-        ),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id: int = args.dataset_id
-    loop_val: int | None = args.loop
-    force: bool = args.force
-    no_state: bool = args.no_state
-    annotated: bool = args.annotated
-    ensure_classes_in_folds: bool = not args.not_ensure_classes_in_folds
-
-    update_step(
-        dataset_id,
-        loop_val=loop_val,
-        annotated=annotated,
-        force=force,
-        no_state=no_state,
-        ensure_classes_in_folds=ensure_classes_in_folds,
-    )
-
-
+@register_subcommand("update_data")
 def update_step(
-    dataset_id: int,
+    config: ActiveConfig,
     num_folds: int = 5,
     loop_val: int | None = None,
     annotated: bool = True,
@@ -82,17 +21,12 @@ def update_step(
     no_state: bool = False,
     ensure_classes_in_folds: bool = True,
 ):
-    p = get_results_folder(dataset_id)
-    nnunetv2.paths.set_paths(
-        nnUNet_raw=p / "nnUNet_raw",
-        nnUNet_preprocessed=p / "nnUNet_preprocessed",
-        nnUNet_results=p / "nnUNet_results",
-    )
-    data_path = get_raw_path(dataset_id)
-    save_splits_file = get_preprocessed_path(dataset_id) / "splits_final.json"
+    config.set_nnunet_env()
+    data_path = get_raw_path(config.id)
+    save_splits_file = get_preprocessed_path(config.id) / "splits_final.json"
     target_dir = data_path / "labelsTr"
 
-    dataset_json = read_dataset_json(dataset_id)
+    dataset_json = read_dataset_json(config.id)
     ignore_label = dataset_json["labels"]["ignore"]
     file_ending = dataset_json["file_ending"]
 
@@ -103,10 +37,10 @@ def update_step(
     if annotated:
         base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
     else:
-        base_dir = get_raw_path(dataset_id) / f"annoTr_{loop_val:02}"
+        base_dir = get_raw_path(config.id) / f"annoTr_{loop_val:02}"
 
     if not no_state:
-        state = State.get_id_state(dataset_id, verify=not force)
+        state = State.get_id_state(config.id, verify=not force)
 
     if ensure_classes_in_folds:
         logger.info("Ensure every class in all train folds.")
