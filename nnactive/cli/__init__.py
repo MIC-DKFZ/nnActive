@@ -2,7 +2,7 @@ from jsonargparse import ActionConfigFile, ArgumentParser, Namespace
 
 from nnactive.cli.registry import add_subcommands, run_subcommand
 
-from .subcommands import setup
+from .subcommands import setup, nnunet_preprocess
 
 
 def main() -> None:

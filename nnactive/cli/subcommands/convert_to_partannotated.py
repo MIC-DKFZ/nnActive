@@ -22,7 +22,7 @@ from nnactive.data.create_empty_masks import (
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_patch_size
-from nnactive.paths import nnActive_data, nnActive_raw
+from nnactive.paths import nnActive_data, nnActive_raw, set_raw_paths
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
@@ -75,12 +75,10 @@ def convert_dataset_to_partannotated(
     #     )
     if not already_exists or force:
         # load base_dataset_json
-        temp = paths.nnUNet_raw
-        paths.set_paths(nnUNet_raw=NNACTIVE_RAW)
-        base_dataset: str = convert_id_to_dataset_name(base_id)
-        base_dataset_json: dict = read_dataset_json(base_dataset)
-        paths.set_paths(nnUNet_raw=temp)
-        base_dir = NNACTIVE_RAW / base_dataset
+        with set_raw_paths():
+            base_dataset: str = convert_id_to_dataset_name(base_id)
+            base_dataset_json: dict = read_dataset_json(base_dataset)
+            base_dir = Path(paths.nnUNet_raw) / base_dataset
 
         # rewrite target_dataset_json and save
         target_dataset_json = deepcopy(base_dataset_json)

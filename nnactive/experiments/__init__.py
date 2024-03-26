@@ -2,8 +2,10 @@ from itertools import product
 from typing import Callable
 
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
+import nnunetv2.paths as paths
 
 from nnactive.config.struct import ActiveConfig
+from nnactive.paths import set_raw_paths
 from nnactive.nnunet.utils import get_patch_size
 
 __experiments = {}
@@ -24,12 +26,14 @@ def list_experiments():
 
 
 def make_kits_small_config(seed: int, uncertainty: str):
-    base_id = 982
-    dataset_name = convert_id_to_dataset_name(base_id)
+    with set_raw_paths():
+        base_id = 982
+        dataset_name = convert_id_to_dataset_name(base_id)
+        patch_size = get_patch_size(base_id)
     return "kits_small", ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
-        patch_size=get_patch_size(base_id),
+        patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=10,
         query_steps=3,

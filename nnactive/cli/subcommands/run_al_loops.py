@@ -16,35 +16,12 @@ from .train_nnUNet_ensemble import train_nnUNet_ensemble
 from .update_data import update_step
 
 
-@register_subcommand(
-    "run_al_loops",
-    [
-        (("-d", "--dataset_id"), {"type": int, "required": True}),
-        (
-            ("--verbose"),
-            {
-                "action": "store_true",
-                "help": "Disables progress bars and get more explicit print statements.",
-            },
-        ),
-        (
-            ("--n_gpus"),
-            {
-                "default": 1,
-                "type": int,
-                "help": "Set amount of gpus to be used in parallel for training, prediction and query step."
-                "Keep in mind that setting this to values >1 will start parallel processes.",
-            },
-        ),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    verbose = args.verbose
-    n_gpus = args.n_gpus
+@register_subcommand("run_al_loops")
+def main(config: ActiveConfig, verbose: bool = False, n_gpus: int = 1) -> None:
+    dataset_id = config.id
 
-    config = ActiveConfig.get_from_id(dataset_id)
-    config.set_nnunet_env(override_id=dataset_id)
+    config.set_nnunet_env()
+
     state = State.get_id_state(dataset_id)
 
     # TODO: update nnUNet env vars based on config
@@ -71,9 +48,7 @@ def main(args: Namespace) -> None:
                 do_all = al_iteration == 0
 
                 preprocess(
-                    [dataset_id],
-                    configurations=[config.model_config],
-                    num_processes=[config.num_processes],
+                    config,
                     verbose=verbose,
                     do_all=do_all,
                 )
