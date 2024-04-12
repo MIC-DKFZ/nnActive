@@ -12,7 +12,7 @@ from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
+from nnactive.aggregations.convolution import ConvolveAggTorchFFT
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
 from nnactive.logger import monitor
@@ -219,18 +219,26 @@ class PatchDice:
             # )
             TP = 2 * mean_prob * prob_fold
             Div = mean_prob + prob_fold
-            if (
-                self.stride == 1
-            ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
-                agg = ConvolveAggScipy(kernel_size, stride=self.stride)
-            else:
-                TP = TP.type(torch.float32).to(mean_device)
-                Div = Div.type(torch.float32).to(mean_device)
-                logger.info(f"TP and Div on device: {TP.device}")
-                agg = ConvolveAggTorch(kernel_size, stride=self.stride)
+            TP = TP.type(torch.float32).to(mean_device)
+            Div = Div.type(torch.float32).to(mean_device)
+            logger.info(f"TP and Div on device: {TP.device}")
+            agg = ConvolveAggTorchFFT(kernel_size, stride=self.stride)
             class_dice = None
+            if get_tensor_memory_usage(TP[i]) * 10 > estimate_free_cuda_memory():
+                TP = TP.to("cpu")
+                Div = Div.to("cpu")
             for i in range(TP.shape[0]):
-                conv = agg.forward(TP[i])[0] / agg.forward(Div[i])[0]
+                try:
+                    conv = agg.forward(TP[i])[0] / agg.forward(Div[i])[0]
+                except RuntimeError as e:
+                    logger.debug(
+                        "Possibly CUDA OOM error, try to obtain compute_val on CPU."
+                    )
+                    TP = TP.to("cpu")
+                    Div = Div.to("cpu")
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    conv = agg.forward(TP[i])[0] / agg.forward(Div[i])[0]
                 if class_dice is None:
                     class_dice = np.zeros((TP.shape[0], *conv.shape))
                 class_dice[i] = conv
