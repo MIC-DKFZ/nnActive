@@ -90,7 +90,7 @@ class PatchDice:
             logger.info(f"TP and Div on device: {TP.device}")
             agg = ConvolveAggTorchFFT(kernel_size, stride=self.stride)
             class_dice = None
-            if get_tensor_memory_usage(TP[i]) * 10 > estimate_free_cuda_memory():
+            if DEVICE != "cpu" and get_tensor_memory_usage(TP[i]) * 10 > estimate_free_cuda_memory():
                 TP = TP.to("cpu")
                 Div = Div.to("cpu")
             for i in range(TP.shape[0]):
