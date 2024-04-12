@@ -17,6 +17,7 @@ dependencies = [
     "psutil", # required to get RAM requirements
     "loguru",
     "wandb",
+    "fft-conv-pytorch"
 ]
 
 [project.optional-dependencies]
