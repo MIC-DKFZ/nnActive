@@ -6,6 +6,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Callable, ParamSpec, TypeVar
 
+import argparse
 from jsonargparse import ArgumentParser, Namespace
 from jsonargparse._common import Action
 
@@ -74,30 +75,6 @@ __subcommands = {}
 P = ParamSpec("P")
 
 
-def register_subcommand(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
-    def decorator(fn: Callable[P, None]) -> Callable[P, None]:
-        __subcommands[name] = fn
-        return fn
-
-    return decorator
-
-
-def add_subcommands(parser: ArgumentParser):
-    subcommands = parser.add_subcommands(dest="command")
-    for name, fn in __subcommands.items():
-        subparser = ArgumentParser()
-
-        signature = typing.get_type_hints(fn)
-        if "config" in signature and signature["config"] == ActiveConfig:
-            subparser.add_argument(
-                "--experiment", action=ActionExperiment, choices=list_experiments()
-            )
-
-        subparser.add_function_arguments(fn)
-
-        subcommands.add_subcommand(name, subparser)
-
-
 def _dict_to_dataclass(cfg: dict) -> ActiveConfig:
     def __dict_to_dataclass(cfg, cls: type, key: str):  # noqa: ANN202,ANN001
         try:
@@ -143,6 +120,32 @@ def _dict_to_dataclass(cfg: dict) -> ActiveConfig:
     )  # pyright: ignore [reportReturnType]
 
 
+def register_subcommand(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
+    def decorator(fn: Callable[P, None]) -> Callable[P, None]:
+        __subcommands[name] = fn
+        return fn
+
+    return decorator
+
+
+def add_subcommands(parser: ArgumentParser):
+    subcommands = parser.add_subcommands(dest="command")
+    for name, fn in __subcommands.items():
+        subparser = ArgumentParser()
+
+        signature = typing.get_type_hints(fn)
+        if "config" in signature and signature["config"] == ActiveConfig:
+            subparser.add_argument(
+                "--experiment", action=ActionExperiment, choices=list_experiments()
+            )
+
+        subparser.add_function_arguments(fn)
+
+        subcommands.add_subcommand(name, subparser)
+
+
 def run_subcommand(args: Namespace):
-    config = _dict_to_dataclass(args[args.command].config)
-    __subcommands[args.command](config)
+    kwargs = args[args.command].as_dict()
+    kwargs["config"] = _dict_to_dataclass(args[args.command].config)
+    del kwargs["experiment"]
+    __subcommands[args.command](**kwargs)

@@ -17,12 +17,16 @@ from .update_data import update_step
 
 
 @register_subcommand("run_al_loops")
-def main(config: ActiveConfig, verbose: bool = False, n_gpus: int = 1) -> None:
-    dataset_id = config.id
-
+def main(config: ActiveConfig, continue_id: int | None = None, verbose: bool = False, n_gpus: int = 1) -> None:
     config.set_nnunet_env()
 
-    state = State.get_id_state(dataset_id)
+    print(f"{continue_id=}")
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+
+    dataset_id = state.dataset_id
 
     # TODO: update nnUNet env vars based on config
 
@@ -49,6 +53,7 @@ def main(config: ActiveConfig, verbose: bool = False, n_gpus: int = 1) -> None:
 
                 preprocess(
                     config,
+                    continue_id=continue_id,
                     verbose=verbose,
                     do_all=do_all,
                 )

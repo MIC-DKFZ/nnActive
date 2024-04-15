@@ -61,7 +61,7 @@ def check_dataset_id(output_id: int, force_override: bool):
     return True
 
 
-def convert_dset(config: ActiveConfig):
+def convert_dset(config: ActiveConfig, state: State):
     print("Converting Dataset")
 
     past_suffix = f"__unc-{config.uncertainty}__seed-{config.seed}"
@@ -69,7 +69,7 @@ def convert_dset(config: ActiveConfig):
 
     convert_dataset_to_partannotated(
         config.base_id,
-        config.id,
+        state.dataset_id,
         0,
         config.query_size,
         config.patch_size,
@@ -81,32 +81,30 @@ def convert_dset(config: ActiveConfig):
     )
 
 
-def prepare_dset(config: ActiveConfig):
+def prepare_dset(config: ActiveConfig, state: State):
     subprocess.run(
-        f"nnUNetv2_extract_fingerprint -d {config.id}  -np {config.num_processes}",
+        f"nnUNetv2_extract_fingerprint -d {state.dataset_id}  -np {config.num_processes}",
         shell=True,
         check=True,
     )
     subprocess.run(
-        f"nnUNetv2_plan_experiment -d {config.id} -np {config.num_processes}",
+        f"nnUNetv2_plan_experiment -d {state.dataset_id} -np {config.num_processes}",
         shell=True,
         check=True,
     )
 
 
 def setup_al(config: ActiveConfig):
-    state = State(dataset_id=config.id)
+    config.group_dir().mkdir(exist_ok=True)
+    state = State.next_free_state(config)
     state.save_state()
+    config.save_id(state.dataset_id)
+    return state
 
 
 @register_subcommand("setup")
 def main(config: ActiveConfig, debug: bool = False, force: bool = False):
     config.set_nnunet_env()
-    if check_dataset_id(config.id, force):
-        if debug:
-            print(f"Creating Dataset{config.id:3d}....")
-            return
-        convert_dset(config)
-        prepare_dset(config)
-        config.save_id(config.id)
-        setup_al(config)
+    state = setup_al(config)
+    convert_dset(config, state)
+    prepare_dset(config, state)

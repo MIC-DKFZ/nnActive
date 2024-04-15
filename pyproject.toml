@@ -18,6 +18,7 @@ dependencies = [
     "loguru",
     "wandb",
     "jsonargparse[signatures]",
+    "shtab",
 ]
 
 [project.optional-dependencies]

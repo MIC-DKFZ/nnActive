@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Union
 
 from loguru import logger
-from nnunetv2 import paths
+import nnunetv2.paths
 from pydantic.dataclasses import dataclass
 
 from nnactive.nnunet.utils import convert_id_to_dataset_name
-from nnactive.paths import get_nnActive_results, nnActive_data
+import nnactive.paths
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -22,7 +22,6 @@ FILENAME = "config.json"
 @dataclass
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
-    id: int = 0
     base_id: int = 0
     starting_budget: str = "standard"  # how was starting budget created?
     trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
@@ -63,17 +62,24 @@ class ActiveConfig:
     # TODO: nnUNet env var setter
     # TODO: path getters
     def set_nnunet_env(self):
-        assert nnActive_data is not None
-
-        experiment_path = nnActive_data / self.dataset
+        experiment_path = self.group_dir()
         os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
         os.environ["nnUNet_preprocessed"] = str(experiment_path / "nnUNet_preprocessed")
         os.environ["nnUNet_results"] = str(experiment_path / "nnUNet_results")
-        paths.set_paths(
+        nnunetv2.paths.set_paths(
             nnUNet_raw=str(experiment_path / "nnUNet_raw"),
             nnUNet_preprocessed=str(experiment_path / "nnUNet_preprocessed"),
             nnUNet_results=str(experiment_path / "nnUNet_results"),
         )
+        nnactive.paths.set_paths(nnActive_results=self.group_dir() / "nnActive_results")
+
+    def name(self) -> str:
+        dataset = self.dataset.replace(f"Dataset{self.base_id}_", "")
+        return f"{dataset}{self.pre_suffix}__unc-{self.uncertainty}__seed-{self.seed}"
+
+    def group_dir(self) -> Path:
+        assert nnactive.paths.nnActive_data is not None
+        return nnactive.paths.nnActive_data / self.dataset
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:
@@ -93,7 +99,7 @@ class ActiveConfig:
         try:
             save_path: Path = get_results_folder(dataset_id) / FILENAME
         except FileNotFoundError:
-            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
+            save_path: Path = nnactive.paths.get_nnActive_results() / convert_id_to_dataset_name(
                 dataset_id
             )
             logger.info(f"Creating Path: {save_path}")

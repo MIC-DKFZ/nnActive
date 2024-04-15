@@ -21,6 +21,7 @@ from nnactive.results.utils import get_results_folder
 @register_subcommand("nnunet_preprocess")
 def preprocess(
     config: ActiveConfig,
+    continue_id: int | None = None,
     plans_identifier: str = "nnUNetPlans",
     verbose: bool = False,
     do_all: bool = False,
@@ -28,10 +29,10 @@ def preprocess(
 ) -> None:
     config.set_nnunet_env()
 
-    try:
-        state = State.get_id_state(config.id, verify=not force)
-    except FileNotFoundError:
-        state = State(dataset_id=config.id, loop=0)
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
 
     num_processes = [config.num_processes]
     configurations = [config.model_config]
@@ -47,7 +48,7 @@ def preprocess(
             f"{len(num_processes)}"
         )
 
-    dataset_name = convert_id_to_dataset_name(config.id)
+    dataset_name = convert_id_to_dataset_name(state.dataset_id)
     logger.info(f"Preprocessing dataset {dataset_name}")
     plans_file = join(
         nnunetv2.paths.nnUNet_preprocessed, dataset_name, plans_identifier + ".json"
@@ -63,7 +64,7 @@ def preprocess(
             continue
         configuration_manager = plans_manager.get_configuration(c)
         preprocessor = nnActivePreprocessor(verbose=verbose)
-        preprocessor.run(config.id, c, plans_identifier, num_processes=n, do_all=do_all)
+        preprocessor.run(state.dataset_id, c, plans_identifier, num_processes=n, do_all=do_all)
     maybe_mkdir_p(
         join(nnunetv2.paths.nnUNet_preprocessed, dataset_name, "gt_segmentations")
     )

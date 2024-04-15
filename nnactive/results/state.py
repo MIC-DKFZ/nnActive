@@ -7,6 +7,7 @@ from loguru import logger
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from pydantic.dataclasses import dataclass
 
+from nnactive.config.struct import ActiveConfig
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.paths import get_nnActive_results
@@ -19,6 +20,7 @@ FILENAME = "state.json"
 @dataclass
 class State:
     dataset_id: int
+    name: str
     loop: int = 0
     preprocess: bool = False
     training: bool = False
@@ -49,11 +51,9 @@ class State:
         try:
             fn = get_results_folder(self.dataset_id) / FILENAME
         except FileNotFoundError:
-            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
-                self.dataset_id
-            )
+            save_path: Path = get_nnActive_results() / f"Dataset{self.dataset_id:03d}_{self.name}"
             logger.info(f"Creating Path: {save_path}")
-            save_path.mkdir()
+            save_path.mkdir(parents=True)
             fn = save_path / FILENAME
         save_dataclass_to_json(self, fn)
 
@@ -96,6 +96,23 @@ class State:
         if verify:
             state.verify()
         return state
+
+    @classmethod
+    def latest(cls, config: ActiveConfig) -> State:
+        state_files = sorted(
+            list((config.group_dir() / "nnActive_results").glob(f"Dataset*{config.name()}/state.json"))
+        )
+        assert state_files, f"No state files found for {config.name()}"
+        return State.from_json(state_files[-1])
+
+    @classmethod
+    def next_free_state(cls, config: ActiveConfig) -> State:
+        state_files = list(map(lambda path: int(path.name[7:10]), list((config.group_dir() / "nnActive_results").glob("Dataset*"))))
+        if not state_files:
+            return State(name=config.name(), dataset_id=0)
+
+        return State(name=config.name(), dataset_id=max(state_files) + 1)
+
 
     @staticmethod
     def filename():
