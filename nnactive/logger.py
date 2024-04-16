@@ -4,11 +4,10 @@ from contextlib import contextmanager
 from time import time
 from typing import Any, Generator, Iterable, TypeVar
 
+import wandb
 from loguru import logger
 from nnunetv2.training.logging.nnunet_logger import nnUNetLogger
 from wandb.errors import CommError
-
-import wandb
 
 ItemT = TypeVar("ItemT")
 
@@ -104,6 +103,14 @@ class nnActiveMonitor:
     def log(self, key, value, epoch: int) -> None:
         self.assert_wandb_active()
         wandb.log({key: value, "epoch": epoch})
+
+    def write_metric(self, value, name: str):
+        self.assert_wandb_active()
+        if f"{name}" not in self._defined_metrics:
+            wandb.define_metric(f"{name}", summary="mean")
+            self._defined_metrics.add(f"{name}")
+        wandb.log({name: value})
+        logger.info(f"{name}: {value}s")
 
 
 monitor = nnActiveMonitor()

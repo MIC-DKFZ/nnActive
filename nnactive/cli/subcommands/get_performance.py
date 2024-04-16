@@ -12,6 +12,7 @@ from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
+from nnactive.logger import monitor
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.predict import predict_entry_point
 from nnactive.nnunet.utils import (
@@ -126,55 +127,59 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
     folds = " ".join([f"{fold}" for fold in range(num_folds)])
     # TODO: redo add_validation in config!
     folds = [i for i in range(num_folds)]
-
-    predict_entry_point(
-        input_folder=str(images_path),
-        output_folder=str(pred_path),
-        dataset_id=dataset_id,
-        train_identifier=config.trainer,
-        configuration_identifier=config.model_config,
-        folds=folds,
-        verbose=verbose,
-        disable_progress_bar=not verbose,
-    )
-
-    os.makedirs(loop_results_path, exist_ok=True)
-    compute_metrics_on_folder2(
-        folder_ref=str(labels_path),
-        folder_pred=str(pred_path),
-        dataset_json_file=str(dataset_json_path),
-        plans_file=str(plans_path),
-        output_file=str(loop_summary_json),
-        num_processes=8,
-    )
-
-    # Summarize the cross validation performance as json. Might be interesting to track across loops
-    logger.info("Creating a summary of the cross validation results from training...")
-    num_folds = config.working_folds
-    summary_cross_val_dict = {}
-
-    # first save the individual cross val dicts by simply appending them with key fold_X
-    for fold in range(num_folds):
-        trained_model_path = get_output_folder(
-            dataset_id, config.trainer, plans_identifier, config.model_config, fold
+    with monitor.active_run(config=config.to_dict()):
+        predict_entry_point(
+            input_folder=str(images_path),
+            output_folder=str(pred_path),
+            dataset_id=dataset_id,
+            train_identifier=config.trainer,
+            configuration_identifier=config.model_config,
+            folds=folds,
+            verbose=verbose,
+            disable_progress_bar=not verbose,
         )
-        summary_json_train = Path(trained_model_path) / "validation" / "summary.json"
-        with open(summary_json_train, "r") as f:
-            summary_dict_train = json.load(f)
-        summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
 
-    # get foreground mean across folds
-    foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, num_folds)
-    # get the per class mean across folds
-    per_class_mean_cv = get_mean_cv(summary_cross_val_dict, num_folds)
-    summary_cross_val_dict["mean"] = {}
-    summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
-    summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv
+        os.makedirs(loop_results_path, exist_ok=True)
+        compute_metrics_on_folder2(
+            folder_ref=str(labels_path),
+            folder_pred=str(pred_path),
+            dataset_json_file=str(dataset_json_path),
+            plans_file=str(plans_path),
+            output_file=str(loop_summary_json),
+            num_processes=8,
+        )
 
-    # save the cv results
-    with open(loop_summary_cross_val_json, "w") as f:
-        json.dump(summary_cross_val_dict, f, indent=2)
+        # Summarize the cross validation performance as json. Might be interesting to track across loops
+        logger.info(
+            "Creating a summary of the cross validation results from training..."
+        )
+        num_folds = config.working_folds
+        summary_cross_val_dict = {}
 
-    if not force:
-        state.get_performance = True
-        state.save_state()
+        # first save the individual cross val dicts by simply appending them with key fold_X
+        for fold in range(num_folds):
+            trained_model_path = get_output_folder(
+                dataset_id, config.trainer, plans_identifier, config.model_config, fold
+            )
+            summary_json_train = (
+                Path(trained_model_path) / "validation" / "summary.json"
+            )
+            with open(summary_json_train, "r") as f:
+                summary_dict_train = json.load(f)
+            summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
+
+        # get foreground mean across folds
+        foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, num_folds)
+        # get the per class mean across folds
+        per_class_mean_cv = get_mean_cv(summary_cross_val_dict, num_folds)
+        summary_cross_val_dict["mean"] = {}
+        summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
+        summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv
+
+        # save the cv results
+        with open(loop_summary_cross_val_json, "w") as f:
+            json.dump(summary_cross_val_dict, f, indent=2)
+
+        if not force:
+            state.get_performance = True
+            state.save_state()
