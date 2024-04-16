@@ -7,7 +7,7 @@ from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.convert_to_partannotated import (
     convert_dataset_to_partannotated,
 )
-from nnactive.config.struct import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.paths import nnActive_data
 from nnactive.results.state import State
 
@@ -81,7 +81,7 @@ def convert_dset(config: ActiveConfig, state: State):
     )
 
 
-def prepare_dset(config: ActiveConfig, state: State):
+def prepare_dset(config: RuntimeConfig, state: State):
     subprocess.run(
         f"nnUNetv2_extract_fingerprint -d {state.dataset_id}  -np {config.num_processes}",
         shell=True,
@@ -103,8 +103,8 @@ def setup_al(config: ActiveConfig):
 
 
 @register_subcommand("setup")
-def main(config: ActiveConfig, debug: bool = False, force: bool = False):
+def main(config: ActiveConfig, runtime_config: RuntimeConfig, debug: bool = False, force: bool = False):
     config.set_nnunet_env()
     state = setup_al(config)
     convert_dset(config, state)
-    prepare_dset(config, state)
+    prepare_dset(runtime_config, state)

@@ -38,9 +38,6 @@ class ActiveConfig:
         None  # how many potential queries per image are allowed
     )
     seed: int = 12345  # seed to be used for everything random in the experiment
-    num_processes: int = (
-        4  # how many processes are used within nnU-Net TODO: this value is dependent on data and machine --> Autoconfig
-    )
     full_folds: int = 5  # the amount of folds used in the split
     train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
@@ -74,7 +71,7 @@ class ActiveConfig:
         nnactive.paths.set_paths(nnActive_results=self.group_dir() / "nnActive_results")
 
     def name(self) -> str:
-        dataset = self.dataset.replace(f"Dataset{self.base_id}_", "")
+        dataset = self.dataset.replace(f"Dataset{self.base_id:03}_", "")
         return f"{dataset}{self.pre_suffix}__unc-{self.uncertainty}__seed-{self.seed}"
 
     def group_dir(self) -> Path:
@@ -116,3 +113,8 @@ class ActiveConfig:
     @property
     def working_folds(self):
         return self.train_folds if self.train_folds is not None else self.full_folds
+
+
+@dataclass
+class RuntimeConfig:
+    num_processes: int = 4

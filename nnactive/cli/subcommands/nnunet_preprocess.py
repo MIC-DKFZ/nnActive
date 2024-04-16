@@ -12,7 +12,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.config.struct import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
@@ -21,6 +21,7 @@ from nnactive.results.utils import get_results_folder
 @register_subcommand("nnunet_preprocess")
 def preprocess(
     config: ActiveConfig,
+    runtime_config: RuntimeConfig,
     continue_id: int | None = None,
     plans_identifier: str = "nnUNetPlans",
     verbose: bool = False,
@@ -34,7 +35,7 @@ def preprocess(
     else:
         state = State.get_id_state(continue_id)
 
-    num_processes = [config.num_processes]
+    num_processes = [runtime_config.num_processes]
     configurations = [config.model_config]
     if not isinstance(num_processes, list):
         num_processes = list(num_processes)

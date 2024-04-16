@@ -14,6 +14,7 @@ from nnactive.update_data import update_data
 @register_subcommand("update_data")
 def update_step(
     config: ActiveConfig,
+    continue_id: int | None = None,
     num_folds: int = 5,
     loop_val: int | None = None,
     annotated: bool = True,
@@ -22,11 +23,15 @@ def update_step(
     ensure_classes_in_folds: bool = True,
 ):
     config.set_nnunet_env()
-    data_path = get_raw_path(config.id)
-    save_splits_file = get_preprocessed_path(config.id) / "splits_final.json"
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+    data_path = get_raw_path(state.dataset_id)
+    save_splits_file = get_preprocessed_path(state.dataset_id) / "splits_final.json"
     target_dir = data_path / "labelsTr"
 
-    dataset_json = read_dataset_json(config.id)
+    dataset_json = read_dataset_json(state.dataset_id)
     ignore_label = dataset_json["labels"]["ignore"]
     file_ending = dataset_json["file_ending"]
 
@@ -35,12 +40,13 @@ def update_step(
         additional_label_path = None
 
     if annotated:
-        base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
+        # base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
+        base_dir = get_raw_path(state.dataset_id) / "labelsTr"
     else:
-        base_dir = get_raw_path(config.id) / f"annoTr_{loop_val:02}"
+        base_dir = get_raw_path(state.dataset_id) / f"annoTr_{loop_val:02}"
 
     if not no_state:
-        state = State.get_id_state(config.id, verify=not force)
+        state = State.get_id_state(state.dataset_id, verify=not force)
 
     if ensure_classes_in_folds:
         logger.info("Ensure every class in all train folds.")

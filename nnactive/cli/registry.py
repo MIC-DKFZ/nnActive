@@ -10,7 +10,7 @@ import argparse
 from jsonargparse import ArgumentParser, Namespace
 from jsonargparse._common import Action
 
-from nnactive.config.struct import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.experiments import get_experiment, list_experiments
 
 previous_config: ContextVar = ContextVar("previous_config", default=None)
@@ -75,7 +75,8 @@ __subcommands = {}
 P = ParamSpec("P")
 
 
-def _dict_to_dataclass(cfg: dict) -> ActiveConfig:
+T = TypeVar("T", bound=type)
+def _dict_to_dataclass(cfg: dict, cls: T) -> T:
     def __dict_to_dataclass(cfg, cls: type, key: str):  # noqa: ANN202,ANN001
         try:
             if is_dataclass(cls):
@@ -116,7 +117,7 @@ def _dict_to_dataclass(cfg: dict) -> ActiveConfig:
         return cfg
 
     return __dict_to_dataclass(
-        cfg, ActiveConfig, ""
+        cfg, cls, ""
     )  # pyright: ignore [reportReturnType]
 
 
@@ -146,6 +147,7 @@ def add_subcommands(parser: ArgumentParser):
 
 def run_subcommand(args: Namespace):
     kwargs = args[args.command].as_dict()
-    kwargs["config"] = _dict_to_dataclass(args[args.command].config)
+    kwargs["config"] = _dict_to_dataclass(args[args.command].config, ActiveConfig)
+    kwargs["runtime_config"] = _dict_to_dataclass(args[args.command].runtime_config, RuntimeConfig)
     del kwargs["experiment"]
     __subcommands[args.command](**kwargs)

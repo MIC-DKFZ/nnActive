@@ -115,23 +115,29 @@ def wrap_prediction(
 
 
 @register_subcommand("get_performance")
-def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = False, n_gpus: int = 1):
+def get_performance(
+    config: ActiveConfig,
+    continue_id: int | None = None,
+    force: bool = False,
+    verbose: bool = False,
+    n_gpus: int = 1,
+):
     config.set_nnunet_env()
-    state = State.get_id_state(config.id, verify=not force)
-    config = ActiveConfig.get_from_id(config.id)
-    images_path = get_raw_path(config.id) / "imagesVal"
-    labels_path = get_raw_path(config.id) / "labelsVal"
-    loop_val = len(get_sorted_loop_files(get_raw_path(config.id))) - 1
-    pred_path = get_results_path(config.id) / "predVal"
-    dataset_json_path = get_raw_path(config.id) / "dataset.json"
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+    images_path = get_raw_path(state.dataset_id) / "imagesVal"
+    labels_path = get_raw_path(state.dataset_id) / "labelsVal"
+    loop_val = len(get_sorted_loop_files(get_raw_path(state.dataset_id))) - 1
+    pred_path = get_results_path(state.dataset_id) / "predVal"
+    dataset_json_path = get_raw_path(state.dataset_id) / "dataset.json"
     plans_identifier = "nnUNetPlans"
-    plans_path = get_preprocessed_path(config.id) / f"{plans_identifier}.json"
+    plans_path = get_preprocessed_path(state.dataset_id) / f"{plans_identifier}.json"
 
     num_folds = config.working_folds
     loop_results_path: Path = (
-        nnActive_results
-        / convert_id_to_dataset_name(config.id)
-        / f"loop_{loop_val:03d}"
+        get_results_folder(state.dataset_id) / f"loop_{loop_val:03d}"
     )
 
     loop_summary_json = loop_results_path / "summary.json"
@@ -143,7 +149,7 @@ def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = F
         predict_entry_point(
             input_folder=str(images_path),
             output_folder=str(pred_path),
-            dataset_id=dataset_id,
+            dataset_id=state.dataset_id,
             train_identifier=config.trainer,
             configuration_identifier=config.model_config,
             folds=[i for i in range(num_folds)],
@@ -158,7 +164,7 @@ def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = F
                     wrap_prediction,
                     [str(images_path)] * n_gpus,
                     [str(pred_path)] * n_gpus,
-                    [dataset_id] * n_gpus,
+                    [state.dataset_id] * n_gpus,
                     [config] * n_gpus,
                     [verbose] * n_gpus,
                     [n_gpus] * n_gpus,
@@ -191,7 +197,11 @@ def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = F
     # first save the individual cross val dicts by simply appending them with key fold_X
     for fold in range(num_folds):
         trained_model_path = get_output_folder(
-            config.id, config.trainer, plans_identifier, config.model_config, fold
+            state.dataset_id,
+            config.trainer,
+            plans_identifier,
+            config.model_config,
+            fold,
         )
 
         os.makedirs(loop_results_path, exist_ok=True)
@@ -214,9 +224,9 @@ def get_performance(config: ActiveConfig, force: bool = False, verbose: bool = F
         # first save the individual cross val dicts by simply appending them with key fold_X
         for fold in range(num_folds):
             trained_model_path = get_output_folder(
-                dataset_id,
+                state.dataset_id,
                 config.trainer,
-                config.model_plans,
+                plans_identifier,
                 config.model_config,
                 fold,
             )

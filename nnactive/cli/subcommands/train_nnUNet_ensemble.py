@@ -47,8 +47,13 @@ def wrap_training(
 
 
 @register_subcommand("train_nnUNet_ensemble")
-def train_nnUNet_ensemble(config: ActiveConfig, force: bool = False, n_gpus: int = 1):
+def train_nnUNet_ensemble(config: ActiveConfig, continue_id: int | None = None, force: bool = False, n_gpus: int = 1):
     config.set_nnunet_env()
+
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
 
     # ensure that set_num_interop is not executed twice
     # multithreading in torch doesn't help nnU-Net if run on GPU
@@ -60,11 +65,10 @@ def train_nnUNet_ensemble(config: ActiveConfig, force: bool = False, n_gpus: int
         os.environ["torchset"] = "True"
 
     num_folds = config.working_folds
-    state = State.get_id_state(config.id, verify=not force)
 
     unpack_dataset(
         folder=str(
-            get_preprocessed_path(config.id)
+            get_preprocessed_path(state.dataset_id)
             / "_".join([config.model_plans, config.model_config])
         ),
         unpack_segmentation=True,
@@ -78,7 +82,7 @@ def train_nnUNet_ensemble(config: ActiveConfig, force: bool = False, n_gpus: int
         for fold in range(num_folds):
             run_training(
                 str(
-                    config.id
+                    state.dataset_id
                 ),  # TODO: fix this bug in nnU-Net requiring input to be string.
                 config.model_config,
                 fold,
@@ -96,7 +100,7 @@ def train_nnUNet_ensemble(config: ActiveConfig, force: bool = False, n_gpus: int
             with ProcessPoolExecutor(max_workers=n_gpus) as executor:
                 for _ in executor.map(
                     wrap_training,
-                    [config.id] * num_folds,
+                    [state.dataset_id] * num_folds,
                     [config] * num_folds,
                     folds,
                     devices,

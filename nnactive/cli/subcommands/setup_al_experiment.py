@@ -111,7 +111,6 @@ def main(args: Namespace) -> None:
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
-        num_processes=num_processes,
         dataset=base_dataset_name,
         train_folds=train_folds,
     )

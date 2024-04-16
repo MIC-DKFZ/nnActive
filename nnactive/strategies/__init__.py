@@ -2,6 +2,7 @@ from typing import Union
 
 from loguru import logger
 
+from nnactive.config.struct import ActiveConfig
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.entropy_exp import ExpectedEntropy
@@ -14,8 +15,8 @@ from nnactive.strategies.randomlabel_all_classes import (
 )
 
 
-def get_strategy(strategy_name: str, dataset_id: int, **kwargs) -> AbstractQueryMethod:
-    strategy = strategydict[strategy_name].init_from_dataset_id(dataset_id, **kwargs)
+def get_strategy(config: ActiveConfig, strategy_name: str, dataset_id: int, **kwargs) -> AbstractQueryMethod:
+    strategy = strategydict[strategy_name].init_from_dataset_id(config, dataset_id, **kwargs)
     return strategy
 
 
@@ -46,7 +47,7 @@ def init_strategy(
     return strategy
 
 
-strategydict = {
+strategydict: dict[str, type[AbstractQueryMethod]] = {
     "mutual_information": BALD,
     "pred_entropy": PredictiveEntropy,
     "exp_entropy": ExpectedEntropy,

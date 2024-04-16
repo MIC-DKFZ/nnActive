@@ -6,6 +6,7 @@ from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
+from nnactive.config.struct import RuntimeConfig
 from nnactive.logger import monitor
 from nnactive.query_pool import query_pool
 from nnactive.results.state import State
@@ -17,7 +18,7 @@ from .update_data import update_step
 
 
 @register_subcommand("run_al_loops")
-def main(config: ActiveConfig, continue_id: int | None = None, verbose: bool = False, n_gpus: int = 1) -> None:
+def main(config: ActiveConfig, runtime_config: RuntimeConfig, continue_id: int | None = None, verbose: bool = False, n_gpus: int = 1) -> None:
     config.set_nnunet_env()
 
     print(f"{continue_id=}")
@@ -53,6 +54,7 @@ def main(config: ActiveConfig, continue_id: int | None = None, verbose: bool = F
 
                 preprocess(
                     config,
+                    runtime_config,
                     continue_id=continue_id,
                     verbose=verbose,
                     do_all=do_all,
@@ -63,18 +65,18 @@ def main(config: ActiveConfig, continue_id: int | None = None, verbose: bool = F
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(config, n_gpus=n_gpus)
+                train_nnUNet_ensemble(config, continue_id=continue_id, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
-                get_performance(config, verbose=verbose, n_gpus=n_gpus)
+                get_performance(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if al_iteration < config.query_steps - 1:
                 if state.pred_tr is False and state.query is False:
                     monitor.log("task", "query_pool", epoch=al_iteration)
-                    query_pool(config, verbose=verbose, n_gpus=n_gpus)
+                    query_pool(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
                     state = State.get_id_state(dataset_id)
                 if state.update_data is False:
                     monitor.log("task", "update_step", epoch=al_iteration)
-                    update_step(config, annotated=True)
+                    update_step(config, continue_id=continue_id, annotated=True)
                     state = State.get_id_state(dataset_id)
