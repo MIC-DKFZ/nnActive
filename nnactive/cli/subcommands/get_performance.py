@@ -106,7 +106,9 @@ def main(args: Namespace) -> None:
     force = args.force
     verbose = args.verbose
     n_gpus = args.n_gpus
-    get_performance(dataset_id, force, verbose, n_gpus)
+    config = ActiveConfig.get_from_id(dataset_id)
+    with monitor.active_run(config=config.to_dict()):
+        get_performance(dataset_id, force, verbose, n_gpus)
 
 
 def wrap_prediction(
@@ -161,40 +163,39 @@ def get_performance(
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
 
     # TODO: redo add_validation in config!
-    with monitor.active_run(config=config.to_dict()):
-        if n_gpus == 1:
-            device = torch.device("cuda:0")
-            predict_entry_point(
-                input_folder=str(images_path),
-                output_folder=str(pred_path),
-                dataset_id=dataset_id,
-                train_identifier=config.trainer,
-                configuration_identifier=config.model_config,
-                folds=[i for i in range(num_folds)],
-                verbose=verbose,
-                disable_progress_bar=verbose,
-                device=device,
-            )
-        else:
-            try:
-                with ProcessPoolExecutor(max_workers=n_gpus) as executor:
-                    for _ in executor.map(
-                        wrap_prediction,
-                        [str(images_path)] * num_folds,
-                        [str(pred_path)] * num_folds,
-                        [dataset_id] * num_folds,
-                        [config] * num_folds,
-                        [verbose] * num_folds,
-                        [n_gpus] * num_folds,
-                        [p_id for p_id in range(num_folds)],
-                    ):
-                        pass
-            except BrokenProcessPool as exc:
-                raise MemoryError(
-                    "One of the worker processes died. "
-                    "This usually happens because you run out of memory. "
-                    "Try running with less processes."
-                ) from exc
+    if n_gpus == 1:
+        device = torch.device("cuda:0")
+        predict_entry_point(
+            input_folder=str(images_path),
+            output_folder=str(pred_path),
+            dataset_id=dataset_id,
+            train_identifier=config.trainer,
+            configuration_identifier=config.model_config,
+            folds=[i for i in range(num_folds)],
+            verbose=verbose,
+            disable_progress_bar=verbose,
+            device=device,
+        )
+    else:
+        try:
+            with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+                for _ in executor.map(
+                    wrap_prediction,
+                    [str(images_path)] * num_folds,
+                    [str(pred_path)] * num_folds,
+                    [dataset_id] * num_folds,
+                    [config] * num_folds,
+                    [verbose] * num_folds,
+                    [n_gpus] * num_folds,
+                    [p_id for p_id in range(num_folds)],
+                ):
+                    pass
+        except BrokenProcessPool as exc:
+            raise MemoryError(
+                "One of the worker processes died. "
+                "This usually happens because you run out of memory. "
+                "Try running with less processes."
+            ) from exc
 
     os.makedirs(loop_results_path, exist_ok=True)
     compute_metrics_on_folder2(
@@ -237,7 +238,11 @@ def get_performance(
         # first save the individual cross val dicts by simply appending them with key fold_X
         for fold in range(num_folds):
             trained_model_path = get_output_folder(
-                dataset_id, config.trainer, plans_identifier, config.model_config, fold
+                dataset_id,
+                config.trainer,
+                config.model_plans,
+                config.model_config,
+                fold,
             )
             summary_json_train = (
                 Path(trained_model_path) / "validation" / "summary.json"
