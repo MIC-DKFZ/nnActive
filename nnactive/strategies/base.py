@@ -37,7 +37,11 @@ class AbstractQueryMethod(ABC):
         self.verbose = verbose
 
     @abstractmethod
-    def query(self, verbose=False) -> list[Patch]:
+    def query(
+        self,
+        verbose=False,
+        n_gpus: int = 1,
+    ) -> list[Patch]:
         pass
 
     @property

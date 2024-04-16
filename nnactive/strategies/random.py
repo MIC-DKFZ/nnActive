@@ -5,7 +5,6 @@ import numpy as np
 from loguru import logger
 
 from nnactive.data import Patch
-from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.utils.io import load_label_map
@@ -50,8 +49,15 @@ class Random(AbstractQueryMethod):
         self.rng.shuffle(self.img_names)
 
     def query(
-        self, verbose: bool = False, already_annotated_patches=None
+        self, verbose: bool = False, n_gpus: int = 1, already_annotated_patches=None
     ) -> list[Patch]:
+        """
+        Args:
+            already_annotated_patches (list[Patch], optional): only used in combination with all_classes. Defaults to None.
+
+        Returns:
+            List[Patch]: patches for annotation
+        """
         img_generator = _get_infinte_iter(self.img_names)
         if already_annotated_patches is None:
             patches = []

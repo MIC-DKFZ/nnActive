@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import List, Union
 
@@ -6,7 +8,6 @@ from loguru import logger
 
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
-from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.query.get_locs import get_locs_from_segmentation
 from nnactive.strategies.random import (
@@ -71,131 +72,171 @@ class RandomLabel(Random):
             self.background_cls = dataset_json["labels"].get("background")
 
     def query(
-        self, verbose: bool = False, already_annotated_patches: list[Patch] = None
+        self,
+        verbose: bool = False,
+        already_annotated_patches: list[Patch] = None,
+        n_gpus: int = 1,
     ) -> List[Patch]:
-        logger.info(self.img_names)
-        img_generator = _get_infinte_iter(self.img_names)
-        labeled_patches = self.annotated_patches
-        if already_annotated_patches is None:
-            patches = []
-        else:
-            patches = already_annotated_patches
-        for i in range(self.query_size - len(patches)):
-            if verbose:
-                logger.debug("-" * 8)
-                logger.debug("-" * 8)
-                logger.debug(f"Start Creation of Patch {i}")
-            labeled = False
-            patch_count = 0
-            while True:
-                if patch_count > 3 * len(self.img_names):
-                    logger.warning(f"Patch {i} could not be created without overlap!")
-                    break
-                img_name = img_generator.__next__()
-                if verbose:
-                    logger.debug(f"Loading Image: {img_name}")
-                label_map: np.ndarray = load_label_map(
-                    img_name.replace(self.file_ending, ""),
-                    self.raw_labels_path,
-                    self.file_ending,
-                )
-                current_patch_list = labeled_patches + patches
-                img_size = label_map.shape
-                # only needed for creation of patches in first iteration
-                if verbose:
-                    logger.debug(f"Create Mask: {img_name}")
-                selected_image_patches = [
-                    patch for patch in current_patch_list if patch.file == img_name
-                ]
+        """
+        Args:
+            already_annotated_patches (list[Patch], optional): only used in combination with all_classes. Defaults to None.
 
-                additional_label = None
-                if self.additional_label_path is not None:
+        Returns:
+            List[Patch]: patches for annotation
+        """
+
+        # ensure that all processes are run into subprocesses for n_gpus > 1
+        # issues can arise if this is not done.
+        if n_gpus > 1:
+            logger.debug("Execute Query in Subprocess.")
+            patch_list = []
+            try:
+                with ProcessPoolExecutor(max_workers=1) as executor:
+                    for patch_final in executor.map(
+                        self.query,
+                        [verbose],
+                        [None],
+                        [1],
+                    ):
+                        patch_list.append(patch_final)
+                return patch_list[0]
+
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+        else:
+            logger.info(self.img_names)
+            img_generator = _get_infinte_iter(self.img_names)
+            labeled_patches = self.annotated_patches
+            if already_annotated_patches is None:
+                patches = []
+            else:
+                patches = already_annotated_patches
+            for i in range(self.query_size - len(patches)):
+                if verbose:
+                    logger.debug("-" * 8)
+                    logger.debug("-" * 8)
+                    logger.debug(f"Start Creation of Patch {i}")
+                labeled = False
+                patch_count = 0
+                while True:
+                    if patch_count > 3 * len(self.img_names):
+                        logger.warning(
+                            f"Patch {i} could not be created without overlap!"
+                        )
+                        break
+                    img_name = img_generator.__next__()
                     if verbose:
-                        logger.debug("Create additional label map.")
-                    additional_label = load_label_map(
+                        logger.debug(f"Loading Image: {img_name}")
+                    label_map: np.ndarray = load_label_map(
                         img_name.replace(self.file_ending, ""),
-                        self.additional_label_path,
+                        self.raw_labels_path,
                         self.file_ending,
                     )
-                    additional_label: np.ndarray = additional_label != 255
-
-                if verbose:
-                    logger.debug("Mask creation succesfull")
-
-                area = self.rng.choice(["all", "seg", "border"])
-
-                if verbose:
-                    logger.debug(f"Start drawing random patch with strategy: {area}")
-
-                if area in ["seg", "border"]:
+                    current_patch_list = labeled_patches + patches
+                    img_size = label_map.shape
+                    # only needed for creation of patches in first iteration
                     if verbose:
-                        logger.debug(f"Get Locations for Style: {area}")
-                    locs = get_locs_from_segmentation(
-                        label_map,
-                        area,
-                        state=self.rng,
-                        background_cls=self.background_cls,
-                    ).tolist()
-                    if verbose:
-                        logger.debug("Obtaining Locations was succesful.")
-                    if len(locs) == 0:
-                        continue
+                        logger.debug(f"Create Mask: {img_name}")
+                    selected_image_patches = [
+                        patch for patch in current_patch_list if patch.file == img_name
+                    ]
 
-                num_tries = 0
-                while True:
-                    # propose a random patch
+                    additional_label = None
+                    if self.additional_label_path is not None:
+                        if verbose:
+                            logger.debug("Create additional label map.")
+                        additional_label = load_label_map(
+                            img_name.replace(self.file_ending, ""),
+                            self.additional_label_path,
+                            self.file_ending,
+                        )
+                        additional_label: np.ndarray = additional_label != 255
+
+                    if verbose:
+                        logger.debug("Mask creation succesfull")
+
+                    area = self.rng.choice(["all", "seg", "border"])
+
+                    if verbose:
+                        logger.debug(
+                            f"Start drawing random patch with strategy: {area}"
+                        )
+
                     if area in ["seg", "border"]:
-                        # if verbose:
-                        # print("Draw Random Patch")
-                        (
-                            iter_patch_loc,
-                            iter_patch_size,
-                        ) = _obtain_random_patch_from_locs(
-                            locs, img_size, self.patch_size, self.rng
-                        )
-                    if area in ["all"]:
-                        iter_patch_loc, iter_patch_size = _obtain_random_patch_for_img(
-                            img_size, self.patch_size, self.rng
-                        )
+                        if verbose:
+                            logger.debug(f"Get Locations for Style: {area}")
+                        locs = get_locs_from_segmentation(
+                            label_map,
+                            area,
+                            state=self.rng,
+                            background_cls=self.background_cls,
+                        ).tolist()
+                        if verbose:
+                            logger.debug("Obtaining Locations was succesful.")
+                        if len(locs) == 0:
+                            continue
 
-                    patch = Patch(
-                        file=img_name,
-                        coords=iter_patch_loc,
-                        size=iter_patch_size,
-                    )
-
-                    # check if patch is valid
-                    if self.check_overlap(
-                        patch, selected_image_patches, additional_label, verbose
-                    ):
-                        patches.append(patch)
-                        logger.info(
-                            f"Creating Patch in image {img_name} with iteration: {num_tries}"
-                        )
-                        labeled = True
-                        break
-
-                    # if no new patch could fit inside of img do not consider again
-                    if num_tries == self.trials_per_img:
-                        logger.info(f"Could not place patch in image {img_name}")
-                        logger.info(f"PatchCount {len(patches)}")
-                        logger.info(f"{num_tries=}")
-                        # this is change compared to baseline, but samples where no random patch fits.
-                        # no patch at all will fit!
+                    num_tries = 0
+                    while True:
+                        # propose a random patch
+                        if area in ["seg", "border"]:
+                            # if verbose:
+                            # print("Draw Random Patch")
+                            (
+                                iter_patch_loc,
+                                iter_patch_size,
+                            ) = _obtain_random_patch_from_locs(
+                                locs, img_size, self.patch_size, self.rng
+                            )
                         if area in ["all"]:
-                            count = 0
-                            for item in self.img_names:
-                                if item == img_name:
-                                    break
-                                count += 1
+                            iter_patch_loc, iter_patch_size = (
+                                _obtain_random_patch_for_img(
+                                    img_size, self.patch_size, self.rng
+                                )
+                            )
 
-                            # self.img_names.pop(count)
-                            # img_generator = _get_infinte_iter(self.img_names)
+                        patch = Patch(
+                            file=img_name,
+                            coords=iter_patch_loc,
+                            size=iter_patch_size,
+                        )
+
+                        # check if patch is valid
+                        if self.check_overlap(
+                            patch, selected_image_patches, additional_label, verbose
+                        ):
+                            patches.append(patch)
+                            logger.info(
+                                f"Creating Patch in image {img_name} with iteration: {num_tries}"
+                            )
+                            labeled = True
+                            break
+
+                        # if no new patch could fit inside of img do not consider again
+                        if num_tries == self.trials_per_img:
+                            logger.info(f"Could not place patch in image {img_name}")
+                            logger.info(f"PatchCount {len(patches)}")
+                            logger.info(f"{num_tries=}")
+                            # this is change compared to baseline, but samples where no random patch fits.
+                            # no patch at all will fit!
+                            if area in ["all"]:
+                                count = 0
+                                for item in self.img_names:
+                                    if item == img_name:
+                                        break
+                                    count += 1
+
+                                # self.img_names.pop(count)
+                                # img_generator = _get_infinte_iter(self.img_names)
+                            break
+                        num_tries += 1
+                    if labeled:
                         break
-                    num_tries += 1
-                if labeled:
-                    break
-        return patches
+            return patches
 
 
 def _obtain_random_patch_from_locs(

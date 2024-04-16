@@ -84,7 +84,7 @@ def get_tensor_memory_usage(tensor: torch.Tensor):
     return memory_usage_gb
 
 
-def estimate_free_cuda_memory(device=0) -> float:
+def estimate_free_cuda_memory(device: torch.device | int | str = "cuda:0") -> float:
     """Returns unallocated memory for device in GB"""
     total_memory = torch.cuda.get_device_properties(device).total_memory / (
         1024**3
@@ -93,13 +93,13 @@ def estimate_free_cuda_memory(device=0) -> float:
     return total_memory - memory_allocated
 
 
-def log_cuda_memory_info():
-    total_memory = torch.cuda.get_device_properties(0).total_memory / (
+def log_cuda_memory_info(device: torch.device | int | str = "cuda:0"):
+    total_memory = torch.cuda.get_device_properties(device).total_memory / (
         1024**3
     )  # Convert to gigabytes
-    memory_allocated = torch.cuda.memory_allocated() / (1024**3)
-    max_memory_allocated = torch.cuda.max_memory_allocated() / (1024**3)
-    memory_cached = torch.cuda.memory_reserved() / (1024**3)
+    memory_allocated = torch.cuda.memory_allocated(device) / (1024**3)
+    max_memory_allocated = torch.cuda.max_memory_allocated(device) / (1024**3)
+    memory_cached = torch.cuda.memory_reserved(device) / (1024**3)
 
     logger.debug("-" * 8)
     logger.debug("Before Compute")

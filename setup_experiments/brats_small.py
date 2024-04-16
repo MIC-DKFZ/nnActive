@@ -21,6 +21,7 @@ if __name__ == "__main__":
     patch_size = [20, 20, 20]
     num_processes = 4
     train_folds = 5
+    additional_overlap = 0.8
     pre_suffix = "__patch-full_patch"
     add_validation = "--disable_tta"
     add_uncertainty = "--diable_tta"
@@ -41,5 +42,6 @@ if __name__ == "__main__":
         pre_suffix=pre_suffix,
         add_validation=add_validation,
         add_uncertainty=add_uncertainty,
+        additional_overlap=additional_overlap,
     )
     setter.rollout(first_d_set, num_experiments=args.num_experiments, debug=args.debug)

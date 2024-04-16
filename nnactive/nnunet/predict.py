@@ -45,28 +45,32 @@ def predict_entry_point(
         part_id < num_parts
     ), "Do you even read the documentation? See nnUNetv2_predict -h."
 
-    assert device in [
-        "cpu",
-        "cuda",
-        "mps",
-    ], f"-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {device}."
-    if device == "cpu":
-        # let's allow torch to use hella threads
-        import multiprocessing
-
-        torch.set_num_threads(multiprocessing.cpu_count())
-        device = torch.device("cpu")
-    elif device == "cuda":
-        # multithreading in torch doesn't help nnU-Net if run on GPU
-        try:
-            os.environ["torchset"]
-        except KeyError:
-            torch.set_num_threads(1)
-            torch.set_num_interop_threads(1)
-            os.environ["torchset"] = "True"
-        device = torch.device("cuda")
+    if isinstance(device, torch.device):
+        if device.type == "cuda":
+            torch.set_default_device(device)
     else:
-        device = torch.device("mps")
+        assert device in [
+            "cpu",
+            "cuda",
+            "mps",
+        ], f"-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {device}."
+        if device == "cpu":
+            # let's allow torch to use hella threads
+            import multiprocessing
+
+            torch.set_num_threads(multiprocessing.cpu_count())
+            device = torch.device("cpu")
+        elif device == "cuda":
+            # multithreading in torch doesn't help nnU-Net if run on GPU
+            try:
+                os.environ["torchset"]
+            except KeyError:
+                torch.set_num_threads(1)
+                torch.set_num_interop_threads(1)
+                os.environ["torchset"] = "True"
+            device = torch.device("cuda")
+        else:
+            device = torch.device("mps")
 
     predictor = nnUNetPredictor(
         tile_step_size=step_size,

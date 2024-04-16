@@ -27,11 +27,21 @@ from .update_data import update_step
                 "help": "Disables progress bars and get more explicit print statements.",
             },
         ),
+        (
+            ("--n_gpus"),
+            {
+                "default": 1,
+                "type": int,
+                "help": "Set amount of gpus to be used in parallel for training, prediction and query step."
+                "Keep in mind that setting this to values >1 will start parallel processes.",
+            },
+        ),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     verbose = args.verbose
+    n_gpus = args.n_gpus
 
     config = ActiveConfig.get_from_id(dataset_id)
     state = State.get_id_state(dataset_id)
@@ -70,16 +80,16 @@ def main(args: Namespace) -> None:
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(dataset_id)
+                train_nnUNet_ensemble(dataset_id, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
-                get_performance(dataset_id, verbose=verbose)
+                get_performance(dataset_id, verbose=verbose, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if al_iteration < config.query_steps - 1:
                 if state.pred_tr is False and state.query is False:
                     monitor.log("task", "query_pool", epoch=al_iteration)
-                    query_pool(dataset_id, verbose=verbose)
+                    query_pool(dataset_id, verbose=verbose, n_gpus=n_gpus)
                     state = State.get_id_state(dataset_id)
                 if state.update_data is False:
                     monitor.log("task", "update_step", epoch=al_iteration)

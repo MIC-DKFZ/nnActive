@@ -1,21 +1,11 @@
-import hashlib
-import os
 import shutil
-import subprocess
 from pathlib import Path
 
-import numpy as np
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
-from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
-from tqdm import tqdm
 
 from nnactive.cli.subcommands.convert_to_partannotated import (
     convert_dataset_to_partannotated,
 )
-from nnactive.cli.subcommands.nnunet_extract_fingerprint import (
-    extract_fingerprint_dataset,
-)
-from nnactive.cli.subcommands.resample_nnunet_dataset import resample_nnunet_dataset
 from nnactive.loops.loading import get_loop_patches
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
