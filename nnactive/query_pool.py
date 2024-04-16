@@ -8,7 +8,9 @@ from nnactive.strategies import get_strategy
 from nnactive.utils.io import save_json
 
 
-def query_pool(dataset_id: int, force: bool = False, verbose: bool = False):
+def query_pool(
+    dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
+):
     state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
 
@@ -22,7 +24,7 @@ def query_pool(dataset_id: int, force: bool = False, verbose: bool = False):
         n_patch_per_image=config.n_patch_per_image,
         verbose=verbose,
     )
-    query = strategy.query()
+    query = strategy.query(n_gpus=n_gpus)
 
     top_patches_fn = f"{config.uncertainty}_{loop_val:03d}.json"
     save_json(strategy.top_patches, raw_dataset_path / top_patches_fn)

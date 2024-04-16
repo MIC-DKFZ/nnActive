@@ -66,9 +66,16 @@ class nnActivePreprocessor(DefaultPreprocessor):
             patches = get_patches_from_loop_files(loop_path)
         else:
             patches = get_loop_patches(loop_path, None)
-        identifiers = [
-            patch.file.replace(dataset_json["file_ending"], "") for patch in patches
-        ]
+
+        # preprocess every file only once in case of multiple patches for same image.
+        identifiers = list(
+            set(
+                [
+                    patch.file.replace(dataset_json["file_ending"], "")
+                    for patch in patches
+                ]
+            )
+        )
         output_directory = join(
             nnUNet_preprocessed, dataset_name, configuration_manager.data_identifier
         )

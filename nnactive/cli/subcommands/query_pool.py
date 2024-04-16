@@ -46,6 +46,14 @@ from nnactive.query_pool import query_pool
                 "help": "Disables progress bars and get more explicit print statements.",
             },
         ),
+        (
+            ("--n_gpus"),
+            {
+                "default": 1,
+                "type": int,
+                "help": "How many gpus in parallel are used in this step.",
+            },
+        ),
     ],
 )
 def main(args: Namespace):
@@ -54,6 +62,7 @@ def main(args: Namespace):
     query_size = args.num_patches
     force = args.force
     verbose = args.verbose
+    n_gpus = args.n_gpus
 
     config = ActiveConfig.get_from_id(dataset_id)
     if patch_size is not None:
@@ -61,4 +70,4 @@ def main(args: Namespace):
     if query_size is not None:
         config.query_size = query_size
     with monitor.active_run(config=config.to_dict()):
-        query_pool(dataset_id, force=force, verbose=verbose)
+        query_pool(dataset_id, n_gpus=n_gpus, force=force, verbose=verbose)

@@ -21,6 +21,7 @@ class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
     starting_budget: str = "standard"  # how was starting budget created?
     trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
+    model_plans: str = "nnUNetPlans"
     model_config: str = "3d_fullres"  # 3d_fullres
     uncertainty: str = (
         "random"  # mutual_information TODO: rename this to query_strategy!
@@ -40,7 +41,7 @@ class ActiveConfig:
     train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
     use_mirroring: bool = False  # use mirroring during query prediction
-    use_gaussian: bool = False  # use gaussian during query predition
+    use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
     add_uncertainty: str = ""  # deprecated argument!
     add_validation: str = ""  # deprecated argument!

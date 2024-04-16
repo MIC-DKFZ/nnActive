@@ -1,9 +1,13 @@
 import json
+import multiprocessing
 import os
 from argparse import Namespace
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import numpy as np
+import torch
 from loguru import logger
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 
@@ -94,16 +98,49 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
                 "help": "Disables progress bars and get more explicit print statements.",
             },
         ),
+        (("--n_gpus"), {"default": 1, "type": int}),
     ],
 )
 def main(args: Namespace) -> None:
     dataset_id = args.dataset_id
     force = args.force
     verbose = args.verbose
-    get_performance(dataset_id, force, verbose)
+    n_gpus = args.n_gpus
+    get_performance(dataset_id, force, verbose, n_gpus)
 
 
-def get_performance(dataset_id: int, force: bool = False, verbose: bool = False):
+def wrap_prediction(
+    input_folder: str,
+    output_folder: str,
+    dataset_id: int,
+    config: ActiveConfig,
+    verbose: bool,
+    num_parts: int,
+    part_id: int,
+    device: torch.device,
+):
+    logger.info(
+        f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
+    )
+    folds = [fold for fold in range(config.working_folds)]
+    torch.cuda.set_device(device)
+    predict_entry_point(
+        input_folder=input_folder,
+        output_folder=output_folder,
+        dataset_id=dataset_id,
+        train_identifier=config.trainer,
+        configuration_identifier=config.model_config,
+        folds=folds,
+        verbose=verbose,
+        num_parts=num_parts,
+        part_id=part_id,
+        disable_progress_bar=verbose,
+    )
+
+
+def get_performance(
+    dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
+):
     state = State.get_id_state(dataset_id, verify=not force)
     config = ActiveConfig.get_from_id(dataset_id)
     images_path = get_raw_path(dataset_id) / "imagesVal"
@@ -111,8 +148,7 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
     loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
     pred_path = get_results_path(dataset_id) / "predVal"
     dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
-    plans_identifier = "nnUNetPlans"
-    plans_path = get_preprocessed_path(dataset_id) / f"{plans_identifier}.json"
+    plans_path = get_preprocessed_path(dataset_id) / f"{config.model_plans}.json"
 
     num_folds = config.working_folds
     loop_results_path: Path = (
@@ -124,19 +160,61 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
     loop_summary_json = loop_results_path / "summary.json"
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
 
-    folds = " ".join([f"{fold}" for fold in range(num_folds)])
     # TODO: redo add_validation in config!
-    folds = [i for i in range(num_folds)]
     with monitor.active_run(config=config.to_dict()):
-        predict_entry_point(
-            input_folder=str(images_path),
-            output_folder=str(pred_path),
-            dataset_id=dataset_id,
-            train_identifier=config.trainer,
-            configuration_identifier=config.model_config,
-            folds=folds,
-            verbose=verbose,
-            disable_progress_bar=not verbose,
+        if n_gpus == 1:
+            device = torch.device("cuda:0")
+            predict_entry_point(
+                input_folder=str(images_path),
+                output_folder=str(pred_path),
+                dataset_id=dataset_id,
+                train_identifier=config.trainer,
+                configuration_identifier=config.model_config,
+                folds=[i for i in range(num_folds)],
+                verbose=verbose,
+                disable_progress_bar=verbose,
+                device=device,
+            )
+        else:
+            try:
+                with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+                    for _ in executor.map(
+                        wrap_prediction,
+                        [str(images_path)] * num_folds,
+                        [str(pred_path)] * num_folds,
+                        [dataset_id] * num_folds,
+                        [config] * num_folds,
+                        [verbose] * num_folds,
+                        [n_gpus] * num_folds,
+                        [p_id for p_id in range(num_folds)],
+                    ):
+                        pass
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+
+    os.makedirs(loop_results_path, exist_ok=True)
+    compute_metrics_on_folder2(
+        folder_ref=str(labels_path),
+        folder_pred=str(pred_path),
+        dataset_json_file=str(dataset_json_path),
+        plans_file=str(plans_path),
+        output_file=str(loop_summary_json),
+        num_processes=8,
+    )
+
+    # Summarize the cross validation performance as json. Might be interesting to track across loops
+    logger.info("Creating a summary of the cross validation results from training...")
+    num_folds = config.working_folds
+    summary_cross_val_dict = {}
+
+    # first save the individual cross val dicts by simply appending them with key fold_X
+    for fold in range(num_folds):
+        trained_model_path = get_output_folder(
+            dataset_id, config.trainer, config.model_plans, config.model_config, fold
         )
 
         os.makedirs(loop_results_path, exist_ok=True)

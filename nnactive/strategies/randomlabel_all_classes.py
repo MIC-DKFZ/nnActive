@@ -27,6 +27,7 @@ def query_starting_budget_all_classes(
     additional_label_path: Path | None = None,
     additional_overlap: float = 0.8,
 ) -> list[Patch]:
+    # logger.debug(f"Additional overlap {additional_overlap}")
     dataset_json = read_dataset_json(annotated_id)
     label_dict_dataset_json = dataset_json["labels"]
     # Take first value if multi-region training e.g. BraTS
@@ -46,10 +47,12 @@ def query_starting_budget_all_classes(
         for label, files in label_dict_files.items():
             if label_dict_dataset_json[label] in img_labels:
                 files.append(fn)
+    # logger.debug(label_dict_files)
     labeled_patches = annotated_patches
     patches = []
     # Select a set amount of num_per_label samples for each class
     while len(label_dict_files) > 0:
+        # select always label with least amount of examples!
         label_use = [(key, len(v)) for key, v in label_dict_files.items()]
         label_use.sort(key=lambda x: x[1])
 
@@ -61,9 +64,16 @@ def query_starting_budget_all_classes(
                 f"This is not enough to ensure all classes are represented in all training folds."
             )
         else:
-            samples = random.sample(label_dict_files.pop(label), num_per_label)
+            samples: list[str] = label_dict_files.pop(label)
+            rng.shuffle(samples)
         label_per_class_counter = 0
+
+        # iteration over all samples that contain class and try to set patch inside
         for sample in samples:
+            # if enough patches drawn per class, exit loop
+            if label_per_class_counter == num_per_label:
+                break
+
             labeled = False
             num_tries = 0
             additional_label = None
@@ -74,19 +84,20 @@ def query_starting_budget_all_classes(
                     file_ending,
                 )
                 additional_label: np.ndarray = additional_label != 255
+            if verbose:
+                logger.debug(f"Loading Image: {sample} for label {label}")
+            label_map = load_label_map(sample, raw_labels_path, file_ending)
+            img_size = label_map.shape
+            current_patch_list = labeled_patches + patches
+            selected_patches_image = [
+                patch
+                for patch in current_patch_list
+                if patch.file == sample + file_ending
+            ]
+            locs = np.argwhere(label_map == label_dict_dataset_json[label]).tolist()
 
+            # try drawing patches for sample until one fits or max_tries
             while not labeled:
-                if verbose:
-                    logger.debug(f"Loading Image: {sample} for label {label}")
-                label_map = load_label_map(sample, raw_labels_path, file_ending)
-                img_size = label_map.shape
-                current_patch_list = labeled_patches + patches
-                selected_patches_image = [
-                    patch
-                    for patch in current_patch_list
-                    if patch.file == sample + file_ending
-                ]
-                locs = np.argwhere(label_map == label_dict_dataset_json[label]).tolist()
                 (
                     iter_patch_loc,
                     iter_patch_size,
@@ -103,6 +114,14 @@ def query_starting_budget_all_classes(
                             percentage_overlap_array(patch, additional_label)
                             <= additional_overlap
                         ):
+                            for label_rm in label_dict_files:
+                                if sample in label_dict_files[label_rm]:
+                                    label_dict_files[label_rm].remove(sample)
+                            # only temporary for patchsize = 1
+                            labeled_val = label_map[patch.coords]
+                            logger.debug(
+                                f"Annotated Patch {patch} for Label {label_dict_dataset_json[label]} and it consists of label {labeled_val}"
+                            )
                             patches.append(patch)
                             # print(f"Creating Patch with iteration: {num_tries}")
                             labeled = True
@@ -123,13 +142,15 @@ def query_starting_budget_all_classes(
 
                 # if no new patch could fit inside of img do not consider again
                 if num_tries == trials_per_img:
-                    logger.info(f"Could not place patch in image {sample.name}")
-                    logger.info(f"PatchCount {len(patches)}")
-                    logger.info(f"{num_tries=}")
+                    logger.info(f"Could not place patch in image {sample}")
+                    logger.info(f"PatchCount: {len(patches)}")
+                    logger.info(f"Num Tries: {num_tries}")
                     break
                 num_tries += 1
-        if label_per_class_counter < 2:
-            raise RuntimeError(f'Could not place 2 patches for class "{label}"')
+        if label_per_class_counter < num_per_label:
+            raise RuntimeError(
+                f'Could not place {num_per_label} patches for class "{label}"'
+            )
     # if verbose:
     #     logger.debug(patches)
     return patches
@@ -167,7 +188,7 @@ class RandomLabelAllClasses(RandomLabel):
         )
         random.seed(seed)
 
-    def query(self, verbose: bool = False, **kwargs) -> List[Patch]:
+    def query(self, verbose: bool = False, n_gpus: int = 1, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times
         annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
         selected_patches = query_starting_budget_all_classes(
@@ -182,7 +203,9 @@ class RandomLabelAllClasses(RandomLabel):
             additional_overlap=self.additional_overlap,
             verbose=verbose,
         )
-        return super().query(verbose, selected_patches)
+        return super().query(
+            verbose=verbose, already_annotated_patches=selected_patches
+        )
 
 
 class RandomAllClasses(Random):
@@ -215,7 +238,7 @@ class RandomAllClasses(Random):
         )
         random.seed(seed)
 
-    def query(self, verbose: bool = False, **kwargs) -> List[Patch]:
+    def query(self, verbose: bool = False, n_gpus: int = 1, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times
         annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
         selected_patches = query_starting_budget_all_classes(
@@ -230,4 +253,6 @@ class RandomAllClasses(Random):
             additional_overlap=self.additional_overlap,
             verbose=verbose,
         )
-        return super().query(verbose, selected_patches)
+        return super().query(
+            verbose=verbose, already_annotated_patches=selected_patches
+        )
