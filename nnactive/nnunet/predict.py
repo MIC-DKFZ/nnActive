@@ -1,56 +1,12 @@
-import inspect
-import itertools
-import multiprocessing
 import os
-import traceback
-from copy import deepcopy
-from time import sleep
-from typing import List, Optional, Tuple, Union
+from typing import Union
 
-import nnunetv2
-import numpy as np
 import torch
-from acvl_utils.cropping_and_padding.padding import pad_nd_image
-from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
-from batchgenerators.utilities.file_and_folder_operations import (
-    isdir,
-    isfile,
-    join,
-    load_json,
-    maybe_mkdir_p,
-    save_json,
-    subdirs,
-)
-from nnunetv2.configuration import default_num_processes
-from nnunetv2.inference.data_iterators import (
-    PreprocessAdapterFromNpy,
-    preprocessing_iterator_fromfiles,
-    preprocessing_iterator_fromnpy,
-)
-from nnunetv2.inference.export_prediction import (
-    convert_predicted_logits_to_segmentation_with_correct_shape,
-    export_prediction_from_logits,
-)
+from batchgenerators.utilities.file_and_folder_operations import isdir, maybe_mkdir_p
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-from nnunetv2.inference.sliding_window_prediction import (
-    compute_gaussian,
-    compute_steps_for_sliding_window,
-)
-from nnunetv2.utilities.file_path_utilities import (
-    check_workers_alive_and_busy,
-    get_output_folder,
-)
-from nnunetv2.utilities.find_class_by_name import recursive_find_python_class
-from nnunetv2.utilities.helpers import dummy_context, empty_cache
-from nnunetv2.utilities.json_export import recursive_fix_for_json_export
-from nnunetv2.utilities.label_handling.label_handling import (
-    determine_num_input_channels,
-)
-from nnunetv2.utilities.plans_handling.plans_handler import (
-    ConfigurationManager,
-    PlansManager,
-)
-from nnunetv2.utilities.utils import create_lists_from_splitted_dataset_folder
+from nnunetv2.utilities.file_path_utilities import get_output_folder
+
+from nnactive.logger import monitor
 
 
 def predict_entry_point(
@@ -121,6 +77,7 @@ def predict_entry_point(
         verbose=verbose,
         verbose_preprocessing=verbose,
         allow_tqdm=not disable_progress_bar,
+        log_times=monitor,
     )
     predictor.initialize_from_trained_model_folder(
         model_folder, folds, checkpoint_name=checkpoint

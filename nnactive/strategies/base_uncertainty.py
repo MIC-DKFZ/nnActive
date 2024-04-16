@@ -402,7 +402,7 @@ class nnActivePredictor(nnUNetPredictor):
         # set up multiprocessing for spawning
 
         for preprocessed in monitor.itertimer(
-            data_iterator, name="predict_from_data_iterator"
+            data_iterator, name="get_queries_per_image"
         ):
             # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
             # if os.path.basename(preprocessed["ofile"]) not in [
