@@ -10,7 +10,7 @@ dependencies = [
     "numpy",
     "batchgenerators",
     "dynamic-network-architectures @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git@convnext", # only until convnext is merged into main
-    "nnunetv2 @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/iml/active-nnu-net.git@alegra-humanAL",
+    "nnunetv2 @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/iml/active-nnu-net.git",
     "SimpleITK",
     "rich",
     "pydantic",
