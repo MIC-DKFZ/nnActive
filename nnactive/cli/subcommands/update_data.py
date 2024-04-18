@@ -9,6 +9,7 @@ from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_data
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
+from nnactive import paths
 
 
 @register_subcommand("update_data")
@@ -40,8 +41,7 @@ def update_step(
         additional_label_path = None
 
     if annotated:
-        # base_dir = get_raw_path(dataset_json["annotated_id"]) / "labelsTr"
-        base_dir = get_raw_path(state.dataset_id) / "labelsTr"
+        base_dir = paths.nnActive_raw / "nnUNet_raw" / config.dataset / "labelsTr"
     else:
         base_dir = get_raw_path(state.dataset_id) / f"annoTr_{loop_val:02}"
 

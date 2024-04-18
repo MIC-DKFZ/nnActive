@@ -148,6 +148,9 @@ def add_subcommands(parser: ArgumentParser):
 def run_subcommand(args: Namespace):
     kwargs = args[args.command].as_dict()
     kwargs["config"] = _dict_to_dataclass(args[args.command].config, ActiveConfig)
-    kwargs["runtime_config"] = _dict_to_dataclass(args[args.command].runtime_config, RuntimeConfig)
+
+    if "runtime_config" in kwargs:
+        kwargs["runtime_config"] = _dict_to_dataclass(args[args.command].runtime_config, RuntimeConfig)
+
     del kwargs["experiment"]
     __subcommands[args.command](**kwargs)
