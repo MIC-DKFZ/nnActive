@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import shutil
 from pathlib import Path
 from time import sleep
@@ -21,8 +22,10 @@ from nnactive.loops.loading import get_loop_patches, get_patches_from_loop_files
 
 class nnActivePreprocessor(DefaultPreprocessor):
     """Preprocessor for nnUNet which works identical to nnUNet DefaultPreprocessor.
-    Only change is that only the cases for which annotations are in loop files noted are actually preprocessed.
+    Only change is that only the cases for which annotations are in loop files noted are actually preprocessed
     Further, it also allows to partially only preprocess the data which has been added in the newest loop_file.
+    AND
+    .npy files contained in the dataset are deleted.
     """
 
     def run(
@@ -82,6 +85,13 @@ class nnActivePreprocessor(DefaultPreprocessor):
 
         if isdir(output_directory) and do_all:
             shutil.rmtree(output_directory)
+        else:
+            # delete previously existing _seg.npy files
+            # data does not change
+            filepaths = [join(output_directory, i + "_seg.npy") for i in identifiers]
+            for filepath in filepaths:
+                if os.path.isfile(filepath):
+                    os.remove(filepath)
 
         maybe_mkdir_p(output_directory)
 
