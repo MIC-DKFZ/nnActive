@@ -188,6 +188,7 @@ def get_performance(
                     [verbose] * num_folds,
                     [n_gpus] * num_folds,
                     [p_id for p_id in range(num_folds)],
+                    [torch.device(f"cuda:{i}") for i in range(n_gpus)],
                 ):
                     pass
         except BrokenProcessPool as exc:
