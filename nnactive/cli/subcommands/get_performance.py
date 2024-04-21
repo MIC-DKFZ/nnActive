@@ -181,13 +181,13 @@ def get_performance(
             with ProcessPoolExecutor(max_workers=n_gpus) as executor:
                 for _ in executor.map(
                     wrap_prediction,
-                    [str(images_path)] * num_folds,
-                    [str(pred_path)] * num_folds,
-                    [dataset_id] * num_folds,
-                    [config] * num_folds,
-                    [verbose] * num_folds,
-                    [n_gpus] * num_folds,
-                    [p_id for p_id in range(num_folds)],
+                    [str(images_path)] * n_gpus,
+                    [str(pred_path)] * n_gpus,
+                    [dataset_id] * n_gpus,
+                    [config] * n_gpus,
+                    [verbose] * n_gpus,
+                    [n_gpus] * n_gpus,
+                    [p_id for p_id in range(n_gpus)],
                     [torch.device(f"cuda:{i}") for i in range(n_gpus)],
                 ):
                     pass
