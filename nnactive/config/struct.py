@@ -6,12 +6,12 @@ import re
 from pathlib import Path
 from typing import Union
 
-from loguru import logger
 import nnunetv2.paths
+from loguru import logger
 from pydantic.dataclasses import dataclass
 
-from nnactive.nnunet.utils import convert_id_to_dataset_name
 import nnactive.paths
+from nnactive.nnunet.utils import convert_id_to_dataset_name
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -23,7 +23,8 @@ FILENAME = "config.json"
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
     base_id: int = 0
-    starting_budget: str = "standard"  # how was starting budget created?
+    starting_budget: str = "random"  # how was starting budget created?
+    starting_budget_size: int | None = None
     trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
     model_plans: str = "nnUNetPlans"
     model_config: str = "3d_fullres"  # 3d_fullres
@@ -40,13 +41,11 @@ class ActiveConfig:
     seed: int = 12345  # seed to be used for everything random in the experiment
     full_folds: int = 5  # the amount of folds used in the split
     train_folds: int | None = None  # if specified, use subset of folds
-    dataset: str = "Dataset Identifier"
+    dataset: str = "Dataset Identifier"  # required!
     pre_suffix: str = ""
     use_mirroring: bool = False  # use mirroring during query prediction
     use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
-    add_uncertainty: str = ""  # deprecated argument!
-    add_validation: str = ""  # deprecated argument!
     patch_overlap: float = 0  # how much overlap is allowed for patchs
     additional_overlap: float = (
         0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
@@ -55,6 +54,8 @@ class ActiveConfig:
     def __post_init__(self):
         if self.n_patch_per_image is None:
             self.n_patch_per_image = self.query_size
+        if self.starting_budget_size is None:
+            self.starting_budget_size = self.query_size
 
     # TODO: nnUNet env var setter
     # TODO: path getters
@@ -96,7 +97,9 @@ class ActiveConfig:
         try:
             save_path: Path = get_results_folder(dataset_id) / FILENAME
         except FileNotFoundError:
-            save_path: Path = nnactive.paths.get_nnActive_results() / convert_id_to_dataset_name(
+            save_path: (
+                Path
+            ) = nnactive.paths.get_nnActive_results() / convert_id_to_dataset_name(
                 dataset_id
             )
             logger.info(f"Creating Path: {save_path}")
@@ -118,3 +121,4 @@ class ActiveConfig:
 @dataclass
 class RuntimeConfig:
     num_processes: int = 4
+    n_gpus: int = 1

@@ -18,7 +18,12 @@ from .update_data import update_step
 
 
 @register_subcommand("run_al_loops")
-def main(config: ActiveConfig, runtime_config: RuntimeConfig, continue_id: int | None = None, verbose: bool = False, n_gpus: int = 1) -> None:
+def main(
+    config: ActiveConfig,
+    runtime_config: RuntimeConfig,
+    continue_id: int | None = None,
+    verbose: bool = False,
+) -> None:
     config.set_nnunet_env()
 
     print(f"{continue_id=}")
@@ -65,16 +70,26 @@ def main(config: ActiveConfig, runtime_config: RuntimeConfig, continue_id: int |
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(config, continue_id=continue_id, n_gpus=n_gpus)
+                train_nnUNet_ensemble(config, continue_id=continue_id)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
-                get_performance(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
+                get_performance(
+                    config,
+                    runtime_config,
+                    continue_id=continue_id,
+                    verbose=verbose,
+                )
                 state = State.get_id_state(dataset_id)
             if al_iteration < config.query_steps - 1:
                 if state.pred_tr is False and state.query is False:
                     monitor.log("task", "query_pool", epoch=al_iteration)
-                    query_pool(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
+                    query_pool(
+                        config,
+                        runtime_config,
+                        continue_id=continue_id,
+                        verbose=verbose,
+                    )
                     state = State.get_id_state(dataset_id)
                 if state.update_data is False:
                     monitor.log("task", "update_step", epoch=al_iteration)

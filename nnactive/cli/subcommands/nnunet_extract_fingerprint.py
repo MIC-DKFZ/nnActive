@@ -40,6 +40,7 @@ def extract_fingerprint_dataset(
     return fpe.run(overwrite_existing=clean)
 
 
+# TODO: Fix this for final version.
 @register_subcommand(
     "nnunet_extract_fingerprint",
     [

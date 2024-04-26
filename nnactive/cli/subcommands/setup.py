@@ -71,7 +71,7 @@ def convert_dset(config: ActiveConfig, state: State):
         config.base_id,
         state.dataset_id,
         0,
-        config.query_size,
+        config.starting_budget_size,
         config.patch_size,
         name_suffix,
         {},
@@ -103,7 +103,12 @@ def setup_al(config: ActiveConfig):
 
 
 @register_subcommand("setup")
-def main(config: ActiveConfig, runtime_config: RuntimeConfig, debug: bool = False, force: bool = False):
+def main(
+    config: ActiveConfig,
+    runtime_config: RuntimeConfig,
+    debug: bool = False,
+    force: bool = False,
+):
     config.set_nnunet_env()
     state = setup_al(config)
     convert_dset(config, state)

@@ -15,7 +15,7 @@ from nnunetv2.run.run_training import run_training
 from nnunetv2.training.dataloading.utils import unpack_dataset
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.config import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_preprocessed_path
 from nnactive.results.state import State
@@ -47,7 +47,12 @@ def wrap_training(
 
 
 @register_subcommand("train_nnUNet_ensemble")
-def train_nnUNet_ensemble(config: ActiveConfig, continue_id: int | None = None, force: bool = False, n_gpus: int = 1):
+def train_nnUNet_ensemble(
+    config: ActiveConfig,
+    runtime_config: RuntimeConfig = RuntimeConfig(),
+    continue_id: int | None = None,
+    force: bool = False,
+):
     config.set_nnunet_env()
 
     if continue_id is None:
@@ -73,11 +78,11 @@ def train_nnUNet_ensemble(config: ActiveConfig, continue_id: int | None = None, 
         ),
         unpack_segmentation=True,
         overwrite_existing=False,
-        num_processes=4 * n_gpus,
+        num_processes=runtime_config.num_processes * runtime_config.n_gpus,
         verify_npy=False,
     )
 
-    if n_gpus == 1:
+    if runtime_config.n_gpus == 1:
         device = torch.device("cuda:0")
         for fold in range(num_folds):
             run_training(
@@ -91,13 +96,13 @@ def train_nnUNet_ensemble(config: ActiveConfig, continue_id: int | None = None, 
                 logger=monitor.get_logger(),
             )
     else:
-        devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
+        devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
         folds = [
-            [fold for fold in range(num_folds) if fold % n_gpus == d]
-            for d in range(n_gpus)
+            [fold for fold in range(num_folds) if fold % runtime_config.n_gpus == d]
+            for d in range(runtime_config.n_gpus)
         ]
         try:
-            with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus) as executor:
                 for _ in executor.map(
                     wrap_training,
                     [state.dataset_id] * num_folds,

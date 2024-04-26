@@ -2,7 +2,7 @@ from pathlib import Path
 
 import nnunetv2.paths
 
-from nnactive.config import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.loops.loading import get_loop_patches, get_sorted_loop_files, save_loop
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.state import State
@@ -11,7 +11,13 @@ from nnactive.strategies import get_strategy
 from nnactive.utils.io import save_json
 
 
-def query_pool(config: ActiveConfig, continue_id: int | None = None, force: bool = False, verbose: bool = False, n_gpus: int = 1):
+def query_pool(
+    config: ActiveConfig,
+    runtime_config: RuntimeConfig = RuntimeConfig(),
+    continue_id: int | None = None,
+    force: bool = False,
+    verbose: bool = False,
+):
     config.set_nnunet_env()
     if continue_id is None:
         state = State.latest(config)
@@ -29,7 +35,7 @@ def query_pool(config: ActiveConfig, continue_id: int | None = None, force: bool
         # n_patch_per_image=config.n_patch_per_image,
         verbose=verbose,
     )
-    query = strategy.query(n_gpus=n_gpus)
+    query = strategy.query(n_gpus=runtime_config.n_gpus)
 
     top_patches_fn = f"{config.uncertainty}_{loop_val:03d}.json"
     save_json(strategy.top_patches, raw_dataset_path / top_patches_fn)

@@ -16,7 +16,7 @@ from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.config import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.logger import monitor
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.predict import predict_entry_point
@@ -31,7 +31,6 @@ from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 
 nnActive_results = get_nnActive_results()
-TIMEOUT_S = 60 * 60
 
 
 def get_mean_foreground_cv(summary_cross_val_dict, n_folds):
@@ -117,10 +116,10 @@ def wrap_prediction(
 @register_subcommand("get_performance")
 def get_performance(
     config: ActiveConfig,
+    runtime_config: RuntimeConfig = RuntimeConfig(),
     continue_id: int | None = None,
     force: bool = False,
     verbose: bool = False,
-    n_gpus: int = 1,
 ):
     config.set_nnunet_env()
     if continue_id is None:
@@ -132,8 +131,7 @@ def get_performance(
     loop_val = len(get_sorted_loop_files(get_raw_path(state.dataset_id))) - 1
     pred_path = get_results_path(state.dataset_id) / "predVal"
     dataset_json_path = get_raw_path(state.dataset_id) / "dataset.json"
-    plans_identifier = "nnUNetPlans"
-    plans_path = get_preprocessed_path(state.dataset_id) / f"{plans_identifier}.json"
+    plans_path = get_preprocessed_path(state.dataset_id) / f"{config.model_plans}.json"
 
     num_folds = config.working_folds
     loop_results_path: Path = (
@@ -144,7 +142,7 @@ def get_performance(
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
 
     # TODO: redo add_validation in config!
-    if n_gpus == 1:
+    if runtime_config.n_gpus == 1:
         device = torch.device("cuda:0")
         predict_entry_point(
             input_folder=str(images_path),
@@ -159,17 +157,17 @@ def get_performance(
         )
     else:
         try:
-            with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus) as executor:
                 for _ in executor.map(
                     wrap_prediction,
-                    [str(images_path)] * n_gpus,
-                    [str(pred_path)] * n_gpus,
-                    [state.dataset_id] * n_gpus,
-                    [config] * n_gpus,
-                    [verbose] * n_gpus,
-                    [n_gpus] * n_gpus,
-                    [p_id for p_id in range(n_gpus)],
-                    [torch.device(f"cuda:{i}") for i in range(n_gpus)],
+                    [str(images_path)] * runtime_config.n_gpus,
+                    [str(pred_path)] * runtime_config.n_gpus,
+                    [state.dataset_id] * runtime_config.n_gpus,
+                    [config] * runtime_config.n_gpus,
+                    [verbose] * runtime_config.n_gpus,
+                    [runtime_config.n_gpus] * runtime_config.n_gpus,
+                    [p_id for p_id in range(runtime_config.n_gpus)],
+                    [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)],
                 ):
                     pass
         except BrokenProcessPool as exc:
@@ -199,7 +197,7 @@ def get_performance(
         trained_model_path = get_output_folder(
             state.dataset_id,
             config.trainer,
-            plans_identifier,
+            config.model_plans,
             config.model_config,
             fold,
         )
@@ -211,7 +209,7 @@ def get_performance(
             dataset_json_file=str(dataset_json_path),
             plans_file=str(plans_path),
             output_file=str(loop_summary_json),
-            num_processes=8,
+            num_processes=runtime_config.num_processes,
         )
 
         # Summarize the cross validation performance as json. Might be interesting to track across loops
@@ -226,7 +224,7 @@ def get_performance(
             trained_model_path = get_output_folder(
                 state.dataset_id,
                 config.trainer,
-                plans_identifier,
+                config.model_plans,
                 config.model_config,
                 fold,
             )
