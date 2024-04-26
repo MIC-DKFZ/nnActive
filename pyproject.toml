@@ -17,6 +17,8 @@ dependencies = [
     "psutil", # required to get RAM requirements
     "loguru",
     "wandb",
+    "jsonargparse[signatures]",
+    "shtab",
 ]
 
 [project.optional-dependencies]

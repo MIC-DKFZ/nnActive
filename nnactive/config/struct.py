@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 from typing import Union
 
 from loguru import logger
+import nnunetv2.paths
 from pydantic.dataclasses import dataclass
 
 from nnactive.nnunet.utils import convert_id_to_dataset_name
-from nnactive.paths import get_nnActive_results
+import nnactive.paths
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -19,6 +22,7 @@ FILENAME = "config.json"
 @dataclass
 class ActiveConfig:
     patch_size: Union[tuple[int, int, int], str]  # what is the patch size to query?
+    base_id: int = 0
     starting_budget: str = "standard"  # how was starting budget created?
     trainer: str = "nnActiveTrainer_200epochs"  # e.g. nnUNetDebugTrainer
     model_plans: str = "nnUNetPlans"
@@ -30,16 +34,14 @@ class ActiveConfig:
     query_size: int = 20  # how many samples are queried
     query_steps: int = 10  # how many query steps are supposed to be made
     agg_stride: int | list[int] = 1  # stride for the aggregation function
-    _n_patch_per_image: int | None = (
+    n_patch_per_image: int | None = (
         None  # how many potential queries per image are allowed
     )
     seed: int = 12345  # seed to be used for everything random in the experiment
-    num_processes: int = (
-        4  # how many processes are used within nnU-Net TODO: this value is dependent on data and machine --> Autoconfig
-    )
     full_folds: int = 5  # the amount of folds used in the split
     train_folds: int | None = None  # if specified, use subset of folds
     dataset: str = "Dataset Identifier"
+    pre_suffix: str = ""
     use_mirroring: bool = False  # use mirroring during query prediction
     use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
@@ -49,6 +51,32 @@ class ActiveConfig:
     additional_overlap: float = (
         0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
     )
+
+    def __post_init__(self):
+        if self.n_patch_per_image is None:
+            self.n_patch_per_image = self.query_size
+
+    # TODO: nnUNet env var setter
+    # TODO: path getters
+    def set_nnunet_env(self):
+        experiment_path = self.group_dir()
+        os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
+        os.environ["nnUNet_preprocessed"] = str(experiment_path / "nnUNet_preprocessed")
+        os.environ["nnUNet_results"] = str(experiment_path / "nnUNet_results")
+        nnunetv2.paths.set_paths(
+            nnUNet_raw=str(experiment_path / "nnUNet_raw"),
+            nnUNet_preprocessed=str(experiment_path / "nnUNet_preprocessed"),
+            nnUNet_results=str(experiment_path / "nnUNet_results"),
+        )
+        nnactive.paths.set_paths(nnActive_results=self.group_dir() / "nnActive_results")
+
+    def name(self) -> str:
+        dataset = self.dataset.replace(f"Dataset{self.base_id:03}_", "")
+        return f"{dataset}{self.pre_suffix}__unc-{self.uncertainty}__seed-{self.seed}"
+
+    def group_dir(self) -> Path:
+        assert nnactive.paths.nnActive_data is not None
+        return nnactive.paths.nnActive_data / self.dataset
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:
@@ -68,7 +96,7 @@ class ActiveConfig:
         try:
             save_path: Path = get_results_folder(dataset_id) / FILENAME
         except FileNotFoundError:
-            save_path: Path = get_nnActive_results() / convert_id_to_dataset_name(
+            save_path: Path = nnactive.paths.get_nnActive_results() / convert_id_to_dataset_name(
                 dataset_id
             )
             logger.info(f"Creating Path: {save_path}")
@@ -86,10 +114,7 @@ class ActiveConfig:
     def working_folds(self):
         return self.train_folds if self.train_folds is not None else self.full_folds
 
-    @property
-    def n_patch_per_image(self):
-        return (
-            self._n_patch_per_image
-            if self._n_patch_per_image is not None
-            else self.query_size
-        )
+
+@dataclass
+class RuntimeConfig:
+    num_processes: int = 4

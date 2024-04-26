@@ -6,6 +6,7 @@ from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
+from nnactive.config.struct import RuntimeConfig
 from nnactive.logger import monitor
 from nnactive.query_pool import query_pool
 from nnactive.results.state import State
@@ -16,35 +17,19 @@ from .train_nnUNet_ensemble import train_nnUNet_ensemble
 from .update_data import update_step
 
 
-@register_subcommand(
-    "run_al_loops",
-    [
-        (("-d", "--dataset_id"), {"type": int, "required": True}),
-        (
-            ("--verbose"),
-            {
-                "action": "store_true",
-                "help": "Disables progress bars and get more explicit print statements.",
-            },
-        ),
-        (
-            ("--n_gpus"),
-            {
-                "default": 1,
-                "type": int,
-                "help": "Set amount of gpus to be used in parallel for training, prediction and query step."
-                "Keep in mind that setting this to values >1 will start parallel processes.",
-            },
-        ),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    verbose = args.verbose
-    n_gpus = args.n_gpus
+@register_subcommand("run_al_loops")
+def main(config: ActiveConfig, runtime_config: RuntimeConfig, continue_id: int | None = None, verbose: bool = False, n_gpus: int = 1) -> None:
+    config.set_nnunet_env()
 
-    config = ActiveConfig.get_from_id(dataset_id)
-    state = State.get_id_state(dataset_id)
+    print(f"{continue_id=}")
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+
+    dataset_id = state.dataset_id
+
+    # TODO: update nnUNet env vars based on config
 
     with monitor.active_run(config=config.to_dict()):
         logger.info(config)
@@ -68,9 +53,9 @@ def main(args: Namespace) -> None:
                 do_all = al_iteration == 0
 
                 preprocess(
-                    [dataset_id],
-                    configurations=[config.model_config],
-                    num_processes=[config.num_processes],
+                    config,
+                    runtime_config,
+                    continue_id=continue_id,
                     verbose=verbose,
                     do_all=do_all,
                 )
@@ -80,18 +65,18 @@ def main(args: Namespace) -> None:
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(dataset_id, n_gpus=n_gpus)
+                train_nnUNet_ensemble(config, continue_id=continue_id, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
-                get_performance(dataset_id, verbose=verbose, n_gpus=n_gpus)
+                get_performance(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
                 state = State.get_id_state(dataset_id)
             if al_iteration < config.query_steps - 1:
                 if state.pred_tr is False and state.query is False:
                     monitor.log("task", "query_pool", epoch=al_iteration)
-                    query_pool(dataset_id, verbose=verbose, n_gpus=n_gpus)
+                    query_pool(config, continue_id=continue_id, verbose=verbose, n_gpus=n_gpus)
                     state = State.get_id_state(dataset_id)
                 if state.update_data is False:
                     monitor.log("task", "update_step", epoch=al_iteration)
-                    update_step(dataset_id, annotated=True)
+                    update_step(config, continue_id=continue_id, annotated=True)
                     state = State.get_id_state(dataset_id)

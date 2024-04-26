@@ -76,6 +76,6 @@ def main(args: Namespace) -> None:
         preprocess(
             [dataset_id],
             configurations=[config.model_config],
-            num_processes=[config.num_processes],
+            num_processes=[runtime_config.num_processes],
             do_all=True,
         )

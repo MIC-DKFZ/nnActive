@@ -1,64 +1,156 @@
-import functools
-from argparse import ArgumentParser, Namespace
-from typing import Any, Callable
+import types
+import typing
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import asdict, is_dataclass
+from pathlib import Path
+from typing import Callable, ParamSpec, TypeVar
+
+import argparse
+from jsonargparse import ArgumentParser, Namespace
+from jsonargparse._common import Action
+
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
+from nnactive.experiments import get_experiment, list_experiments
+
+previous_config: ContextVar = ContextVar("previous_config", default=None)
+
+
+@contextmanager
+def previous_config_context(cfg):
+    token = previous_config.set(cfg)
+    try:
+        yield
+    finally:
+        previous_config.reset(token)
+
+
+class ActionExperiment(Action):
+    """Action to indicate that an argument is an experiment name."""
+
+    def __init__(self, **kwargs):
+        """Initializer for ActionExperiment instance."""
+        if "default" in kwargs:
+            raise ValueError("ActionExperiment does not accept a default.")
+        opt_name = kwargs["option_strings"]
+        opt_name = (
+            opt_name[0]
+            if len(opt_name) == 1
+            else [x for x in opt_name if x[0:2] == "--"][0]
+        )
+        if "." in opt_name:
+            raise ValueError("ActionExperiment must be a top level option.")
+        if "help" not in kwargs:
+            # TODO: hint to list-experiments
+            kwargs["help"] = "Name of an experiment."
+        super().__init__(**kwargs)
+
+    def __call__(self, parser, cfg, values, option_string=None):
+        """Parses the given experiment configuration and adds all the corresponding keys to the namespace.
+
+        Raises:
+            TypeError: If there are problems parsing the configuration.
+        """
+        self.apply_experiment_config(parser, cfg, self.dest, values)
+
+    @staticmethod
+    def apply_experiment_config(parser: ArgumentParser, cfg, dest, value) -> None:
+        with previous_config_context(cfg):
+            experiment_cfg = get_experiment(value)
+            print(experiment_cfg)
+            tcfg = parser.parse_object(
+                {"config": asdict(experiment_cfg)},
+                env=False,
+                defaults=False,
+                _skip_check=True,
+            )
+            cfg_merged = parser.merge_config(tcfg, cfg)
+            cfg.__dict__.update(cfg_merged.__dict__)
+            print(cfg)
+            cfg[dest] = value
+
 
 __subcommands = {}
-__args = {}
+
+P = ParamSpec("P")
 
 
-ArgType = str | tuple[str, ...] | tuple[(str | tuple[str, ...]), dict[str, Any]]
-ArgsType = list[ArgType] | Callable[[ArgumentParser], None]
+T = TypeVar("T", bound=type)
+def _dict_to_dataclass(cfg: dict, cls: T) -> T:
+    def __dict_to_dataclass(cfg, cls: type, key: str):  # noqa: ANN202,ANN001
+        try:
+            if is_dataclass(cls):
+                fieldtypes = typing.get_type_hints(cls)
+                return cls(
+                    **{
+                        k: __dict_to_dataclass(v, fieldtypes[k], k)
+                        for k, v in cfg.items()
+                    }
+                )
+            if (
+                isinstance(cls, types.UnionType)
+                and len(cls.__args__) == 2
+                and cls.__args__[1] == type(None)
+                and is_dataclass(cls.__args__[0])
+                and isinstance(cfg, dict)
+            ):
+                fieldtypes = typing.get_type_hints(cls.__args__[0])
+                return cls.__args__[0](
+                    **{
+                        k: __dict_to_dataclass(v, fieldtypes[k], k)
+                        for k, v in cfg.items()
+                    }
+                )
+            if typing.get_origin(cls) == list:
+                return [
+                    __dict_to_dataclass(v, typing.get_args(cls)[0], key) for v in cfg
+                ]
+            if cls == Path or (
+                isinstance(cls, types.UnionType)
+                and Path in cls.__args__
+                and cfg is not None
+            ):
+                return Path(cfg)
+        except:
+            print(key)
+            raise
+        return cfg
+
+    return __dict_to_dataclass(
+        cfg, cls, ""
+    )  # pyright: ignore [reportReturnType]
 
 
-def _add_args(parser: ArgumentParser, args: list[ArgType]) -> None:
-    for arg in args:
-        match arg:
-            case str(name):
-                parser.add_argument(name, action="store_true")
-            case [str(name), dict(kwargs)]:
-                parser.add_argument(name, **kwargs)
-            case tuple((tuple(names), dict(kwargs))):
-                parser.add_argument(*names, **kwargs)
-            case tuple(names) if all(map(lambda n: isinstance(n, str), names)):
-                parser.add_argument(*names, action="store_true")
-            case _:
-                raise ValueError(f'Cannot add arguments from "{arg}"')
+def register_subcommand(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
+    def decorator(fn: Callable[P, None]) -> Callable[P, None]:
+        __subcommands[name] = fn
+        return fn
+
+    return decorator
 
 
-def register_subcommand(
-    name: str, args: ArgsType
-) -> Callable[[Callable[[Namespace], None]], Callable[[Namespace], None]]:
-    """Register a function as a CLI subcommand
+def add_subcommands(parser: ArgumentParser):
+    subcommands = parser.add_subcommands(dest="command")
+    for name, fn in __subcommands.items():
+        subparser = ArgumentParser()
 
-    Args:
-        name: name of the subcommand
-        args: list of arguments the command should accept
+        signature = typing.get_type_hints(fn)
+        if "config" in signature and signature["config"] == ActiveConfig:
+            subparser.add_argument(
+                "--experiment", action=ActionExperiment, choices=list_experiments()
+            )
 
-    Returns:
-        registerd fundtion
-    """
+        subparser.add_function_arguments(fn)
 
-    def _inner_wrapper(
-        func: Callable[[Namespace], None]
-    ) -> Callable[[Namespace], None]:
-        __subcommands[name] = func
-        match args:
-            case f if callable(f):
-                __args[name] = f
-            case [*_]:
-                __args[name] = functools.partial(_add_args, args=args)
-            case _:
-                raise ValueError(f'Cannot add arguments from "{args}"')
-
-        return func
-
-    return _inner_wrapper
+        subcommands.add_subcommand(name, subparser)
 
 
-def _add_to_parser(parser: ArgumentParser) -> None:
-    subparsers = parser.add_subparsers(title="commands")
-    for name, func in __subcommands.items():
-        parser = subparsers.add_parser(name)
-        if argsfunc := __args.get(name):
-            argsfunc(parser)
-        parser.set_defaults(command=func)
+def run_subcommand(args: Namespace):
+    kwargs = args[args.command].as_dict()
+    kwargs["config"] = _dict_to_dataclass(args[args.command].config, ActiveConfig)
+
+    if "runtime_config" in kwargs:
+        kwargs["runtime_config"] = _dict_to_dataclass(args[args.command].runtime_config, RuntimeConfig)
+
+    del kwargs["experiment"]
+    __subcommands[args.command](**kwargs)

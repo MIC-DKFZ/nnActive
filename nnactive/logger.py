@@ -34,15 +34,25 @@ class nnActiveMonitor:
         if not self._wandb_active:
             raise ValueError("wandb is not active")
 
+    def is_active(self) -> bool:
+        return self._wandb_active
+
     @contextmanager
     def active_run(
         self,
         project: str = "nnactive",
         name: str | None = None,
         config: dict | None = None,
+        force: bool = False,
     ) -> Generator[None, None, None]:
         if self._wandb_active:
-            wandb.finish()
+            if force:
+                wandb.finish()
+            else:
+                logger.warning("wandb is already active, set `force` to replace active run")
+                def _inner():
+                    yield
+                return _inner()
 
         try:
             wandb.init(project=project, name=name, config=config)

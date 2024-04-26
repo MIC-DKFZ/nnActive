@@ -1,12 +1,54 @@
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
-KEY = "nnActive_results"
-nnActive_results = Path(value) if (value := os.environ.get(KEY)) else None
+import nnunetv2.paths as paths
+
+__paths = {
+    "nnActive_results": (
+        Path(value) if (value := os.environ.get("nnActive_results")) else None
+    ),
+    "nnActive_raw": Path(value) if (value := os.environ.get("nnActive_raw")) else None,
+    "nnActive_data": (
+        Path(value) if (value := os.environ.get("nnActive_data")) else None
+    ),
+}
+
+
+def set_paths(
+    nnActive_raw: str | Path | None = None,
+    nnActive_results: str | Path | None = None,
+    nnActive_data: str | Path | None = None,
+):
+    if nnActive_raw is not None:
+        __paths["nnActive_raw"] = Path(nnActive_raw)
+    if nnActive_results is not None:
+        __paths["nnActive_results"] = Path(nnActive_results)
+    if nnActive_data is not None:
+        __paths["nnActive_data"] = Path(nnActive_data)
+
+
+def __getattr__(item: str):
+    if (value := __paths.get(item)) is not None:
+        return value
+    else:
+        raise AttributeError(f"module {__name__} has no attribute {item}")
 
 
 def get_nnActive_results() -> Path | None:
-    return nnActive_results
+    return __paths["nnActive_results"]
+
+
+@contextmanager
+def set_raw_paths():
+    temp_raw = paths.nnUNet_raw
+    temp_preprocessed = paths.nnUNet_raw
+    paths.set_paths(
+        nnUNet_raw=__paths["nnActive_raw"] / "nnUNet_raw",
+        nnUNet_preprocessed=__paths["nnActive_raw"] / "nnUNet_preprocessed",
+    )
+    yield
+    paths.set_paths(nnUNet_raw=temp_raw, nnUNet_preprocessed=temp_preprocessed)
 
 
 # if nnActive_results is None:

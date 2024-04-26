@@ -6,11 +6,14 @@ from itertools import product
 from pathlib import Path
 from typing import Union
 
+import nnunetv2.paths as paths
+
 from nnactive.cli.subcommands.convert_to_partannotated import (
     convert_dataset_to_partannotated,
 )
 from nnactive.config import ActiveConfig
 from nnactive.nnunet.utils import get_patch_size
+from nnactive.paths import nnActive_data
 from nnactive.results.state import State
 
 DEFAULT_QUERIES = (
@@ -64,10 +67,21 @@ class DatasetSetup:
         self.query_size = query_size
         self.trainer = trainer
         self.starting_budget = starting_budget
+        self.pre_suffix = pre_suffix
         self.patch_size = (
             get_patch_size(self.base_id) if patch_size is None else patch_size
         )
-        self.pre_suffix = pre_suffix
+
+    # def set_nnunet_env(self):
+    #     assert nnActive_data is not None
+    #     experiment_path = nnActive_data / (
+    #         self.base_dataset_name
+    #         + self.pre_suffix
+    #         + f"__unc-{self.uncertainty}__seed-{self.seed}"
+    #     )
+    #     os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
+    #     os.environ["nnUNet_preprocessed"] = str(experiment_path / "nnUNet_preprocessed")
+    #     os.environ["nnUNet_results"] = str(experiment_path / "nnUNet_results")
 
     @property
     def base_dataset_name(self):
@@ -78,7 +92,7 @@ class DatasetSetup:
 
     @property
     def data_path(self):
-        data_path = os.getenv("nnUNet_raw")
+        data_path = os.getenv("nnActive_raw")
         if data_path is None:
             raise ValueError("OS variable nnUNet_raw is not set.")
         return Path(data_path)
@@ -91,7 +105,7 @@ class DatasetSetup:
     def existing_dsets(self):
         existing_dsets = [
             folder.name
-            for folder in self.data_path.iterdir()
+            for folder in nnActive_data.iterdir()
             if folder.is_dir() and folder.name.startswith("Dataset")
         ]
         return existing_dsets
@@ -160,25 +174,6 @@ class DatasetSetup:
         seed: int,
         uncertainty: str,
     ):
-        config = ActiveConfig(
-            trainer=self.trainer,
-            patch_size=self.patch_size,
-            uncertainty=uncertainty,
-            query_size=self.query_size,
-            query_steps=self.query_steps,
-            starting_budget=self.starting_budget,
-            seed=seed,
-            num_processes=self.num_processes,
-            dataset=self.base_dataset_name,
-            train_folds=self.train_folds,
-            full_folds=self.full_folds,
-            add_uncertainty=self.add_uncertainty,
-            add_validation=self.add_validation,
-            agg_stride=self.agg_stride,
-            patch_overlap=self.patch_overlap,
-            additional_overlap=self.additional_overlap,
-        )
-        config.save_id(dataset_id)
         state = State(dataset_id=dataset_id)
         state.save_state()
 
@@ -189,13 +184,37 @@ class DatasetSetup:
             if num_experiments:
                 if i >= num_experiments:
                     break
+
+            config = ActiveConfig(
+                trainer=self.trainer,
+                patch_size=self.patch_size,
+                uncertainty=unc,
+                query_size=self.query_size,
+                query_steps=self.query_steps,
+                starting_budget=self.starting_budget,
+                seed=seed,
+                num_processes=self.num_processes,
+                dataset=self.base_dataset_name,
+                pre_suffix=self.pre_suffix,
+                train_folds=self.train_folds,
+                full_folds=self.full_folds,
+                add_uncertainty=self.add_uncertainty,
+                add_validation=self.add_validation,
+                agg_stride=self.agg_stride,
+                patch_overlap=self.patch_overlap,
+                additional_overlap=self.additional_overlap,
+            )
+            # TODO: Subprocess this for env separation
+
             output_id = start_id + i
+            config.set_nnunet_env()
             if self.check_dataset_id(output_id):
                 if debug:
                     print(f"Creating Dataset{output_id:3d}....")
                     continue
                 self.convert_dset(output_id, seed, unc)
                 self.prepare_dset(output_id)
+                config.save_id(output_id)
                 self.setup_al(output_id, seed, unc)
 
     @staticmethod

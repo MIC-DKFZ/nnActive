@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
+import nnunetv2.paths
 import numpy as np
 import torch
 from loguru import logger
@@ -27,6 +28,7 @@ from nnactive.nnunet.utils import (
 )
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 nnActive_results = get_nnActive_results()
 TIMEOUT_S = 60 * 60
@@ -83,34 +85,6 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-@register_subcommand(
-    "get_performance",
-    [
-        (("-d", "--dataset_id"), {"type": int}),
-        (
-            ("-f", "--force"),
-            {"action": "store_true", "help": "Ignores the internal State."},
-        ),
-        (
-            ("--verbose"),
-            {
-                "action": "store_true",
-                "help": "Disables progress bars and get more explicit print statements.",
-            },
-        ),
-        (("--n_gpus"), {"default": 1, "type": int}),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    force = args.force
-    verbose = args.verbose
-    n_gpus = args.n_gpus
-    config = ActiveConfig.get_from_id(dataset_id)
-    with monitor.active_run(config=config.to_dict()):
-        get_performance(dataset_id, force, verbose, n_gpus)
-
-
 def wrap_prediction(
     input_folder: str,
     output_folder: str,
@@ -140,23 +114,30 @@ def wrap_prediction(
     )
 
 
+@register_subcommand("get_performance")
 def get_performance(
-    dataset_id: int, force: bool = False, verbose: bool = False, n_gpus: int = 1
+    config: ActiveConfig,
+    continue_id: int | None = None,
+    force: bool = False,
+    verbose: bool = False,
+    n_gpus: int = 1,
 ):
-    state = State.get_id_state(dataset_id, verify=not force)
-    config = ActiveConfig.get_from_id(dataset_id)
-    images_path = get_raw_path(dataset_id) / "imagesVal"
-    labels_path = get_raw_path(dataset_id) / "labelsVal"
-    loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
-    pred_path = get_results_path(dataset_id) / "predVal"
-    dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
-    plans_path = get_preprocessed_path(dataset_id) / f"{config.model_plans}.json"
+    config.set_nnunet_env()
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+    images_path = get_raw_path(state.dataset_id) / "imagesVal"
+    labels_path = get_raw_path(state.dataset_id) / "labelsVal"
+    loop_val = len(get_sorted_loop_files(get_raw_path(state.dataset_id))) - 1
+    pred_path = get_results_path(state.dataset_id) / "predVal"
+    dataset_json_path = get_raw_path(state.dataset_id) / "dataset.json"
+    plans_identifier = "nnUNetPlans"
+    plans_path = get_preprocessed_path(state.dataset_id) / f"{plans_identifier}.json"
 
     num_folds = config.working_folds
     loop_results_path: Path = (
-        nnActive_results
-        / convert_id_to_dataset_name(dataset_id)
-        / f"loop_{loop_val:03d}"
+        get_results_folder(state.dataset_id) / f"loop_{loop_val:03d}"
     )
 
     loop_summary_json = loop_results_path / "summary.json"
@@ -168,7 +149,7 @@ def get_performance(
         predict_entry_point(
             input_folder=str(images_path),
             output_folder=str(pred_path),
-            dataset_id=dataset_id,
+            dataset_id=state.dataset_id,
             train_identifier=config.trainer,
             configuration_identifier=config.model_config,
             folds=[i for i in range(num_folds)],
@@ -183,7 +164,7 @@ def get_performance(
                     wrap_prediction,
                     [str(images_path)] * n_gpus,
                     [str(pred_path)] * n_gpus,
-                    [dataset_id] * n_gpus,
+                    [state.dataset_id] * n_gpus,
                     [config] * n_gpus,
                     [verbose] * n_gpus,
                     [n_gpus] * n_gpus,
@@ -216,7 +197,11 @@ def get_performance(
     # first save the individual cross val dicts by simply appending them with key fold_X
     for fold in range(num_folds):
         trained_model_path = get_output_folder(
-            dataset_id, config.trainer, config.model_plans, config.model_config, fold
+            state.dataset_id,
+            config.trainer,
+            plans_identifier,
+            config.model_config,
+            fold,
         )
 
         os.makedirs(loop_results_path, exist_ok=True)
@@ -239,9 +224,9 @@ def get_performance(
         # first save the individual cross val dicts by simply appending them with key fold_X
         for fold in range(num_folds):
             trained_model_path = get_output_folder(
-                dataset_id,
+                state.dataset_id,
                 config.trainer,
-                config.model_plans,
+                plans_identifier,
                 config.model_config,
                 fold,
             )
