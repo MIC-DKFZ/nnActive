@@ -33,7 +33,14 @@ def list_experiments():
     return __experiments.keys()
 
 
-def make_kits_small_config(seed: int, uncertainty: str):
+def make_kits_small_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 3,
+    patch_size: list[int] = [64, 64, 64],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 982
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -43,48 +50,58 @@ def make_kits_small_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=10,
-        query_steps=3,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
-        train_folds=2,
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
+        train_folds=5,
         full_folds=5,
-        add_validation="--disable_tta",
-        add_uncertainty="--diable_tta",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_kits_config(seed: int, uncertainty: str):
+def make_kits_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 10,
+    patch_size: list[int] = [64, 64, 64],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 135
         dataset_name = convert_id_to_dataset_name(base_id)
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
-        patch_size=[64, 64, 64],
+        patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=10,
-        query_steps=10,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
         add_validation="",
         add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_brats_small_config(seed: int, uncertainty: str):
+def make_brats_small_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 3,
+    patch_size: list[int] = [20, 20, 20],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 981
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -94,23 +111,28 @@ def make_brats_small_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=10,
-        query_steps=3,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="--disable_tta",
-        add_uncertainty="--diable_tta",
         agg_stride=8,
         patch_overlap=0,
         additional_overlap=0.2,
     )
 
 
-def make_brats_config(seed: int, uncertainty: str):
+def make_brats_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 10,
+    patch_size: list[int] = [20, 20, 20],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 137
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -119,16 +141,14 @@ def make_brats_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=[20, 20, 20],
         uncertainty=uncertainty,
-        query_size=20,
-        query_steps=10,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-20",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="--disable_tta",
-        add_uncertainty="--diable_tta",
         agg_stride=8,
         patch_overlap=0,
         additional_overlap=0.2,
@@ -136,58 +156,71 @@ def make_brats_config(seed: int, uncertainty: str):
 
 
 def make_hippocampus_config(
-    seed: int, uncertainty: str, query_size: int = 20, query_steps: int = 10
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 10,
+    patch_size: list[int] = [20, 20, 20],
 ):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 4
         dataset_name = convert_id_to_dataset_name(base_id)
     return ActiveConfig(
-        trainer="nnActiveTrainer_5epochs",
+        trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
-        patch_size=[20, 20, 20],
+        patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix=f"__patch-20__qs{query_size}",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="--disable_tta",
-        add_uncertainty="--diable_tta",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_acdc_config(seed: int, uncertainty: str):
+def make_acdc_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 15,
+    query_steps: int = 10,
+    patch_size: list[int] = [4, 40, 40],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 27
         dataset_name = convert_id_to_dataset_name(base_id)
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
-        patch_size=[4, 40, 40],
+        patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=15,
-        query_steps=10,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_acdc_small_config(seed: int, uncertainty: str):
+def make_acdc_small_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 3,
+    patch_size: list[int] = [4, 40, 40],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 985
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -197,23 +230,28 @@ def make_acdc_small_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=25,
-        query_steps=5,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
+        starting_budget_size=40,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_amos_config(seed: int, uncertainty: str):
+def make_amos_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 10,
+    patch_size: list[int] = [32, 74, 74],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 216
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -223,23 +261,28 @@ def make_amos_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=32,
-        query_steps=10,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
+        starting_budget_size=40,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_amos_small_config(seed: int, uncertainty: str):
+def make_amos_small_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 20,
+    query_steps: int = 3,
+    patch_size: list[int] = [32, 74, 74],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 984
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -249,23 +292,27 @@ def make_amos_small_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=60,
-        query_steps=3,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
-def make_airway_config(seed: int, uncertainty: str):
+def make_airway_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 10,
+    patch_size: list[int] = [20, 20, 20],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 980
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -275,23 +322,28 @@ def make_airway_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=10,
-        query_steps=10,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-full_patch",
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
         additional_overlap=0.2,
     )
 
 
-def make_airway_small_config(seed: int, uncertainty: str):
+def make_airway_small_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 3,
+    patch_size: list[int] = [20, 20, 20],
+):
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 983
         dataset_name = convert_id_to_dataset_name(base_id)
@@ -301,19 +353,16 @@ def make_airway_small_config(seed: int, uncertainty: str):
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
-        query_size=10,
-        query_steps=3,
+        query_size=query_size,
+        query_steps=query_steps,
         starting_budget="random-label-all-classes",
         seed=seed,
         dataset=dataset_name,
-        pre_suffix="__patch-std_patch__sb-random-label-all-classes",
-        train_folds=1,
+        pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
+        train_folds=5,
         full_folds=5,
-        add_validation="",
-        add_uncertainty="",
         agg_stride=8,
         patch_overlap=0,
-        additional_overlap=0.2,
     )
 
 
@@ -332,7 +381,7 @@ register(
 register(
     make_brats_small_config,
     seeds=[12345, 12346, 12347],
-    uncertainties=["pred_entropy", "mutual_information", "random"],
+    uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
 )
 
 register(
@@ -366,7 +415,7 @@ register(
 register(
     make_acdc_small_config,
     seeds=[12345, 12346, 12347],
-    uncertainties=["pred_entropy", "mutual_information", "random"],
+    uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
 )
 
 register(
@@ -378,7 +427,7 @@ register(
 register(
     make_amos_small_config,
     seeds=[12345, 12346, 12347],
-    uncertainties=["pred_entropy", "mutual_information", "random"],
+    uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
 )
 
 register(
@@ -390,5 +439,5 @@ register(
 register(
     make_airway_small_config,
     seeds=[12345, 12346, 12347],
-    uncertainties=["pred_entropy", "mutual_information", "random"],
+    uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
 )
