@@ -40,11 +40,12 @@ def make_kits_small_config(
     query_steps: int = 3,
     patch_size: list[int] = [64, 64, 64],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 982
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
@@ -70,10 +71,12 @@ def make_kits_config(
     query_steps: int = 10,
     patch_size: list[int] = [64, 64, 64],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 135
         dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
@@ -101,11 +104,12 @@ def make_brats_small_config(
     query_steps: int = 3,
     patch_size: list[int] = [20, 20, 20],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 981
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
@@ -132,10 +136,12 @@ def make_brats_config(
     query_steps: int = 10,
     patch_size: list[int] = [20, 20, 20],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 137
         dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
@@ -162,10 +168,12 @@ def make_hippocampus_config(
     query_steps: int = 10,
     patch_size: list[int] = [20, 20, 20],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 4
         dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
@@ -191,10 +199,12 @@ def make_acdc_config(
     query_steps: int = 10,
     patch_size: list[int] = [4, 40, 40],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 27
         dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
@@ -220,11 +230,12 @@ def make_acdc_small_config(
     query_steps: int = 3,
     patch_size: list[int] = [4, 40, 40],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 985
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
@@ -233,7 +244,6 @@ def make_acdc_small_config(
         query_size=query_size,
         query_steps=query_steps,
         starting_budget="random-label-all-classes",
-        starting_budget_size=40,
         seed=seed,
         dataset=dataset_name,
         pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
@@ -249,13 +259,14 @@ def make_amos_config(
     uncertainty: str,
     query_size: int = 20,
     query_steps: int = 10,
-    patch_size: list[int] = [32, 74, 74],
+    patch_size: list[int] | None = [32, 74, 74],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 216
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_200epochs",
         base_id=base_id,
@@ -282,11 +293,12 @@ def make_amos_small_config(
     query_steps: int = 3,
     patch_size: list[int] = [32, 74, 74],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 984
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
@@ -295,6 +307,7 @@ def make_amos_small_config(
         query_size=query_size,
         query_steps=query_steps,
         starting_budget="random-label-all-classes",
+        starting_budget_size=40,
         seed=seed,
         dataset=dataset_name,
         pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
@@ -312,11 +325,12 @@ def make_airway_config(
     query_steps: int = 10,
     patch_size: list[int] = [20, 20, 20],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 980
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_airway_200epochs",
         base_id=base_id,
@@ -343,11 +357,12 @@ def make_airway_small_config(
     query_steps: int = 3,
     patch_size: list[int] = [20, 20, 20],
 ):
-    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     with set_raw_paths():
         base_id = 983
         dataset_name = convert_id_to_dataset_name(base_id)
-        patch_size = get_patch_size(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    patch_size_str = "_".join(map(lambda x: str(x), patch_size))
     return ActiveConfig(
         trainer="nnActiveTrainer_airway_5epochs",
         base_id=base_id,
