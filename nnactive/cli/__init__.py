@@ -3,7 +3,13 @@ from jsonargparse import ActionConfigFile, ArgumentParser, Namespace
 
 from nnactive.cli.registry import add_subcommands, run_subcommand
 
-from .subcommands import nnunet_preprocess, run_al_loops, setup, train_nnUNet_ensemble
+from .subcommands import (
+    manual_crop_pred,
+    nnunet_preprocess,
+    run_al_loops,
+    setup,
+    train_nnUNet_ensemble,
+)
 
 
 def main() -> None:
