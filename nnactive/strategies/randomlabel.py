@@ -9,6 +9,7 @@ from loguru import logger
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
+from nnactive.paths import set_raw_paths
 from nnactive.query.get_locs import get_locs_from_segmentation
 from nnactive.strategies.random import (
     Random,
@@ -61,8 +62,9 @@ class RandomLabel(Random):
         self.raw_labels_path = raw_labels_path
         if self.raw_labels_path is None:
             config = ActiveConfig.get_from_id(self.dataset_id)
-            annotated_id = int(config.dataset.split("_")[0][-3:])
-            self.raw_labels_path = get_raw_path(annotated_id) / "labelsTr"
+            with set_raw_paths():
+                annotated_id = int(config.dataset.split("_")[0][-3:])
+                self.raw_labels_path = get_raw_path(annotated_id) / "labelsTr"
 
         self.background_cls = background_cls
         if self.background_cls is None:
