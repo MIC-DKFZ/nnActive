@@ -69,9 +69,10 @@ class RandomLabel(Random):
         self.background_cls = background_cls
         if self.background_cls is None:
             config = ActiveConfig.get_from_id(self.dataset_id)
-            annotated_id = int(config.dataset.split("_")[0][-3:])
-            dataset_json = read_dataset_json(annotated_id)
-            self.background_cls = dataset_json["labels"].get("background")
+            with set_raw_paths():
+                annotated_id = int(config.dataset.split("_")[0][-3:])
+                dataset_json = read_dataset_json(annotated_id)
+                self.background_cls = dataset_json["labels"].get("background")
 
     def query(
         self,
