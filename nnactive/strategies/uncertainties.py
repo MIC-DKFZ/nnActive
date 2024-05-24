@@ -48,12 +48,12 @@ def prob_pred_entropy(
         torch.Tensor: predictive entropy H x W x D (on device)
     """
     logger.info("Compute pred entropy")
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+        logger.debug("-" * 8)
+        logger.debug("Before Compute of Mean Prob")
 
-    torch.cuda.reset_peak_memory_stats(device)
-    logger.debug("-" * 8)
-    logger.debug("Before Compute of Mean Prob")
-
-    log_cuda_memory_info(device)
+        log_cuda_memory_info(device)
 
     def _compute_mean_prob(mean_prob: torch.Tensor, probs: list[Path] | torch.Tensor):
         for fold in range(1, len(probs)):
@@ -93,7 +93,7 @@ def prob_pred_entropy(
         compute_val *= torch.log(compute_val)
         # here we assume that all nans are stemming from -inf after log
         compute_val = compute_val.nan_to_num()
-        compute_val = compute_val.sum(dim=0)
+        compute_val = -1 * compute_val.sum(dim=0)
     except RuntimeError as e:
         logger.debug("Possibly CUDA OOM error, try to obtain compute_val on CPU.")
         del compute_val
@@ -140,7 +140,7 @@ def prob_exp_entropy(
         compute_val = compute_val.to(device)
         compute_val *= torch.log(compute_val)
         compute_val = compute_val.nan_to_num()
-        compute_val = compute_val.sum(dim=0)
+        compute_val = (-1 / len(probs)) * compute_val.sum(dim=0)
         for fold in range(1, len(probs)):
             if isinstance(probs, list):
                 temp_val = torch.from_numpy(np.load(probs[fold])).to(use_device)
@@ -149,7 +149,7 @@ def prob_exp_entropy(
             temp_val *= torch.log(temp_val)
             # set all nan values (nan, inf, -inf) to 0
             temp_val = temp_val.nan_to_num()
-            compute_val += temp_val.sum(dim=0)
+            compute_val += (-1 / len(probs)) * temp_val.sum(dim=0)
     except RuntimeError as e:
         logger.debug("Possible CUDA OOM error, try to obtain compute_val on CPU.")
         logger.debug(e)
