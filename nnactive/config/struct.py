@@ -56,6 +56,8 @@ class ActiveConfig:
             self.n_patch_per_image = self.query_size
         if self.starting_budget_size is None:
             self.starting_budget_size = self.query_size
+        if self.train_folds is None:
+            self.train_folds = self.full_folds
 
     # TODO: nnUNet env var setter
     # TODO: path getters
@@ -112,10 +114,6 @@ class ActiveConfig:
     @staticmethod
     def filename():
         return FILENAME
-
-    @property
-    def working_folds(self):
-        return self.train_folds if self.train_folds is not None else self.full_folds
 
 
 @dataclass

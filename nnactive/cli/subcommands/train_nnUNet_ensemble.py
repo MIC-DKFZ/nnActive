@@ -69,7 +69,7 @@ def train_nnUNet_ensemble(
         torch.set_num_interop_threads(1)
         os.environ["torchset"] = "True"
 
-    num_folds = config.working_folds
+    num_folds = config.train_folds
 
     unpack_dataset(
         folder=str(

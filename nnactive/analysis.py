@@ -20,6 +20,10 @@ PALETTE = {
     # "other_3": "tab:cyan",
 }
 
+FULL_DATASET_PERFORMANCE = {
+    "Dataset004_Hippocampus": 0.895,
+}
+
 
 def load_results(filenames: list[Path]) -> list[dict]:
     out_list = []
@@ -28,21 +32,25 @@ def load_results(filenames: list[Path]) -> list[dict]:
         with open(filename, "r") as file:
             file_dict = json.load(file)
         out_dict["Mean Dice"] = file_dict["foreground_mean"]["Dice"]
+        # for cls in file_dict["mean"]:
+        #     out_dict[f"Class Dice {cls}"] = file_dict["mean"][cls]["Dice"]
+
         out_dict["Loop"] = int(filename.parent.name.split("_")[1])
         out_list.append(out_dict)
     return out_list
 
 
 def get_experiment_results(experiment_path: Path):
-    filenames = [fn for fn in experiment_path.rglob("summary.json")]
+    # check that summary.jsons are read from loop_XXX in results format
+    filenames = [
+        fn for fn in experiment_path.rglob("summary.json") if "loop_" in fn.__str__()
+    ]
     # make use of loop_XXX folder structure
     filenames.sort()
     dict_list = load_results(filenames)
 
     config_item = ActiveConfig.from_json(experiment_path / ActiveConfig.filename())
     config = config_item.__dict__
-    config.pop("train_folds")
-    config["working_folds"] = config_item.working_folds
 
     for dictval in dict_list:
         dictval["Experiment Name"] = experiment_path.name
@@ -61,9 +69,13 @@ def compare_multi_experiment_results(
         base_path (Path): $nnActive_results
     """
     experiment_vals = []
-    for exp_path in base_path.iterdir():
-        if exp_path.name.startswith("Dataset"):
-            experiment_vals.extend(get_experiment_results(exp_path))
+
+    experiment_paths = [fn.parent for fn in base_path.rglob("config.json")]
+
+    # for exp_path in base_path.iterdir():
+    #     if exp_path.name.startswith("Dataset"):
+    for exp_path in experiment_paths:
+        experiment_vals.extend(get_experiment_results(exp_path))
     df = pd.DataFrame(experiment_vals)
     if base_dataset_id:
         df = (
@@ -72,7 +84,7 @@ def compare_multi_experiment_results(
             .drop("index", axis=1)
         )
 
-    df["#Patches"] = (df["Loop"] + 1) * df["query_size"]
+    df["#Patches"] = (df["Loop"]) * df["query_size"] + df["starting_budget_size"]
 
     skip_keys = [
         "Experiment Name",
@@ -86,7 +98,11 @@ def compare_multi_experiment_results(
     query_key = "uncertainty"
     vals = [seperator for seperator in df.columns if seperator not in skip_keys]
     max_loop_ind = vals.index("query_steps")
+    dataset_ind = vals.index("dataset")
+    sb_ind = vals.index("starting_budget_size")
+    qs_ind = vals.index("query_size")
     for key, df_g in df.groupby(vals):
+        dataset = key[dataset_ind]
         fig, axs = plt.subplots()
         sns.lineplot(
             data=df_g,
@@ -99,11 +115,18 @@ def compare_multi_experiment_results(
             palette=PALETTE,
         )
 
-        # Value for Hippocampus Dataset
-        # axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
+        if dataset in FULL_DATASET_PERFORMANCE:
+            axs.axhline(
+                y=FULL_DATASET_PERFORMANCE[dataset],
+                label="Full Data Performance",
+                linestyle="-",
+                color="black",
+            )
         axs.set_xticks(np.arange(0, key[max_loop_ind]))
         axs.legend(loc="best")
-        plt.savefig(f"Performance__{key}.png")
+        axs.set_title(dataset)
+        key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
+        plt.savefig(f"Performance-{dataset}__{key_plot}.png")
 
         fig, axs = plt.subplots()
         sns.lineplot(
@@ -117,13 +140,28 @@ def compare_multi_experiment_results(
             palette=PALETTE,
         )
 
-        # Value for Hippocampus Dataset
-        axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
-        axs.set_ylim(0.84, 0.90)
-        axs.set_xlim(10, 200)
-        # axs.set_xticks(np.arange(0, key[max_loop_ind]))
-        axs.legend(loc="best")
-        plt.savefig(f"PerformancePatch__{key}.png")
+        # # Value for Hippocampus Dataset
+        if dataset in FULL_DATASET_PERFORMANCE:
+            axs.axhline(
+                y=FULL_DATASET_PERFORMANCE[dataset],
+                label="Full Data Performance",
+                linestyle="-",
+                color="black",
+            )
+
+        axs.set_xticks(
+            np.arange(
+                key[sb_ind],
+                key[sb_ind] + (key[qs_ind] * key[max_loop_ind]),
+                key[qs_ind],
+            )
+        )
+        # axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
+        # axs.set_ylim(0.84, 0.90)
+        # axs.set_xlim(10, 200)
+        # # axs.set_xticks(np.arange(0, key[max_loop_ind]))
+        # axs.legend(loc="best")
+        plt.savefig(f"PerformancePatch-{dataset}__{key_plot}.png")
 
         ### Label Efficency Plot starts here
 

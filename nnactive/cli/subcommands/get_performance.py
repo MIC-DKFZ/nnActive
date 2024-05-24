@@ -97,7 +97,7 @@ def wrap_prediction(
     logger.info(
         f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
     )
-    folds = [fold for fold in range(config.working_folds)]
+    folds = [fold for fold in range(config.train_folds)]
     torch.cuda.set_device(device)
     predict_entry_point(
         input_folder=input_folder,
@@ -133,7 +133,7 @@ def get_performance(
     dataset_json_path = get_raw_path(state.dataset_id) / "dataset.json"
     plans_path = get_preprocessed_path(state.dataset_id) / f"{config.model_plans}.json"
 
-    num_folds = config.working_folds
+    num_folds = config.train_folds
     loop_results_path: Path = (
         get_results_folder(state.dataset_id) / f"loop_{loop_val:03d}"
     )
@@ -189,7 +189,6 @@ def get_performance(
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
     logger.info("Creating a summary of the cross validation results from training...")
-    num_folds = config.working_folds
     summary_cross_val_dict = {}
 
     # first save the individual cross val dicts by simply appending them with key fold_X
@@ -216,7 +215,6 @@ def get_performance(
         logger.info(
             "Creating a summary of the cross validation results from training..."
         )
-        num_folds = config.working_folds
         summary_cross_val_dict = {}
 
         # first save the individual cross val dicts by simply appending them with key fold_X

@@ -10,7 +10,7 @@ pip install -e '.[dev]'
 
 ## Set up nnActive
 Set up paths as follows:
-```
+```bash
 export nnActive_raw=Path_to_raw_nnunet_data
 export nnActive_data=Path_to_nnactive_data
 export nnActive_results=Path_to_nnactive_results
@@ -19,27 +19,31 @@ export nnUNet_preprocessed=$nnActive_raw/nnUNet_preprocessed
 export nnUNet_results=Path_to_nnUnet_results
 ```
 
-### Set up and update Autocompletion
-#### ZSH:
-write completion file
-```
-nnactive -s zsh > $HOME/.local/bin/completions/_nnactive
+### Autocompletion
+
+#### Usage:
+```bash
 nnactive setup --experiment <tab>
 nnactive run_al_loops --experiment <tab>
+```
+#### Set up on ZSH:
+write completion file
+```bash
+nnactive -s zsh > $HOME/.local/bin/completions/_nnactive
 ```
 Add to fpath
 ```
 fpath+="$HOME/.local/bin/completions"
 ```
-#### Oh-my-zsh:
+#### Set up on Oh-my-zsh:
 write completion file
-```
+```bash
 nnactive -s zsh > $HOME/.oh-my-zsh/completions/_nnactive
-nnactive setup --experiment <tab>
-nnactive run_al_loops --experiment <tab>
 ```
-#### Bash
-TODO
+
+#### Add a new function to CLI
+Add import to file which carries function in: `nnactive/cli/__init__.py`
+
 ## Contributing
 
 - *Run `pre-commit install` every time you clone the repo*

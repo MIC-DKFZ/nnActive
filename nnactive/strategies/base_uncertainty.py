@@ -109,7 +109,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         model_folder = get_output_folder(
             self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
         )
-        use_folds = tuple(range(self.config.working_folds))
+        use_folds = tuple(range(self.config.train_folds))
         predictor.initialize_from_trained_model_folder(
             model_folder, use_folds=use_folds
         )
