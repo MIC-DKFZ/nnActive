@@ -16,8 +16,6 @@ from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
 
-FILENAME = "config.json"
-
 
 @dataclass
 class ActiveConfig:
@@ -89,7 +87,7 @@ class ActiveConfig:
 
     @classmethod
     def get_from_id(cls, dataset_id: int) -> ActiveConfig:
-        fn = get_results_folder(dataset_id) / FILENAME
+        fn = get_results_folder(dataset_id) / cls.filename()
         return ActiveConfig.from_json(fn)
 
     def to_dict(self):
@@ -97,7 +95,7 @@ class ActiveConfig:
 
     def save_id(self, dataset_id: int):
         try:
-            save_path: Path = get_results_folder(dataset_id) / FILENAME
+            save_path: Path = get_results_folder(dataset_id) / self.filename()
         except FileNotFoundError:
             save_path: (
                 Path
@@ -106,17 +104,46 @@ class ActiveConfig:
             )
             logger.info(f"Creating Path: {save_path}")
             save_path.mkdir()
-            save_path = save_path / FILENAME
+            save_path = save_path / self.filename()
         logger.info(f"Saving Config File to {save_path}")
 
         save_dataclass_to_json(self, save_path)
 
     @staticmethod
     def filename():
-        return FILENAME
+        return "config.json"
 
 
 @dataclass
 class RuntimeConfig:
     num_processes: int = 4
     n_gpus: int = 1
+
+
+@dataclass
+class Final:
+    final: bool = True
+    finished: bool = True  # only for now
+    note: str = ""
+
+    @classmethod
+    def from_json(cls, path: Path) -> Final:
+        try:
+            with open(path, "r") as file:
+                parsed = json.load(file)
+        except FileNotFoundError:
+            print(f"No file found for: {path}")
+            parsed = {}
+        return Final(**parsed)
+
+    @classmethod
+    def get_from_id(cls, dataset_id: int) -> Final:
+        fn = get_results_folder(dataset_id) / cls.filename()
+        return Final.from_json(fn)
+
+    def to_dict(self):
+        return get_clean_dataclass_dict(self)
+
+    @staticmethod
+    def filename():
+        return "final.json"

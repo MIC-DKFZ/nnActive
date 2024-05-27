@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from nnactive.config.struct import ActiveConfig
+from nnactive.config.struct import ActiveConfig, Final
+from nnactive.utils.io import load_json
 
 sns.set_style("whitegrid")
 
@@ -20,9 +21,25 @@ PALETTE = {
     # "other_3": "tab:cyan",
 }
 
+DATASET_PERFORMANCES = []
+for result in (Path(__file__).parent.parent / "full_data_results").iterdir():
+    print(result)
+    if result.suffix == ".json":
+        with open(result, "r") as file:
+            summary = load_json(result)
+            summary["Dataset"] = result.name.split("__")[0]
+            summary["Trainer"] = result.name.split("__")[1].split(".")[0]
+            DATASET_PERFORMANCES.append(summary)
+
+
 FULL_DATASET_PERFORMANCE = {
     "Dataset004_Hippocampus": 0.895,
 }
+
+for dataset_summary in DATASET_PERFORMANCES:
+    FULL_DATASET_PERFORMANCE[dataset_summary["Dataset"]] = dataset_summary[
+        "foreground_mean"
+    ]["Dice"]
 
 
 def load_results(filenames: list[Path]) -> list[dict]:
@@ -40,7 +57,7 @@ def load_results(filenames: list[Path]) -> list[dict]:
     return out_list
 
 
-def get_experiment_results(experiment_path: Path):
+def get_experiment_results(experiment_path: Path, filter=True) -> list[dict]:
     # check that summary.jsons are read from loop_XXX in results format
     filenames = [
         fn for fn in experiment_path.rglob("summary.json") if "loop_" in fn.__str__()
@@ -50,11 +67,19 @@ def get_experiment_results(experiment_path: Path):
     dict_list = load_results(filenames)
 
     config_item = ActiveConfig.from_json(experiment_path / ActiveConfig.filename())
-    config = config_item.__dict__
+    config_dict = config_item.to_dict()
+
+    final_item = Final.from_json(experiment_path / Final.filename())
+    # final_dict = final_item.to_dict()
+    if filter:
+        if final_item.final is False:
+            print(f"Skipping Experiment: {experiment_path.name}")
+            return []
 
     for dictval in dict_list:
         dictval["Experiment Name"] = experiment_path.name
-        dictval.update(config)
+        dictval.update(config_dict)
+        # dictval.update(final_dict)
 
     return dict_list
 
@@ -111,7 +136,7 @@ def compare_multi_experiment_results(
             hue=query_key,
             errorbar="sd",
             ax=axs,
-            markers="O",
+            markers=True,
             palette=PALETTE,
         )
 
