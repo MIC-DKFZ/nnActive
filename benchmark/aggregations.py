@@ -6,10 +6,9 @@ import numpy as np
 import pandas as pd
 import torch
 
-from nnactive.aggregations.convolution import (
+from nnactive.aggregations.convolution import (  # ConvolveAggTorchFFT,
     ConvolveAggScipy,
     ConvolveAggTorch,
-    ConvolveAggTorchFFT,
 )
 from nnactive.utils.torchutils import get_tensor_memory_usage
 
@@ -42,8 +41,16 @@ def get_array(shape: Iterable[int] = (524, 524, 524)):
 
 image_shapes = [64, 128, 256, 512, 512, 512]
 kernel_shapes = [32, 64, 128, 64, 128, 256]
-agg_classes = [ConvolveAggScipy, ConvolveAggTorch, ConvolveAggTorchFFT]
-agg_kwargs = [{}, {"stride": 8}, {"stride": 8}]
+agg_classes = [
+    ConvolveAggScipy,
+    ConvolveAggTorch,
+    # ConvolveAggTorchFFT
+]
+agg_kwargs = [
+    {},
+    {"stride": 8},
+    # {"stride": 8}
+]
 num_dims = 3
 
 if __name__ == "__main__":
