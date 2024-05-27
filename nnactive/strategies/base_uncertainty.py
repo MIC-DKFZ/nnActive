@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Union
+import multiprocessing as mp
 
 import numpy as np
 import psutil
@@ -136,7 +137,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             num_parts = [n_gpus] * n_gpus
             parts = [i for i in range(n_gpus)]
             try:
-                with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+                with ProcessPoolExecutor(max_workers=n_gpus, mp_context=mp.get_context("spawn")) as executor:
                     for top_patch_part in executor.map(
                         self.query_part,
                         parts,

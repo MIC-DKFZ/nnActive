@@ -7,6 +7,7 @@ from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import Iterable
+import multiprocessing as mp
 
 import nnunetv2.paths
 import torch
@@ -102,7 +103,7 @@ def train_nnUNet_ensemble(
             for d in range(runtime_config.n_gpus)
         ]
         try:
-            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus) as executor:
+            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")) as executor:
                 for _ in executor.map(
                     wrap_training,
                     [state.dataset_id] * num_folds,

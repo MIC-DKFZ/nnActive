@@ -2,6 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import List, Union
+import multiprocessing as mp
 
 import numpy as np
 from loguru import logger
@@ -94,7 +95,7 @@ class RandomLabel(Random):
             logger.debug("Execute Query in Subprocess.")
             patch_list = []
             try:
-                with ProcessPoolExecutor(max_workers=1) as executor:
+                with ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn")) as executor:
                     for patch_final in executor.map(
                         self.query,
                         [verbose],

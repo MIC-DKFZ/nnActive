@@ -5,6 +5,7 @@ from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
+import multiprocessing as mp
 
 import nnunetv2.paths
 import numpy as np
@@ -157,7 +158,7 @@ def get_performance(
         )
     else:
         try:
-            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus) as executor:
+            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")) as executor:
                 for _ in executor.map(
                     wrap_prediction,
                     [str(images_path)] * runtime_config.n_gpus,
