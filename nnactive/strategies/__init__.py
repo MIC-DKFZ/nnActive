@@ -5,6 +5,7 @@ from loguru import logger
 from nnactive.config.struct import ActiveConfig
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PredictiveEntropy
 from nnactive.strategies.random import Random
@@ -15,8 +16,12 @@ from nnactive.strategies.randomlabel_all_classes import (
 )
 
 
-def get_strategy(config: ActiveConfig, strategy_name: str, dataset_id: int, **kwargs) -> AbstractQueryMethod:
-    strategy = strategydict[strategy_name].init_from_dataset_id(config, dataset_id, **kwargs)
+def get_strategy(
+    config: ActiveConfig, strategy_name: str, dataset_id: int, **kwargs
+) -> AbstractQueryMethod:
+    strategy = strategydict[strategy_name].init_from_dataset_id(
+        config, dataset_id, **kwargs
+    )
     return strategy
 
 
@@ -51,6 +56,7 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "mutual_information": BALD,
     "pred_entropy": PredictiveEntropy,
     "exp_entropy": ExpectedEntropy,
+    "expected_dice": ExpectedDiceQuery,
     "random": Random,
     "random-label": RandomLabel,
     "random-all-classes": RandomAllClasses,
