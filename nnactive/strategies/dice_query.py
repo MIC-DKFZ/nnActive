@@ -1,4 +1,6 @@
 import time
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple, Union
@@ -22,8 +24,14 @@ from nnactive.utils.torchutils import estimate_free_cuda_memory, get_tensor_memo
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
-class ExpectedPatchDice:
+class ExpectedPatchDiceScore:
     def __init__(self, patch_size: list[int], stride: Union[int, list[int]] = 1):
+        """Class containing the code which returns code to compute negative expected dice (expected dice score) and returns a sorted list giving the coords and negative dice scores.
+
+        Args:
+            patch_size (list[int]): _description_
+            stride (Union[int, list[int]], optional): _description_. Defaults to 1.
+        """
         self.patch_size = patch_size
         self.stride = stride
         if isinstance(stride, int):
@@ -66,7 +74,7 @@ class ExpectedPatchDice:
         mean_prob = compute_mean_probs(probs, device).to(torch.float)
 
         num_images = len(probs)
-        dice_dict: dict[tuple, tuple] = {}
+        dice_dict: dict[tuple, list[float]] = {}
         mean_device = mean_prob.device
         logger.info(f"Mean prob on device: {mean_prob.device}")
         # iterate over M
@@ -117,27 +125,29 @@ class ExpectedPatchDice:
             # get mean dice
             # perhaps sum would make more sense but mean and sum max is identical.
             # Just be careful about nanmean!
-            dice: np.ndarray = np.nanmean(class_dice, axis=0)
+            ######### rank according to negative dice #####
+            neg_dice: np.ndarray = -1 * np.nanmean(class_dice, axis=0)
             # get for each coordinate in image space the corresponding dice values
-            for elt in range(dice.size):
+            for elt in range(neg_dice.size):
                 # image space coordinate
-                coords = self.aggregation.backward_index(elt, dice.shape)
+                coords = self.aggregation.backward_index(elt, neg_dice.shape)
                 # aggregated dice space coordinate
                 coords_dice = tuple(
-                    [t.item() for t in np.unravel_index(elt, dice.shape)]
+                    [t.item() for t in np.unravel_index(elt, neg_dice.shape)]
                 )
                 if coords not in dice_dict:
-                    dice_dict[coords] = [dice[coords_dice]]
+                    dice_dict[coords] = [neg_dice[coords_dice]]
                 else:
-                    dice_dict[coords].append(dice[coords_dice])
+                    dice_dict[coords].append(neg_dice[coords_dice])
             img_end = time.perf_counter()
             logger.info(f"Finished image in {img_end - img_start:.4f}sec")
-        dice_dict = {k: np.nanmean(v) for k, v in dice_dict.items()}
+        dice_dict: dict[tuple, float] = {k: np.nanmean(v) for k, v in dice_dict.items()}
         dice_dict = {k: v for k, v in dice_dict.items() if not np.isnan(v)}
+        # get list containing negative scores ranked in ascending order
         sorted_dice_dict = {
             k: v
             for k, v in sorted(
-                dice_dict.items(), key=lambda item: item[1]  # , reverse=True
+                dice_dict.items(), key=lambda item: item[1], reverse=True
             )
         }
         overall_time_end = time.perf_counter()
@@ -182,7 +192,7 @@ class ExpectedDiceQuery(AbstractQueryMethod):
         self.tile_step_size = tile_step_size
         self.agg_stride = agg_stride
         self.n_patch_per_image = n_patch_per_image
-        self.strategy = ExpectedPatchDice(self.patch_size, self.agg_stride)
+        self.strategy = ExpectedPatchDiceScore(self.patch_size, self.agg_stride)
 
     def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
         if n_gpus == 1:
@@ -333,7 +343,13 @@ class ExpectedDiceQuery(AbstractQueryMethod):
         logger.info(f"Finished patch selection for image {label_file}")
         return selected_patches
 
-    def compose_query_of_patches(self):
+    def compose_query_of_patches(self) -> list[Patch]:
+        """Returns the final query based on all patches and respective scores
+        in self.top_patches.
+
+        Returns:
+            list[Patch]: Query of patches with highest scores.
+        """
         with monitor.timer("compose_query_of_patches"):
             sorted_top_patches = sorted(
                 self.top_patches, key=lambda d: d["score"], reverse=True

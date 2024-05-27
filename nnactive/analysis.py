@@ -23,7 +23,6 @@ PALETTE = {
 
 DATASET_PERFORMANCES = []
 for result in (Path(__file__).parent.parent / "full_data_results").iterdir():
-    print(result)
     if result.suffix == ".json":
         with open(result, "r") as file:
             summary = load_json(result)

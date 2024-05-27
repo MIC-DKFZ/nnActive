@@ -408,7 +408,13 @@ register(
 register(
     make_hippocampus_config,
     seeds=[12345, 12346, 12347],
-    uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
+    uncertainties=[
+        "pred_entropy",
+        "mutual_information",
+        "random-label",
+        "random",
+        "expected_dice",
+    ],
     query_size=20,
     query_steps=10,
 )
