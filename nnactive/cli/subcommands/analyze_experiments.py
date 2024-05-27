@@ -1,33 +1,18 @@
-from argparse import Namespace
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from nnactive.analysis import compare_multi_experiment_results
 from nnactive.cli.registry import register_subcommand
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.paths import get_nnActive_results
 
 
-@register_subcommand(
-    "analyze_experiments",
-    [
-        (
-            ("--base_path"),
-            {
-                "type": str,
-                "default": get_nnActive_results(),
-                "help": "Path to nnActive results for later use",
-            },
-        ),
-        (
-            ("--base_dataset_id"),
-            {
-                "type": int,
-                "default": None,
-                "help": "Dataset ID from which the childern are used for visualization",
-            },
-        ),
-    ],
-)
-def main(args: Namespace):
-    base_path = Path(args.base_path)
-    base_dataset_id = args.base_dataset_id
+@register_subcommand("analyze_experiments")
+def analyze_experiments(
+    config: ActiveConfig = ActiveConfig([0, 0, 0]),
+    runtime_config: RuntimeConfig = RuntimeConfig(),
+    base_path: str = get_nnActive_results(),
+    base_dataset_id: int | None = None,
+):
+    base_path = Path(base_path)
     compare_multi_experiment_results(base_path, base_dataset_id)

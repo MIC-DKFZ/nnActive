@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple, Union
 
@@ -7,7 +8,7 @@ import torch
 from loguru import logger
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
-from nnactive.aggregations.convolution import ConvolveAggTorchFFT
+from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
 from nnactive.logger import monitor
@@ -21,12 +22,18 @@ from nnactive.utils.torchutils import estimate_free_cuda_memory, get_tensor_memo
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
-class PatchDice:
+class ExpectedPatchDice:
     def __init__(self, patch_size: list[int], stride: Union[int, list[int]] = 1):
         self.patch_size = patch_size
         self.stride = stride
         if isinstance(stride, int):
             self.stride = [stride] * len(self.patch_size)
+        if (
+            stride == 1
+        ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
+            self.aggregation = ConvolveAggScipy(patch_size, stride=stride)
+        else:
+            self.aggregation = ConvolveAggTorch(patch_size, stride=stride)
 
     def get_coords_patches(self, image_shape):
         kernel_size = [
@@ -50,52 +57,49 @@ class PatchDice:
 
     def forward(
         self,
-        images: List[np.array] = None,
-        dataset_id: int = None,
-        num_folds: int = None,
+        probs: list[Path] | torch.Tensor,
+        device: torch.device = DEVICE,
     ):
         overall_time_start = time.perf_counter()
-        if images is None and dataset_id is None and num_folds is None:
-            raise ValueError("Either images or dataset_id and num_folds must be given")
+        fold = 0
 
-        if images is None:
-            prob_path = get_nnactive_results_folder(dataset_id) / "temp"
-            fold_paths = [prob_path / f"probs_fold{i}.npy" for i in range(0, num_folds)]
-            mean_prob = get_mean_prob(dataset_id, num_folds, device=DEVICE)
-        else:
-            mean_prob = torch.from_numpy(np.mean(images, axis=0)).to(DEVICE)
+        mean_prob = compute_mean_probs(probs, device).to(torch.float)
 
-        # due to softmax, prob shape is offset by one (class dimension)
-        kernel_size = [
-            min(self.patch_size[i], mean_prob.shape[i + 1])
-            for i in range(len(self.patch_size))
-        ]
-
-        num_images = len(images) if images is not None else num_folds
-        dice_dict = None
+        num_images = len(probs)
+        dice_dict: dict[tuple, tuple] = {}
         mean_device = mean_prob.device
         logger.info(f"Mean prob on device: {mean_prob.device}")
-        for i in range(num_images):
+        # iterate over M
+        for fold in range(num_images):
             img_start = time.perf_counter()
+            # Perform this multiplication on CPU so as to not run OOM
             if mean_prob.device != "cpu":
                 logger.info("Putting mean prob on CPU to avoid Cuda OOM error")
                 mean_prob = mean_prob.to("cpu")
-            prob_fold = images[i] if images is not None else np.load(str(fold_paths[i]))
-            prob_fold = torch.from_numpy(prob_fold)
+            if isinstance(probs, list):
+                prob_fold = torch.from_numpy(np.load(probs[fold]))
+            else:
+                # no deepcopy required as we perform no inplace computations
+                prob_fold = probs[fold].to(torch.float)
 
             TP = 2 * mean_prob * prob_fold
             Div = mean_prob + prob_fold
-            TP = TP.type(torch.float32).to(mean_device)
-            Div = Div.type(torch.float32).to(mean_device)
+
+            # Perform time consuming aggregation on GPU
+            TP = TP.to(mean_device)
+            Div = Div.to(mean_device)
             logger.info(f"TP and Div on device: {TP.device}")
-            agg = ConvolveAggTorchFFT(kernel_size, stride=self.stride)
             class_dice = None
-            if DEVICE != "cpu" and get_tensor_memory_usage(TP[i]) * 10 > estimate_free_cuda_memory():
+            if device.type == "cuda" and get_tensor_memory_usage(
+                TP[0]
+            ) * 10 > estimate_free_cuda_memory(device):
                 TP = TP.to("cpu")
                 Div = Div.to("cpu")
-            for i in range(TP.shape[0]):
+            # iterate over classes
+            for c in range(TP.shape[0]):
                 try:
-                    conv = agg.forward(TP[i])[0] / agg.forward(Div[i])[0]
+                    conv, kernel_size = self.aggregation.forward(TP[c])
+                    conv /= self.aggregation.forward(Div[c])[0]
                 except RuntimeError as e:
                     logger.debug(
                         "Possibly CUDA OOM error, try to obtain compute_val on CPU."
@@ -104,21 +108,25 @@ class PatchDice:
                     Div = Div.to("cpu")
                     torch.cuda.empty_cache()
                     torch.cuda.synchronize()
-                    conv = agg.forward(TP[i])[0] / agg.forward(Div[i])[0]
+                    conv, kernel_size = self.aggregation.forward(TP[c])
+                    conv /= self.aggregation.forward(Div[c])[0]
+                # obtain results
                 if class_dice is None:
-                    class_dice = np.zeros((TP.shape[0], *conv.shape))
-                class_dice[i] = conv
-            dice = np.nanmean(class_dice, axis=0)
-            for i in range(dice.size):
-                coords = agg.backward_index(i, dice.shape)
-                coords_dice = (
-                    coords
-                    if self.stride == 1
-                    else tuple([t.item() for t in np.unravel_index(i, dice.shape)])
+                    class_dice = np.zeros((TP.shape[0], *conv.shape))  # C x XYZ
+                class_dice[c] = conv
+            # get mean dice
+            # perhaps sum would make more sense but mean and sum max is identical.
+            # Just be careful about nanmean!
+            dice: np.ndarray = np.nanmean(class_dice, axis=0)
+            # get for each coordinate in image space the corresponding dice values
+            for elt in range(dice.size):
+                # image space coordinate
+                coords = self.aggregation.backward_index(elt, dice.shape)
+                # aggregated dice space coordinate
+                coords_dice = tuple(
+                    [t.item() for t in np.unravel_index(elt, dice.shape)]
                 )
-                if dice_dict is None:
-                    dice_dict = {coords: [dice[coords_dice]]}
-                elif coords not in dice_dict:
+                if coords not in dice_dict:
                     dice_dict[coords] = [dice[coords_dice]]
                 else:
                     dice_dict[coords].append(dice[coords_dice])
@@ -139,7 +147,7 @@ class PatchDice:
         return sorted_dice_dict, kernel_size
 
 
-class DiceQuery(AbstractQueryMethod):
+class ExpectedDiceQuery(AbstractQueryMethod):
     def __init__(
         self,
         dataset_id: int,
@@ -174,10 +182,44 @@ class DiceQuery(AbstractQueryMethod):
         self.tile_step_size = tile_step_size
         self.agg_stride = agg_stride
         self.n_patch_per_image = n_patch_per_image
+        self.strategy = ExpectedPatchDice(self.patch_size, self.agg_stride)
 
-    def query(
-        self, verbose: bool = False, already_annotated_patches=None
-    ) -> list[Patch]:
+    def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
+        if n_gpus == 1:
+            device = torch.device("cuda:0")
+            self.query_part(part_id=0, num_parts=1, device=device)
+        else:
+            devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
+            num_parts = [n_gpus] * n_gpus
+            parts = [i for i in range(n_gpus)]
+            try:
+                with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+                    for top_patch_part in executor.map(
+                        self.query_part,
+                        parts,
+                        num_parts,
+                        devices,
+                    ):
+                        self.top_patches.extend(top_patch_part)
+
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+
+        return self.compose_query_of_patches()
+
+    def query_part(
+        self,
+        part_id: int = 0,
+        num_parts: int = 1,
+        device: torch.device = torch.device("cuda:0"),
+    ) -> list[dict]:
+        temp_path = get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
+
+        torch.cuda.set_device(device)
         # Initialize Predictor
         predictor = nnActivePredictor(
             tile_step_size=self.tile_step_size,
@@ -185,16 +227,17 @@ class DiceQuery(AbstractQueryMethod):
             use_gaussian=self.use_gaussian,
             verbose=self.verbose,
             allow_tqdm=not self.verbose,
+            device=device,
         )
 
         # Initialize Model for Predictor
-        nnunet_plans_identifier = "nnUNetPlans"
+        nnunet_plans_identifier = self.config.model_plans
         nnunet_trainer_name = self.config.trainer
         nnunet_config = self.config.model_config
         model_folder = get_output_folder(
             self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
         )
-        use_folds = tuple(range(self.config.working_folds))
+        use_folds = tuple(range(self.config.train_folds))
         predictor.initialize_from_trained_model_folder(
             model_folder, use_folds=use_folds
         )
@@ -206,19 +249,24 @@ class DiceQuery(AbstractQueryMethod):
             list_of_lists_or_source_folder=source_folder,
             output_folder_or_list_of_truncated_output_files=output_folder,
             num_processes_preprocessing=self.num_processes_preprocessing,
+            part_id=part_id,
+            num_parts=num_parts,
         )
-        predictor.predict_from_data_iterator(data_iterator, self)
+        predictor.predict_from_data_iterator(data_iterator, self, temp_path=temp_path)
         return self.compose_query_of_patches()
 
     def query_from_probs(
-        self, num_folds: int, image_shape: Iterable[int], label_file: str
+        self,
+        probs: list[Path] | np.ndarray,
+        image_shape: Iterable[int],
+        label_file: str,
+        device: torch.device = DEVICE,
     ):
-        dice = PatchDice(patch_size=self.patch_size, stride=self.agg_stride)
-        with monitor.timer("query_from_dice"):
+        with monitor.timer("query_from_probs"):
             with torch.no_grad():
                 logger.info("Compute pairwise dice...")
-                sorted_dice_scores, kernel_size = dice.forward(
-                    dataset_id=self.dataset_id, num_folds=num_folds
+                sorted_dice_scores, kernel_size = self.strategy.forward(
+                    probs, device=device
                 )
                 logger.info("Initialize selected array...")
 
@@ -302,41 +350,60 @@ class DiceQuery(AbstractQueryMethod):
             return patches
 
 
-def get_mean_prob(dataset_id, num_folds, device: str = DEVICE):
+def compute_mean_probs(
+    probs: list[Path] | torch.Tensor, device: torch.device = DEVICE
+) -> torch.Tensor:
+    """Compute predictive entropyon list of paths saving npy arrays or a tensor.
+
+    Args:
+        probs (list[Path] | torch.Tensor): paths to probability maps for image
+            [C x XYZ] per item in list or [M x C x XYZ]
+        device (str, optional): preferred device for computation. Defaults to DEVICE.
+
+    Returns:
+        torch.Tensor: Mean Probs C x H x W x D (on device)
+    """
+    logger.info("Compute mean probabilities")
+
+    def _compute_mean_prob(mean_prob: torch.Tensor, probs: list[Path] | torch.Tensor):
+        for fold in range(1, len(probs)):
+            if isinstance(probs, list):
+                temp_val = torch.from_numpy(np.load(probs[fold])).to(mean_prob.device)
+            else:
+                temp_val = deepcopy(probs[fold]).to(mean_prob.device)
+            mean_prob += temp_val
+            del temp_val
+        mean_prob /= len(probs)
+        return mean_prob
+
     fold = 0
-    prob_path = str(
-        get_nnactive_results_folder(dataset_id) / "temp" / f"probs_fold{fold}.npy"
-    )
-    compute_val = torch.from_numpy(np.load(prob_path))
-    # check if it will fit into GPU
-    if get_tensor_memory_usage(compute_val) * 2.1 < estimate_free_cuda_memory():
-        try:
-            logger.info(f"Compute entropy on device: {device}")
-            compute_val = compute_val.to(device)
-            mean_p = _compute_mean_prob(compute_val, num_folds, dataset_id)
-        except RuntimeError as e:
-            logger.info("Possibly CUDA OOM error, try to obtain compute_val on CPU.")
-            del compute_val
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-            mean_p = get_mean_prob(num_folds, dataset_id, "cpu").to(device)
-        return mean_p
+    if isinstance(probs, list):
+        compute_val = torch.from_numpy(np.load(probs[fold])).to(device)
     else:
-        logger.info(f"Compute entropy on CPU instead of {device}")
-        mean_p = _compute_mean_prob(compute_val, num_folds, dataset_id)
-        return mean_p.to(device)
-
-
-def _compute_mean_prob(mean_prob: torch.Tensor, num_folds: int, dataset_id: int):
-    for fold in range(1, num_folds):
-        prob_path = str(
-            get_nnactive_results_folder(dataset_id) / "temp" / f"probs_fold{fold}.npy"
-        )
-        cur_prob = torch.from_numpy(np.load(prob_path)).to(mean_prob.device)
-        if mean_prob is None:
-            mean_prob = cur_prob
+        compute_val = deepcopy(probs[fold]).to(device)
+    # check if it will fit into GPU
+    if device.type == "cuda":
+        if (get_tensor_memory_usage(compute_val) * 2) * 1.1 < estimate_free_cuda_memory(
+            device
+        ):
+            use_device = device
         else:
-            mean_prob += cur_prob
-        del cur_prob
-    mean_prob /= num_folds
-    return mean_prob
+            use_device = torch.device("cpu")
+            logger.debug(
+                f"Computation on {device} not feasible due to VRAM, falling back to {use_device} for computation and then move to {device}"
+            )
+    else:
+        # CPU case
+        use_device = device
+
+    try:
+        logger.debug(f"Compute Mean Prob on device: {use_device}")
+        compute_val = compute_val.to(use_device)
+        compute_val = _compute_mean_prob(compute_val, probs)
+    except RuntimeError as e:
+        logger.debug("Possibly CUDA OOM error, try to obtain compute_val on CPU.")
+        del compute_val
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        compute_val = compute_mean_probs(probs, torch.device("cpu"))
+    return compute_val.to(device)

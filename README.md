@@ -4,12 +4,45 @@ Scripts for nnActive development
 
 Install with
 ```bash
+pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
 pip install -e '.[dev]'
 ```
 
 ## Set up nnActive
-1. set up nnUNetv2
-2. export nnActive_results=`path...`
+Set up paths as follows:
+```bash
+export nnActive_raw=Path_to_raw_nnunet_data
+export nnActive_data=Path_to_nnactive_data
+export nnActive_results=Path_to_nnactive_results
+export nnUNet_raw=$nnActive_raw/nnUNet_raw
+export nnUNet_preprocessed=$nnActive_raw/nnUNet_preprocessed
+export nnUNet_results=Path_to_nnUnet_results
+```
+
+### Autocompletion
+
+#### Usage:
+```bash
+nnactive setup --experiment <tab>
+nnactive run_al_loops --experiment <tab>
+```
+#### Set up on ZSH:
+write completion file
+```bash
+nnactive -s zsh > $HOME/.local/bin/completions/_nnactive
+```
+Add to fpath
+```
+fpath+="$HOME/.local/bin/completions"
+```
+#### Set up on Oh-my-zsh:
+write completion file
+```bash
+nnactive -s zsh > $HOME/.oh-my-zsh/completions/_nnactive
+```
+
+#### Add a new function to CLI
+Add import to file which carries function in: `nnactive/cli/__init__.py`
 
 ## Contributing
 

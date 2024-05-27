@@ -7,7 +7,8 @@ import numpy as np
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config import ActiveConfig
-from nnactive.nnunet.paths import NNUNET_RAW
+# from nnactive.nnunet.paths import NNUNET_RAW
+import nnunetv2.paths
 from nnactive.nnunet.utils import (
     convert_id_to_dataset_name,
     get_patch_size,
@@ -32,7 +33,7 @@ def create_mitk_geometry_file(dataset_id: int, target_id: int, patch_size: List[
     if len(patch_size) == 3:
         patch_size.reverse()
     patch_size = np.array(patch_size)
-    target_dir = NNUNET_RAW / convert_id_to_dataset_name(target_id)
+    target_dir = nnunetv2.paths.nnUNet_raw / convert_id_to_dataset_name(target_id)
     create_mitk_geometry_patch.main(
         target_dir / "patch.mitkgeometry",
         tuple(np.multiply(scale_factor, patch_size)),
@@ -110,7 +111,6 @@ def main(args: Namespace) -> None:
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
-        num_processes=num_processes,
         dataset=base_dataset_name,
         train_folds=train_folds,
     )

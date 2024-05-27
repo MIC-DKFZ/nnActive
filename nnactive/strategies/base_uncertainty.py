@@ -4,6 +4,8 @@ import os
 import shutil
 import traceback
 from abc import abstractmethod
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Union
 
@@ -22,6 +24,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_t
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
+from torch.backends import cudnn
 from tqdm import tqdm
 
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
@@ -81,7 +84,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
         )
 
-    def query(self, verbose: bool = False) -> list[Patch]:
+    def query_part(
+        self,
+        part_id: int = 0,
+        num_parts: int = 1,
+        device: torch.device = torch.device("cuda:0"),
+    ) -> list[dict]:
+        temp_path = get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
+
+        torch.cuda.set_device(device)
         # Initialize Predictor
         predictor = nnActivePredictor(
             tile_step_size=self.tile_step_size,
@@ -89,16 +100,16 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             use_gaussian=self.use_gaussian,
             verbose=self.verbose,
             allow_tqdm=not self.verbose,
+            device=device,
         )
-
         # Initialize Model for Predictor
-        nnunet_plans_identifier = "nnUNetPlans"
+        nnunet_plans_identifier = self.config.model_plans
         nnunet_trainer_name = self.config.trainer
         nnunet_config = self.config.model_config
         model_folder = get_output_folder(
             self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
         )
-        use_folds = tuple(range(self.config.working_folds))
+        use_folds = tuple(range(self.config.train_folds))
         predictor.initialize_from_trained_model_folder(
             model_folder, use_folds=use_folds
         )
@@ -110,12 +121,45 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             list_of_lists_or_source_folder=source_folder,
             output_folder_or_list_of_truncated_output_files=output_folder,
             num_processes_preprocessing=self.num_processes_preprocessing,
+            part_id=part_id,
+            num_parts=num_parts,
         )
-        predictor.predict_from_data_iterator(data_iterator, self)
+        predictor.predict_from_data_iterator(data_iterator, self, temp_path=temp_path)
+        return self.top_patches
+
+    def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
+        if n_gpus == 1:
+            device = torch.device("cuda:0")
+            self.query_part(part_id=0, num_parts=1, device=device)
+        else:
+            devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
+            num_parts = [n_gpus] * n_gpus
+            parts = [i for i in range(n_gpus)]
+            try:
+                with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+                    for top_patch_part in executor.map(
+                        self.query_part,
+                        parts,
+                        num_parts,
+                        devices,
+                    ):
+                        self.top_patches.extend(top_patch_part)
+
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+
         return self.compose_query_of_patches()
 
     def query_from_probs(
-        self, num_folds: int, image_shape: Iterable[int], label_file: str
+        self,
+        probs: list[Path] | np.ndarray,
+        image_shape: Iterable[int],
+        label_file: str,
+        device: torch.device = torch.device("cuda:0"),
     ):
         """Computes potential queries for a single input image and adds best queries to the internal list of queries.
 
@@ -127,7 +171,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         with monitor.timer("query_from_probs"):
             with torch.no_grad():
                 logger.info("Compute uncertaintes...")
-                uncertainty = self.get_uncertainty(num_folds)
+                uncertainty = self.get_uncertainty(probs, device=device)
 
                 if torch.any(torch.isnan(uncertainty)):
                     # unc_num_nan = torch.sum(torch.isnan(uncertainty))
@@ -139,7 +183,11 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
 
             logger.info("Initialize selected array...")
-            annotated_patches = [patch for patch in self.annotated_patches]
+            annotated_patches = [
+                patch
+                for patch in self.annotated_patches
+                if patch.file == label_file + ".nii.gz"
+            ]
 
             logger.info("Select patches...")
             selected_patches = self.select_top_n_non_overlapping_patches(
@@ -153,14 +201,19 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             self.top_patches += selected_patches
 
     @abstractmethod
-    def get_uncertainty(self, num_folds: int) -> torch.Tensor:
+    def get_uncertainty(
+        self,
+        probs: list[Path] | torch.Tensor,
+        device: torch.device = torch.device("cuda:0"),
+    ) -> torch.Tensor:
         """Compute uncertainty values from out_probs
 
         Args:
-            out_probs (torch.Tensor): probability maps for image [M x C x XYZ]
+            probs (list[Path] | torch.Tensor): paths to probability maps for image
+            [1 x C x XYZ] per item in list or [M x C x XYZ]
 
         Returns:
-            torch.Tensor: outputs [M x C xXYZ]
+            torch.Tensor: outputs [XYZ] on device
         """
 
     def select_top_n_non_overlapping_patches(
@@ -171,6 +224,18 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         label_file: str,
         n: int,
     ) -> list[dict]:
+        """Select top-n non overlapping patches in image.
+
+        Args:
+            patch_size (list[int]): size of patch
+            aggregated (np.ndarray): aggregated uncertainty
+            annotated_patches (list[Patch]): list of annotated patches per image
+            label_file (str): name of label_file without ending (.nii.gz)
+            n (int): number of patches to select
+
+        Returns:
+            list[dict]: dict contains all values required to build a Patch
+        """
         selected_patches = []
         # sort only once since this can take a significant amount of time
         logger.info("Sort potential queries")
@@ -253,6 +318,10 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 for patch in sorted_top_patches
             ]
             patches = [Patch(**patch) for patch in patches]
+            if len(patches) < self.query_size:
+                raise RuntimeError(
+                    f"Not enough patches could be queried, {len(patches)} instead of {self.query_size}"
+                )
             return patches
 
 
@@ -297,29 +366,38 @@ class nnActivePredictor(nnUNetPredictor):
 
         return out_prob
 
-    def save_out_probs_temp(self, out_probs: np.ndarray, fold: int):
-        """Save the predicted probabilities as temporary files on disk to use later
+    def save_out_probs_temp(
+        self,
+        out_probs: np.ndarray,
+        save_file: Path,
+    ) -> Path:
+        """Save the predicted probabilities as temporary files on disk to use later in subsequent steps.
+        Saving location: save_file
 
         Args:
             out_probs (np.ndarray): Predicted probabilities
-            fold (int): current predicted fold
+            save_file (Path): Filename for saving with .npy suffix
         """
         save_timer = Timer()
         save_timer.start()
-        dataset_id = convert_dataset_name_to_id(self.plans_manager.dataset_name)
-        temp_path = get_nnactive_results_folder(dataset_id) / "temp"
-        os.makedirs(temp_path, exist_ok=True)
-        np.save(str(temp_path / f"probs_fold{fold}"), out_probs)
+        os.makedirs(save_file.parent, exist_ok=True)
+        np.save(save_file, out_probs)
         logger.info(f"Time for saving: {save_timer.stop()/1000}s")
 
-    def delete_temp_path(self):
+    def delete_out_probs_temp(self, save_path: Path, save_name: str = "probs_fold"):
         """Delete temp files to not mess up in subsequent query steps"""
-        dataset_id = convert_dataset_name_to_id(self.plans_manager.dataset_name)
-        temp_path = get_nnactive_results_folder(dataset_id) / "temp"
-        shutil.rmtree(temp_path)
+        delete_files = [
+            file for file in save_path.iterdir() if file.name.startswith(save_name)
+        ]
+        for file in delete_files:
+            os.remove(file)
 
     def predict_fold_logits_from_preprocessed_data(
-        self, data: torch.TensorType, properties
+        self,
+        data: torch.TensorType,
+        properties: dict,
+        temp_path: Path,
+        temp_name: str = "probs_fold",
     ):
         """Computes the logits/probs for all folds.
 
@@ -327,6 +405,8 @@ class nnActivePredictor(nnUNetPredictor):
             data (torch.TensorType): Preprocessed Data
         """
         original_perform_everything_on_device = self.perform_everything_on_device
+        num_folds = len(self.list_of_parameters)
+        return_probs = [temp_path / (temp_name + f"{f}.npy") for f in range(num_folds)]
         with torch.no_grad():
             if self.perform_everything_on_device:
                 try:
@@ -342,7 +422,7 @@ class nnActivePredictor(nnUNetPredictor):
                         )
                         logits = self.predict_sliding_window_return_logits(data)
                         out_probs = self.postprocess_logits(logits, properties)
-                        self.save_out_probs_temp(out_probs, fold)
+                        self.save_out_probs_temp(out_probs, return_probs[fold])
 
                 except RuntimeError:
                     logger.exception(
@@ -363,16 +443,19 @@ class nnActivePredictor(nnUNetPredictor):
                         self.network._orig_mod.load_state_dict(params)
                     logits = self.predict_sliding_window_return_logits(data)
                     out_probs = self.postprocess_logits(logits, properties)
-                    self.save_out_probs_temp(out_probs, fold)
+                    self.save_out_probs_temp(out_probs, return_probs[fold])
 
             self.perform_everything_on_device = original_perform_everything_on_device
+        return return_probs
 
     def predict_from_data_iterator(
         self,
         data_iterator,
         query_method: AbstractUncertainQueryMethod,
+        temp_path: Path,
         save_probabilities: bool = False,
         num_processes_segmentation_export: int = default_num_processes,
+        temp_name: str = "probs_fold",
     ):
         """
         each element returned by data_iterator must be a dict with 'data', 'ofile' and 'data_properites' keys!
@@ -381,10 +464,14 @@ class nnActivePredictor(nnUNetPredictor):
         # set up multiprocessing for spawning
 
         for preprocessed in monitor.itertimer(
-            data_iterator, name="predict_from_data_iterator"
+            data_iterator, name="get_queries_per_image"
         ):
             # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
-            # if os.path.basename(preprocessed["ofile"]) != "case_00223":
+            # if os.path.basename(preprocessed["ofile"]) not in [
+            #     "case_00223",
+            #     "case_00210",
+            # ]:
+            #     print("Skipping file:", preprocessed["ofile"])
             #     continue
             data = preprocessed["data"]
             if isinstance(data, str):
@@ -393,9 +480,9 @@ class nnActivePredictor(nnUNetPredictor):
                 os.remove(delfile)
 
             ofile = preprocessed["ofile"]
-            filename = os.path.basename(ofile)
             if ofile is not None:
-                logger.info(f"\nPredicting {os.path.basename(ofile)}:")
+                filename: str = os.path.basename(ofile)
+                logger.info(f"\nPredicting {filename}:")
             else:
                 logger.info(f"\nPredicting image of shape {data.shape}:")
 
@@ -404,16 +491,29 @@ class nnActivePredictor(nnUNetPredictor):
             )
 
             properties = preprocessed["data_properties"]
-            self.predict_fold_logits_from_preprocessed_data(data, properties)
 
-            logger.info("Start Query")
-            query_method.query_from_probs(
-                len(self.list_of_parameters),
-                properties["shape_before_cropping"],
-                filename,
+            if torch.cuda.is_available():
+                cudnn.benchmark = True
+
+            out_probs: list[Path] | np.ndarray = (
+                self.predict_fold_logits_from_preprocessed_data(
+                    data, properties, temp_path, temp_name
+                )
             )
 
-            self.delete_temp_path()
+            logger.info("Start Query")
+            # Benchmark = True can lead to problems during inference with convolutions
+            # illegal memory access
+            if torch.cuda.is_available():
+                cudnn.benchmark = False
+            query_method.query_from_probs(
+                out_probs,
+                properties["shape_before_cropping"],
+                filename,
+                device=self.device,
+            )
+
+            self.delete_out_probs_temp(temp_path, temp_name)
             # TODO: possibly add some multiprocessing as in nnUNet_predictor
 
         if isinstance(data_iterator, MultiThreadedAugmenter):

@@ -1,9 +1,14 @@
 import json
+import multiprocessing
 import os
 from argparse import Namespace
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
+import nnunetv2.paths
 import numpy as np
+import torch
 from loguru import logger
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 
@@ -11,7 +16,8 @@ from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.config import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
+from nnactive.logger import monitor
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.predict import predict_entry_point
 from nnactive.nnunet.utils import (
@@ -22,9 +28,9 @@ from nnactive.nnunet.utils import (
 )
 from nnactive.paths import get_nnActive_results
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 nnActive_results = get_nnActive_results()
-TIMEOUT_S = 60 * 60
 
 
 def get_mean_foreground_cv(summary_cross_val_dict, n_folds):
@@ -78,65 +84,98 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
     return class_dicts
 
 
-@register_subcommand(
-    "get_performance",
-    [
-        (("-d", "--dataset_id"), {"type": int}),
-        (
-            ("-f", "--force"),
-            {"action": "store_true", "help": "Ignores the internal State."},
-        ),
-        (
-            ("--verbose"),
-            {
-                "action": "store_true",
-                "help": "Disables progress bars and get more explicit print statements.",
-            },
-        ),
-    ],
-)
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    force = args.force
-    verbose = args.verbose
-    get_performance(dataset_id, force, verbose)
-
-
-def get_performance(dataset_id: int, force: bool = False, verbose: bool = False):
-    state = State.get_id_state(dataset_id, verify=not force)
-    config = ActiveConfig.get_from_id(dataset_id)
-    images_path = get_raw_path(dataset_id) / "imagesVal"
-    labels_path = get_raw_path(dataset_id) / "labelsVal"
-    loop_val = len(get_sorted_loop_files(get_raw_path(dataset_id))) - 1
-    pred_path = get_results_path(dataset_id) / "predVal"
-    dataset_json_path = get_raw_path(dataset_id) / "dataset.json"
-    plans_identifier = "nnUNetPlans"
-    plans_path = get_preprocessed_path(dataset_id) / f"{plans_identifier}.json"
-
-    num_folds = config.working_folds
-    loop_results_path: Path = (
-        nnActive_results
-        / convert_id_to_dataset_name(dataset_id)
-        / f"loop_{loop_val:03d}"
+def wrap_prediction(
+    input_folder: str,
+    output_folder: str,
+    dataset_id: int,
+    config: ActiveConfig,
+    verbose: bool,
+    num_parts: int,
+    part_id: int,
+    device: torch.device,
+):
+    logger.info(
+        f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
     )
-
-    loop_summary_json = loop_results_path / "summary.json"
-    loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
-
-    folds = " ".join([f"{fold}" for fold in range(num_folds)])
-    # TODO: redo add_validation in config!
-    folds = [i for i in range(num_folds)]
-
+    folds = [fold for fold in range(config.train_folds)]
+    torch.cuda.set_device(device)
     predict_entry_point(
-        input_folder=str(images_path),
-        output_folder=str(pred_path),
+        input_folder=input_folder,
+        output_folder=output_folder,
         dataset_id=dataset_id,
         train_identifier=config.trainer,
         configuration_identifier=config.model_config,
         folds=folds,
         verbose=verbose,
-        disable_progress_bar=not verbose,
+        num_parts=num_parts,
+        part_id=part_id,
+        disable_progress_bar=verbose,
     )
+
+
+@register_subcommand("get_performance")
+def get_performance(
+    config: ActiveConfig,
+    runtime_config: RuntimeConfig = RuntimeConfig(),
+    continue_id: int | None = None,
+    force: bool = False,
+    verbose: bool = False,
+):
+    config.set_nnunet_env()
+    if continue_id is None:
+        state = State.latest(config)
+    else:
+        state = State.get_id_state(continue_id)
+    images_path = get_raw_path(state.dataset_id) / "imagesVal"
+    labels_path = get_raw_path(state.dataset_id) / "labelsVal"
+    loop_val = len(get_sorted_loop_files(get_raw_path(state.dataset_id))) - 1
+    pred_path = get_results_path(state.dataset_id) / "predVal"
+    dataset_json_path = get_raw_path(state.dataset_id) / "dataset.json"
+    plans_path = get_preprocessed_path(state.dataset_id) / f"{config.model_plans}.json"
+
+    num_folds = config.train_folds
+    loop_results_path: Path = (
+        get_results_folder(state.dataset_id) / f"loop_{loop_val:03d}"
+    )
+
+    loop_summary_json = loop_results_path / "summary.json"
+    loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
+
+    # TODO: redo add_validation in config!
+    if runtime_config.n_gpus == 1:
+        device = torch.device("cuda:0")
+        predict_entry_point(
+            input_folder=str(images_path),
+            output_folder=str(pred_path),
+            dataset_id=state.dataset_id,
+            train_identifier=config.trainer,
+            configuration_identifier=config.model_config,
+            folds=[i for i in range(num_folds)],
+            verbose=verbose,
+            disable_progress_bar=verbose,
+            device=device,
+        )
+    else:
+        try:
+            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus) as executor:
+                for _ in executor.map(
+                    wrap_prediction,
+                    [str(images_path)] * runtime_config.n_gpus,
+                    [str(pred_path)] * runtime_config.n_gpus,
+                    [state.dataset_id] * runtime_config.n_gpus,
+                    [config] * runtime_config.n_gpus,
+                    [verbose] * runtime_config.n_gpus,
+                    [runtime_config.n_gpus] * runtime_config.n_gpus,
+                    [p_id for p_id in range(runtime_config.n_gpus)],
+                    [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)],
+                ):
+                    pass
+        except BrokenProcessPool as exc:
+            raise MemoryError(
+                "One of the worker processes died. "
+                "This usually happens because you run out of memory. "
+                "Try running with less processes."
+            ) from exc
 
     os.makedirs(loop_results_path, exist_ok=True)
     compute_metrics_on_folder2(
@@ -150,31 +189,62 @@ def get_performance(dataset_id: int, force: bool = False, verbose: bool = False)
 
     # Summarize the cross validation performance as json. Might be interesting to track across loops
     logger.info("Creating a summary of the cross validation results from training...")
-    num_folds = config.working_folds
     summary_cross_val_dict = {}
 
     # first save the individual cross val dicts by simply appending them with key fold_X
     for fold in range(num_folds):
         trained_model_path = get_output_folder(
-            dataset_id, config.trainer, plans_identifier, config.model_config, fold
+            state.dataset_id,
+            config.trainer,
+            config.model_plans,
+            config.model_config,
+            fold,
         )
-        summary_json_train = Path(trained_model_path) / "validation" / "summary.json"
-        with open(summary_json_train, "r") as f:
-            summary_dict_train = json.load(f)
-        summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
 
-    # get foreground mean across folds
-    foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, num_folds)
-    # get the per class mean across folds
-    per_class_mean_cv = get_mean_cv(summary_cross_val_dict, num_folds)
-    summary_cross_val_dict["mean"] = {}
-    summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
-    summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv
+        os.makedirs(loop_results_path, exist_ok=True)
+        compute_metrics_on_folder2(
+            folder_ref=str(labels_path),
+            folder_pred=str(pred_path),
+            dataset_json_file=str(dataset_json_path),
+            plans_file=str(plans_path),
+            output_file=str(loop_summary_json),
+            num_processes=runtime_config.num_processes,
+        )
 
-    # save the cv results
-    with open(loop_summary_cross_val_json, "w") as f:
-        json.dump(summary_cross_val_dict, f, indent=2)
+        # Summarize the cross validation performance as json. Might be interesting to track across loops
+        logger.info(
+            "Creating a summary of the cross validation results from training..."
+        )
+        summary_cross_val_dict = {}
 
-    if not force:
-        state.get_performance = True
-        state.save_state()
+        # first save the individual cross val dicts by simply appending them with key fold_X
+        for fold in range(num_folds):
+            trained_model_path = get_output_folder(
+                state.dataset_id,
+                config.trainer,
+                config.model_plans,
+                config.model_config,
+                fold,
+            )
+            summary_json_train = (
+                Path(trained_model_path) / "validation" / "summary.json"
+            )
+            with open(summary_json_train, "r") as f:
+                summary_dict_train = json.load(f)
+            summary_cross_val_dict[f"fold_{fold}"] = summary_dict_train
+
+        # get foreground mean across folds
+        foreground_mean_cv = get_mean_foreground_cv(summary_cross_val_dict, num_folds)
+        # get the per class mean across folds
+        per_class_mean_cv = get_mean_cv(summary_cross_val_dict, num_folds)
+        summary_cross_val_dict["mean"] = {}
+        summary_cross_val_dict["mean"]["foreground_mean"] = foreground_mean_cv
+        summary_cross_val_dict["mean"]["mean"] = per_class_mean_cv
+
+        # save the cv results
+        with open(loop_summary_cross_val_json, "w") as f:
+            json.dump(summary_cross_val_dict, f, indent=2)
+
+        if not force:
+            state.get_performance = True
+            state.save_state()

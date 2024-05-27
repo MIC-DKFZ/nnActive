@@ -9,7 +9,7 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 from loguru import logger
-from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
+from nnunetv2 import paths
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
 from nnactive.cli.registry import register_subcommand
@@ -22,17 +22,17 @@ from nnactive.data.create_empty_masks import (
 from nnactive.loops.loading import save_loop
 from nnactive.nnunet.io import generate_custom_splits_file
 from nnactive.nnunet.utils import get_patch_size
+from nnactive.paths import nnActive_data, nnActive_raw, set_raw_paths
 from nnactive.results.utils import (
     convert_id_to_dataset_name as nnactive_id_to_dataset_name,
 )
 from nnactive.strategies import init_strategy
 from nnactive.utils.hostutils import get_verbose
 
-NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
-NNUNET_PREPROCESSED = (
-    Path(nnUNet_preprocessed) if nnUNet_preprocessed is not None else None
-)
-NNUNET_RESULTS = Path(nnUNet_results) if nnUNet_results is not None else None
+NNACTIVE_RAW = nnActive_raw
+assert NNACTIVE_RAW is not None
+NNACTIVE_DATA = nnActive_data
+assert NNACTIVE_DATA is not None
 
 
 def convert_dataset_to_partannotated(
@@ -52,32 +52,33 @@ def convert_dataset_to_partannotated(
     force: only use for development!
     """
     already_exists = False
-    try:
-        exists_name = convert_id_to_dataset_name(target_id)
-        logger.info(
-            f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
-        )
-        already_exists = True
-    except RuntimeError:
-        logger.info("No naming conflict with nnU-Net")
-    try:
-        exists_name = nnactive_id_to_dataset_name(target_id)
-        logger.info(
-            f"Dataset with ID {target_id} already exists in nnActive under name {exists_name}."
-        )
-        already_exists = True
-    except FileNotFoundError:
-        logger.info("No naming conflict with nnActive")
+    # try:
+    #     exists_name = convert_id_to_dataset_name(target_id)
+    #     logger.info(
+    #         f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
+    #     )
+    #     already_exists = True
+    # except RuntimeError:
+    #     logger.info("No naming conflict with nnU-Net")
+    # try:
+    #     exists_name = nnactive_id_to_dataset_name(base_id)
+    #     logger.info(
+    #         f"Dataset with ID {base_id} already exists in nnActive under name {exists_name}."
+    #     )
+    #     already_exists = True
+    # except FileNotFoundError:
+    #     logger.info("No naming conflict with nnActive")
 
-    if already_exists and not force:
-        raise NotImplementedError(
-            "Dataset ID already exists, check corresponding folders."
-        )
+    # if already_exists and not force:
+    #     raise NotImplementedError(
+    #         "Dataset ID already exists, check corresponding folders."
+    #     )
     if not already_exists or force:
         # load base_dataset_json
-        base_dataset: str = convert_id_to_dataset_name(base_id)
-        base_dataset_json: dict = read_dataset_json(base_dataset)
-        base_dir = NNUNET_RAW / base_dataset
+        with set_raw_paths():
+            base_dataset: str = convert_id_to_dataset_name(base_id)
+            base_dataset_json: dict = read_dataset_json(base_dataset)
+            base_dir = Path(paths.nnUNet_raw) / base_dataset
 
         # rewrite target_dataset_json and save
         target_dataset_json = deepcopy(base_dataset_json)
@@ -87,8 +88,8 @@ def convert_dataset_to_partannotated(
         target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = NNUNET_RAW / target_dataset
-        os.makedirs(target_dir, exist_ok=True)
+        target_dir = NNACTIVE_DATA / base_dataset / "nnUNet_raw" / target_dataset
+        target_dir.mkdir(exist_ok=True, parents=True)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
             json.dump(target_dataset_json, file, indent=4)
@@ -107,14 +108,12 @@ def convert_dataset_to_partannotated(
         ]
         for copy_folder in copy_folders:
             if copy_folder in os.listdir(base_dir):
-                shutil.copytree(
-                    base_dir / copy_folder, target_dir / copy_folder, dirs_exist_ok=True
+                (target_dir / copy_folder).symlink_to(
+                    base_dir / copy_folder, target_is_directory=True
                 )
             else:
                 logger.info(
-                    "Skip Path for copying into target:\n{}".format(
-                        base_dir / copy_folder
-                    )
+                    f"Skip Path for copying into target:\n{base_dir / copy_folder}"
                 )
 
         # Create labelstTr for target dataset
@@ -234,95 +233,95 @@ def get_patches_for_partannotation(
     return patches
 
 
-@register_subcommand(
-    "convert",
-    [
-        (
-            ("-d", "--dataset-id"),
-            {
-                "type": int,
-                "required": True,
-                "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
-            },
-        ),
-        (
-            ("-o", "--output-id"),
-            {
-                "type": int,
-                "default": None,
-                "help": "target dataset ID for nnU-Net, default base on offset",
-            },
-        ),
-        (
-            "--offset",
-            {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
-        ),
-        (
-            "--seed",
-            {
-                "default": 12345,
-                "type": int,
-                "help": "Random seed for creation of datasets",
-            },
-        ),
-        (
-            "--full-labeled",
-            {
-                "type": float,
-                "default": 0,
-                "help": "0.X = percentage, int = full number of completely annotated images",
-            },
-        ),  # how to make float and integers
-        (
-            "--strategy",
-            {
-                "type": str,
-                "default": "random",
-                "help": "strategy employed to select random patches",
-            },
-        ),
-        (
-            "--num-patches",
-            {
-                "type": int,
-                "default": 0,
-                "help": "Number of randomly drawn patches",
-            },
-        ),  # how to make float and integers
-        (
-            "--patch-size",
-            {
-                "type": int,
-                "nargs": "+",
-                "default": None,
-                "help": "patch size of the object, default is nnU-Net Patch Size",
-            },
-        ),
-        (
-            "--additional_overlap",
-            {
-                "type": float,
-                "default": 0.4,
-                "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
-            },
-        ),
-        (
-            "--name-suffix",
-            {
-                "type": str,
-                "default": "partanno",
-                "help": "Suffix for the name of the output dataset",
-            },
-        ),
-        (
-            "--force",
-            {
-                "action": "store_true",
-                "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
-            },
-        ),
-    ],
-)
+# @register_subcommand(
+#     "convert",
+#     [
+#         (
+#             ("-d", "--dataset-id"),
+#             {
+#                 "type": int,
+#                 "required": True,
+#                 "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
+#             },
+#         ),
+#         (
+#             ("-o", "--output-id"),
+#             {
+#                 "type": int,
+#                 "default": None,
+#                 "help": "target dataset ID for nnU-Net, default base on offset",
+#             },
+#         ),
+#         (
+#             "--offset",
+#             {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
+#         ),
+#         (
+#             "--seed",
+#             {
+#                 "default": 12345,
+#                 "type": int,
+#                 "help": "Random seed for creation of datasets",
+#             },
+#         ),
+#         (
+#             "--full-labeled",
+#             {
+#                 "type": float,
+#                 "default": 0,
+#                 "help": "0.X = percentage, int = full number of completely annotated images",
+#             },
+#         ),  # how to make float and integers
+#         (
+#             "--strategy",
+#             {
+#                 "type": str,
+#                 "default": "random",
+#                 "help": "strategy employed to select random patches",
+#             },
+#         ),
+#         (
+#             "--num-patches",
+#             {
+#                 "type": int,
+#                 "default": 0,
+#                 "help": "Number of randomly drawn patches",
+#             },
+#         ),  # how to make float and integers
+#         (
+#             "--patch-size",
+#             {
+#                 "type": int,
+#                 "nargs": "+",
+#                 "default": None,
+#                 "help": "patch size of the object, default is nnU-Net Patch Size",
+#             },
+#         ),
+#         (
+#             "--additional_overlap",
+#             {
+#                 "type": float,
+#                 "default": 0.4,
+#                 "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
+#             },
+#         ),
+#         (
+#             "--name-suffix",
+#             {
+#                 "type": str,
+#                 "default": "partanno",
+#                 "help": "Suffix for the name of the output dataset",
+#             },
+#         ),
+#         (
+#             "--force",
+#             {
+#                 "action": "store_true",
+#                 "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
+#             },
+#         ),
+#     ],
+# )
 def main(args: Namespace) -> None:
     full_images = args.full_labeled
 

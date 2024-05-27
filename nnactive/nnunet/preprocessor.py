@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import shutil
 from pathlib import Path
 from time import sleep
@@ -7,7 +8,7 @@ from typing import Union
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import *
 from loguru import logger
-from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
+import nnunetv2.paths
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
     DefaultPreprocessor,
 )
@@ -21,8 +22,10 @@ from nnactive.loops.loading import get_loop_patches, get_patches_from_loop_files
 
 class nnActivePreprocessor(DefaultPreprocessor):
     """Preprocessor for nnUNet which works identical to nnUNet DefaultPreprocessor.
-    Only change is that only the cases for which annotations are in loop files noted are actually preprocessed.
+    Only change is that only the cases for which annotations are in loop files noted are actually preprocessed
     Further, it also allows to partially only preprocess the data which has been added in the newest loop_file.
+    AND
+    .npy files contained in the dataset are deleted.
     """
 
     def run(
@@ -39,10 +42,10 @@ class nnActivePreprocessor(DefaultPreprocessor):
         dataset_name = maybe_convert_to_dataset_name(dataset_name_or_id)
 
         assert isdir(
-            join(nnUNet_raw, dataset_name)
-        ), "The requested dataset could not be found in nnUNet_raw"
+            join(nnunetv2.paths.nnUNet_raw, dataset_name)
+        ), "The requested dataset could not be found in nnunetv2.paths.nnUNet_raw"
 
-        plans_file = join(nnUNet_preprocessed, dataset_name, plans_identifier + ".json")
+        plans_file = join(nnunetv2.paths.nnUNet_preprocessed, dataset_name, plans_identifier + ".json")
         assert isfile(plans_file), (
             "Expected plans file (%s) not found. Run corresponding nnUNet_plan_experiment "
             "first." % plans_file
@@ -58,23 +61,37 @@ class nnActivePreprocessor(DefaultPreprocessor):
         if self.verbose:
             logger.debug(configuration_manager)
 
-        dataset_json_file = join(nnUNet_preprocessed, dataset_name, "dataset.json")
+        dataset_json_file = join(nnunetv2.paths.nnUNet_preprocessed, dataset_name, "dataset.json")
         dataset_json = load_json(dataset_json_file)
 
-        loop_path = Path(nnUNet_raw) / dataset_name
+        loop_path = Path(nnunetv2.paths.nnUNet_raw) / dataset_name
         if do_all:
             patches = get_patches_from_loop_files(loop_path)
         else:
             patches = get_loop_patches(loop_path, None)
-        identifiers = [
-            patch.file.replace(dataset_json["file_ending"], "") for patch in patches
-        ]
+
+        # preprocess every file only once in case of multiple patches for same image.
+        identifiers = list(
+            set(
+                [
+                    patch.file.replace(dataset_json["file_ending"], "")
+                    for patch in patches
+                ]
+            )
+        )
         output_directory = join(
-            nnUNet_preprocessed, dataset_name, configuration_manager.data_identifier
+            nnunetv2.paths.nnUNet_preprocessed, dataset_name, configuration_manager.data_identifier
         )
 
         if isdir(output_directory) and do_all:
             shutil.rmtree(output_directory)
+        else:
+            # delete previously existing _seg.npy files
+            # data does not change
+            filepaths = [join(output_directory, i + "_seg.npy") for i in identifiers]
+            for filepath in filepaths:
+                if os.path.isfile(filepath):
+                    os.remove(filepath)
 
         maybe_mkdir_p(output_directory)
 
@@ -83,11 +100,11 @@ class nnActivePreprocessor(DefaultPreprocessor):
         file_ending = dataset_json["file_ending"]
         # list of lists with image filenames
         image_fnames = create_lists_from_splitted_dataset_folder(
-            join(nnUNet_raw, dataset_name, "imagesTr"), file_ending, identifiers
+            join(nnunetv2.paths.nnUNet_raw, dataset_name, "imagesTr"), file_ending, identifiers
         )
         # list of segmentation filenames
         seg_fnames = [
-            join(nnUNet_raw, dataset_name, "labelsTr", i + file_ending)
+            join(nnunetv2.paths.nnUNet_raw, dataset_name, "labelsTr", i + file_ending)
             for i in identifiers
         ]
 

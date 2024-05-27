@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
 
@@ -37,7 +38,11 @@ class AbstractQueryMethod(ABC):
         self.verbose = verbose
 
     @abstractmethod
-    def query(self, verbose=False) -> list[Patch]:
+    def query(
+        self,
+        verbose=False,
+        n_gpus: int = 1,
+    ) -> list[Patch]:
         pass
 
     @property
@@ -102,9 +107,9 @@ class AbstractQueryMethod(ABC):
         return selected_array
 
     @classmethod
-    def init_from_dataset_id(cls, dataset_id: int, **kwargs):
-        config = ActiveConfig.get_from_id(dataset_id)
-        config_kwargs = config.to_dict()
+    def init_from_dataset_id(cls, config: ActiveConfig, dataset_id: int, **kwargs):
+        # config_kwargs = config.to_dict()
+        config_kwargs = asdict(config)
         config_kwargs.pop("seed")
 
         additional_label_path: Path = get_raw_path(dataset_id) / "addTr"

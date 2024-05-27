@@ -1,12 +1,14 @@
 import json
 import os
 from argparse import Namespace
+from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
 from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_current_loop, get_loop_patches
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
@@ -15,24 +17,29 @@ from nnactive.query.random import create_patch_mask_for_image, load_label_map
 
 @register_subcommand(
     "manual_crop_pred",
-    [
-        (("-d", "--dataset_id"), {"type": int, "required": True}),
-        (
-            ("-l", "--loop"),
-            {
-                "type": int,
-                "default": None,
-            },
-        ),
-    ],
 )
-def main(args: Namespace) -> None:
-    dataset_id = args.dataset_id
-    loop = args.loop
+def main(
+    data_path: str,
+    config: ActiveConfig = ActiveConfig([0, 0, 0]),
+    runtime_config: RuntimeConfig = RuntimeConfig(),
+    continue_id: int | None = None,
+    loop: int | None = None,
+) -> None:
+    """Crop predictions to region requested in loop_xxx.json file.
+    Predictions are expected to be in 'predTr_{loop-1}'
+    Resulting patches are saved in 'predTr_crop_{loop-1}'
 
-    data_path = get_raw_path(dataset_id)
+    Args:
+        data_path (str): Path to folder with raw (containing predTr_{loop-1} and loop_{loop}.json)
+        config (ActiveConfig, optional): Ignore. Defaults to ActiveConfig([0, 0, 0]).
+        runtime_config (RuntimeConfig, optional): Ignore. Defaults to RuntimeConfig().
+        continue_id (int | None, optional): Ignore. Defaults to None.
+        loop (int | None, optional): Set loop file. Defaults to None.
+    """
+    data_path = Path(data_path)
 
-    dataset_json = read_dataset_json(dataset_id)
+    with open(data_path / "dataset.json", "r") as file:
+        dataset_json = json.load(file)
     file_ending = dataset_json["file_ending"]
 
     if loop is None:

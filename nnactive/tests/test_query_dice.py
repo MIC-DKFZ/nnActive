@@ -1,13 +1,14 @@
 import random
 
 import numpy as np
+import torch
 
-from nnactive.strategies.dice_query import PatchDice
+from nnactive.strategies.dice_query import ExpectedPatchDice
 
 
 def test_get_coords():
     input_img = np.zeros([3, 8, 8, 8])
-    patch_dice = PatchDice(patch_size=[2, 2, 2], stride=2)
+    patch_dice = ExpectedPatchDice(patch_size=[2, 2, 2], stride=2)
     coords = patch_dice.get_coords_patches(input_img.shape[1:])
     expected_coords = []
     for i in range(0, 8, 2):
@@ -20,7 +21,7 @@ def test_get_coords():
 
 def test_get_coords_non_fitting_img_size():
     input_img = np.zeros([3, 9, 9, 9])
-    patch_dice = PatchDice(patch_size=[2, 2, 2], stride=2)
+    patch_dice = ExpectedPatchDice(patch_size=[2, 2, 2], stride=2)
     coords = patch_dice.get_coords_patches(input_img.shape[1:])
     expected_coords = []
     for i in range(0, 8, 2):
@@ -33,7 +34,7 @@ def test_get_coords_non_fitting_img_size():
 
 def test_get_coords_larger_patch():
     input_img = np.zeros([3, 8, 8, 8])
-    patch_dice = PatchDice(patch_size=[4, 4, 4], stride=2)
+    patch_dice = ExpectedPatchDice(patch_size=[4, 4, 4], stride=2)
     coords = patch_dice.get_coords_patches(input_img.shape[1:])
     expected_coords = []
     for i in range(0, 6, 2):
@@ -46,7 +47,7 @@ def test_get_coords_larger_patch():
 
 def test_get_coords_non_fitting_img_size_larger_patch():
     input_img = np.zeros([3, 9, 9, 9])
-    patch_dice = PatchDice(patch_size=[4, 4, 4], stride=2)
+    patch_dice = ExpectedPatchDice(patch_size=[4, 4, 4], stride=2)
     coords = patch_dice.get_coords_patches(input_img.shape[1:])
     expected_coords = []
     for i in range(0, 6, 2):
@@ -63,7 +64,7 @@ def get_testing_images():
     input_img[-1] = 1
     input_img2 = input_img.copy()
     input_img3 = input_img.copy()
-    patch_dice = PatchDice(patch_size=patch_size, stride=2)
+    patch_dice = ExpectedPatchDice(patch_size=patch_size, stride=2)
     coords = patch_dice.get_coords_patches(input_img.shape[1:])
     random_locations = random.sample(coords.tolist(), 3)
     random_location_worst = random_locations[0]
@@ -120,9 +121,9 @@ def test_query_dice():
             random_location_medium,
             random_locations_best_agree,
         ) = get_testing_images()
-        dice = PatchDice(patch_size=[2, 2, 2], stride=2)
-        input_img_list = [input_img, input_img2, input_img3]
-        sorted_dice_dict, _ = dice.forward(input_img_list)
+        dice = ExpectedPatchDice(patch_size=[2, 2, 2], stride=2)
+        probs = torch.from_numpy(np.stack([input_img, input_img2, input_img3], axis=0))
+        sorted_dice_dict, _ = dice.forward(probs, device=torch.device("cpu"))
         np.testing.assert_array_equal(
             np.array(random_location_worst),
             np.array(list(sorted_dice_dict.keys())[0]),

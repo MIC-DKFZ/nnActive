@@ -1,7 +1,16 @@
-import argparse
+import shtab
+from jsonargparse import ActionConfigFile, ArgumentParser, Namespace
 
-from .registry import _add_to_parser
-from .subcommands import *
+from nnactive.cli.registry import add_subcommands, run_subcommand
+
+from .subcommands import (
+    analyze_experiments,
+    manual_crop_pred,
+    nnunet_preprocess,
+    run_al_loops,
+    setup,
+    train_nnUNet_ensemble,
+)
 
 
 def main() -> None:
@@ -9,10 +18,10 @@ def main() -> None:
 
     This gets installed as a script named `nnactive` by pip.
     """
-    parser = argparse.ArgumentParser()
-    parser.set_defaults(command=lambda _: parser.print_help())
+    parser = ArgumentParser()
+    shtab.add_argument_to(parser, ["-s", "--print-completion"])
 
-    _add_to_parser(parser)
+    add_subcommands(parser)
 
     args = parser.parse_args()
-    args.command(args)
+    run_subcommand(args)
