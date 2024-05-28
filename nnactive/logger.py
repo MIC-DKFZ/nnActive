@@ -44,18 +44,23 @@ class nnActiveMonitor:
         name: str | None = None,
         config: dict | None = None,
         force: bool = False,
+        group: str | None = None,
     ) -> Generator[None, None, None]:
         if self._wandb_active:
             if force:
                 wandb.finish()
             else:
-                logger.warning("wandb is already active, set `force` to replace active run")
+                logger.warning(
+                    "wandb is already active, set `force` to replace active run"
+                )
+
                 def _inner():
                     yield
+
                 return _inner()
 
         try:
-            wandb.init(project=project, name=name, config=config)
+            wandb.init(project=project, name=name, config=config, group=group)
         except CommError:
             wandb.init(project=project, name=name, config=config, mode="offline")
 

@@ -1,14 +1,16 @@
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import List, Union
-import multiprocessing as mp
 
 import numpy as np
+import wandb
 from loguru import logger
 
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch
+from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import set_raw_paths
 from nnactive.query.get_locs import get_locs_from_segmentation
@@ -75,6 +77,16 @@ class RandomLabel(Random):
                 dataset_json = read_dataset_json(annotated_id)
                 self.background_cls = dataset_json["labels"].get("background")
 
+    def wrap_query(
+        self,
+        verbose: bool = False,
+        already_annotated_patches: list[Patch] = None,
+        n_gpus: int = 1,
+        wandb_group: str | None = None,
+    ):
+        with monitor.active_run(group=wandb_group):
+            self.query(verbose, already_annotated_patches, n_gpus)
+
     def query(
         self,
         verbose: bool = False,
@@ -95,12 +107,11 @@ class RandomLabel(Random):
             logger.debug("Execute Query in Subprocess.")
             patch_list = []
             try:
-                with ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn")) as executor:
+                with ProcessPoolExecutor(
+                    max_workers=1, mp_context=mp.get_context("spawn")
+                ) as executor:
                     for patch_final in executor.map(
-                        self.query,
-                        [verbose],
-                        [None],
-                        [1],
+                        self.query, [verbose], [None], [1], [wandb.run.group]
                     ):
                         patch_list.append(patch_final)
                 return patch_list[0]

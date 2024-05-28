@@ -1,16 +1,17 @@
 import functools
 import math
 import multiprocessing
+import multiprocessing as mp
 import os
 import time
 from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import Iterable
-import multiprocessing as mp
 
 import nnunetv2.paths
 import torch
+import wandb
 from loguru import logger
 from nnunetv2.run.run_training import run_training
 from nnunetv2.training.dataloading.utils import unpack_dataset
@@ -28,23 +29,25 @@ def wrap_training(
     config: ActiveConfig,
     folds: Iterable[int],
     device: torch.device,
+    wandbgroup: str,
 ):
-    # ensure that each fold/fork is mapped onto one gpu
-    torch.cuda.set_device(device)
-    for fold in folds:
-        logger.info(
-            f"Running training fold '{fold}' in process '{multiprocessing.current_process()}' with device '{device}'"
-        )
-        run_training(
-            str(
-                dataset_id
-            ),  # TODO: fix this bug in nnU-Net requiring input to be string.
-            config.model_config,
-            fold,
-            trainer_class_name=config.trainer,
-            device=device,
-            logger=monitor.get_logger(),
-        )
+    with monitor.active_run(group=wandbgroup):
+        # ensure that each fold/fork is mapped onto one gpu
+        torch.cuda.set_device(device)
+        for fold in folds:
+            logger.info(
+                f"Running training fold '{fold}' in process '{multiprocessing.current_process()}' with device '{device}'"
+            )
+            run_training(
+                str(
+                    dataset_id
+                ),  # TODO: fix this bug in nnU-Net requiring input to be string.
+                config.model_config,
+                fold,
+                trainer_class_name=config.trainer,
+                device=device,
+                logger=monitor.get_logger(),
+            )
 
 
 @register_subcommand("train_nnUNet_ensemble")
@@ -103,13 +106,16 @@ def train_nnUNet_ensemble(
             for d in range(runtime_config.n_gpus)
         ]
         try:
-            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")) as executor:
+            with ProcessPoolExecutor(
+                max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")
+            ) as executor:
                 for _ in executor.map(
                     wrap_training,
                     [state.dataset_id] * num_folds,
                     [config] * num_folds,
                     folds,
                     devices,
+                    [wandb.run.group] * num_folds,
                 ):
                     pass
         except BrokenProcessPool as exc:

@@ -1,15 +1,16 @@
 import json
 import multiprocessing
+import multiprocessing as mp
 import os
 from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
-import multiprocessing as mp
 
 import nnunetv2.paths
 import numpy as np
 import torch
+import wandb
 from loguru import logger
 from nnunetv2.evaluation.evaluate_predictions import compute_metrics_on_folder2
 
@@ -94,24 +95,26 @@ def wrap_prediction(
     num_parts: int,
     part_id: int,
     device: torch.device,
+    wandb_group: str,
 ):
-    logger.info(
-        f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
-    )
-    folds = [fold for fold in range(config.train_folds)]
-    torch.cuda.set_device(device)
-    predict_entry_point(
-        input_folder=input_folder,
-        output_folder=output_folder,
-        dataset_id=dataset_id,
-        train_identifier=config.trainer,
-        configuration_identifier=config.model_config,
-        folds=folds,
-        verbose=verbose,
-        num_parts=num_parts,
-        part_id=part_id,
-        disable_progress_bar=verbose,
-    )
+    with monitor.active_run(group=wandb_group):
+        logger.info(
+            f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
+        )
+        folds = [fold for fold in range(config.train_folds)]
+        torch.cuda.set_device(device)
+        predict_entry_point(
+            input_folder=input_folder,
+            output_folder=output_folder,
+            dataset_id=dataset_id,
+            train_identifier=config.trainer,
+            configuration_identifier=config.model_config,
+            folds=folds,
+            verbose=verbose,
+            num_parts=num_parts,
+            part_id=part_id,
+            disable_progress_bar=verbose,
+        )
 
 
 @register_subcommand("get_performance")
@@ -158,7 +161,9 @@ def get_performance(
         )
     else:
         try:
-            with ProcessPoolExecutor(max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")) as executor:
+            with ProcessPoolExecutor(
+                max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")
+            ) as executor:
                 for _ in executor.map(
                     wrap_prediction,
                     [str(images_path)] * runtime_config.n_gpus,
@@ -169,6 +174,7 @@ def get_performance(
                     [runtime_config.n_gpus] * runtime_config.n_gpus,
                     [p_id for p_id in range(runtime_config.n_gpus)],
                     [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)],
+                    [wandb.run.group] * runtime_config.n_gpus,
                 ):
                     pass
         except BrokenProcessPool as exc:

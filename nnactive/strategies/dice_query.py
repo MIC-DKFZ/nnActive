@@ -1,13 +1,14 @@
+import multiprocessing as mp
 import time
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple, Union
-import multiprocessing as mp
 
 import numpy as np
 import torch
+import wandb
 from loguru import logger
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
@@ -195,6 +196,16 @@ class ExpectedDiceQuery(AbstractQueryMethod):
         self.n_patch_per_image = n_patch_per_image
         self.strategy = ExpectedPatchDiceScore(self.patch_size, self.agg_stride)
 
+    def wrap_query_part(
+        self,
+        part_id: int = 0,
+        num_parts: int = 1,
+        device: torch.device = torch.device("cuda:0"),
+        wandb_group: str = "Test",
+    ) -> list[dict]:
+        with monitor.active_run(group=wandb_group):
+            self.query_part(part_id, num_parts, device)
+
     def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
         if n_gpus == 1:
             device = torch.device("cuda:0")
@@ -204,12 +215,15 @@ class ExpectedDiceQuery(AbstractQueryMethod):
             num_parts = [n_gpus] * n_gpus
             parts = [i for i in range(n_gpus)]
             try:
-                with ProcessPoolExecutor(max_workers=n_gpus, mp_context=mp.get_context("spawn")) as executor:
+                with ProcessPoolExecutor(
+                    max_workers=n_gpus, mp_context=mp.get_context("spawn")
+                ) as executor:
                     for top_patch_part in executor.map(
-                        self.query_part,
+                        self.wrap_query_part,
                         parts,
                         num_parts,
                         devices,
+                        [wandb.run.group] * n_gpus,
                     ):
                         self.top_patches.extend(top_patch_part)
 

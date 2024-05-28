@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
 import shutil
 import traceback
@@ -8,11 +9,11 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Union
-import multiprocessing as mp
 
 import numpy as np
 import psutil
 import torch
+import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -128,6 +129,16 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         predictor.predict_from_data_iterator(data_iterator, self, temp_path=temp_path)
         return self.top_patches
 
+    def wrap_query_part(
+        self,
+        part_id: int = 0,
+        num_parts: int = 1,
+        device: torch.device = torch.device("cuda:0"),
+        wandb_group: str = "Test",
+    ) -> list[dict]:
+        with monitor.active_run(group=wandb_group):
+            self.query_part(part_id, num_parts, device)
+
     def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
         if n_gpus == 1:
             device = torch.device("cuda:0")
@@ -137,12 +148,15 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             num_parts = [n_gpus] * n_gpus
             parts = [i for i in range(n_gpus)]
             try:
-                with ProcessPoolExecutor(max_workers=n_gpus, mp_context=mp.get_context("spawn")) as executor:
+                with ProcessPoolExecutor(
+                    max_workers=n_gpus, mp_context=mp.get_context("spawn")
+                ) as executor:
                     for top_patch_part in executor.map(
-                        self.query_part,
+                        self.wrap_query_part,
                         parts,
                         num_parts,
                         devices,
+                        [wandb.run.group] * n_gpus,
                     ):
                         self.top_patches.extend(top_patch_part)
 
