@@ -323,7 +323,7 @@ def make_airway_config(
     uncertainty: str,
     query_size: int = 10,
     query_steps: int = 10,
-    patch_size: list[int] = [20, 20, 20],
+    patch_size: list[int] | None = None,
 ):
     with set_raw_paths():
         base_id = 980
@@ -355,7 +355,7 @@ def make_airway_small_config(
     uncertainty: str,
     query_size: int = 10,
     query_steps: int = 3,
-    patch_size: list[int] = [20, 20, 20],
+    patch_size: list[int] | None = None,
 ):
     with set_raw_paths():
         base_id = 983
