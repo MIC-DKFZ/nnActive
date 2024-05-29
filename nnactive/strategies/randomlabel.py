@@ -36,6 +36,7 @@ class RandomLabel(Random):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         """
@@ -61,6 +62,7 @@ class RandomLabel(Random):
             additional_label_path,
             additional_overlap,
             verbose=verbose,
+            config=config,
         )
         self.raw_labels_path = raw_labels_path
         if self.raw_labels_path is None:
@@ -84,14 +86,17 @@ class RandomLabel(Random):
         n_gpus: int = 1,
         wandb_group: str | None = None,
     ):
+        # TODO: add config here
+        self.config.set_nnunet_env()
         with monitor.active_run(group=wandb_group):
-            self.query(verbose, already_annotated_patches, n_gpus)
+            top_patches = self.query(verbose, already_annotated_patches, n_gpus)
+        return top_patches
 
     def query(
         self,
         verbose: bool = False,
         already_annotated_patches: list[Patch] = None,
-        n_gpus: int = 1,
+        n_gpus: int = 0,
     ) -> List[Patch]:
         """
         Args:
@@ -103,26 +108,7 @@ class RandomLabel(Random):
 
         # ensure that all processes are run into subprocesses for n_gpus > 1
         # issues can arise if this is not done.
-        if n_gpus > 1:
-            logger.debug("Execute Query in Subprocess.")
-            patch_list = []
-            try:
-                with ProcessPoolExecutor(
-                    max_workers=1, mp_context=mp.get_context("spawn")
-                ) as executor:
-                    for patch_final in executor.map(
-                        self.query, [verbose], [None], [1], [wandb.run.group]
-                    ):
-                        patch_list.append(patch_final)
-                return patch_list[0]
-
-            except BrokenProcessPool as exc:
-                raise MemoryError(
-                    "One of the worker processes died. "
-                    "This usually happens because you run out of memory. "
-                    "Try running with less processes."
-                ) from exc
-        else:
+        if n_gpus == 0:
             logger.info(self.img_names)
             img_generator = _get_infinte_iter(self.img_names)
             labeled_patches = self.annotated_patches
@@ -252,6 +238,25 @@ class RandomLabel(Random):
                     if labeled:
                         break
             return patches
+        else:
+            logger.debug("Execute Query in Subprocess.")
+            patch_list = []
+            try:
+                with ProcessPoolExecutor(
+                    max_workers=1, mp_context=mp.get_context("spawn")
+                ) as executor:
+                    for patch_final in executor.map(
+                        self.query, [verbose], [None], [1], [wandb.run.group]
+                    ):
+                        patch_list.append(patch_final)
+                return patch_list[0]
+
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
 
 
 def _obtain_random_patch_from_locs(

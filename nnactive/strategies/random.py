@@ -4,6 +4,7 @@ from typing import Generator, Iterable
 import numpy as np
 from loguru import logger
 
+from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
@@ -23,6 +24,7 @@ class Random(AbstractQueryMethod):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -33,6 +35,7 @@ class Random(AbstractQueryMethod):
             additional_label_path,
             additional_overlap,
             verbose=verbose,
+            config=config,
         )
         self.trials_per_img = trials_per_img
         self.rng = np.random.default_rng(seed)
@@ -49,7 +52,7 @@ class Random(AbstractQueryMethod):
         self.rng.shuffle(self.img_names)
 
     def query(
-        self, verbose: bool = False, n_gpus: int = 1, already_annotated_patches=None
+        self, verbose: bool = False, n_gpus: int = 0, already_annotated_patches=None
     ) -> list[Patch]:
         """
         Args:

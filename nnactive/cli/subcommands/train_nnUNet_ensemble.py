@@ -31,6 +31,7 @@ def wrap_training(
     device: torch.device,
     wandbgroup: str,
 ):
+    config.set_nnunet_env()
     with monitor.active_run(group=wandbgroup):
         # ensure that each fold/fork is mapped onto one gpu
         torch.cuda.set_device(device)
@@ -86,7 +87,7 @@ def train_nnUNet_ensemble(
         verify_npy=False,
     )
 
-    if runtime_config.n_gpus == 1:
+    if runtime_config.n_gpus == 0:
         device = torch.device("cuda:0")
         for fold in range(num_folds):
             run_training(

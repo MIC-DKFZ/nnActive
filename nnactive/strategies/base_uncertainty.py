@@ -57,6 +57,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -67,8 +68,8 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             additional_label_path,
             additional_overlap,
             verbose=verbose,
+            config=config,
         )
-        self.config = ActiveConfig.get_from_id(dataset_id)
 
         self.num_processes_preprocessing = num_processes_preprocessing
         self.n_patch_per_image = n_patch_per_image
@@ -136,11 +137,13 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         device: torch.device = torch.device("cuda:0"),
         wandb_group: str = "Test",
     ) -> list[dict]:
+        self.config.set_nnunet_env()
         with monitor.active_run(group=wandb_group):
-            self.query_part(part_id, num_parts, device)
+            top_patches = self.query_part(part_id, num_parts, device)
+        return top_patches
 
     def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
-        if n_gpus == 1:
+        if n_gpus == 0:
             device = torch.device("cuda:0")
             self.query_part(part_id=0, num_parts=1, device=device)
         else:

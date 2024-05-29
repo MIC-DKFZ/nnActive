@@ -23,7 +23,6 @@ def preprocess(
     config: ActiveConfig,
     runtime_config: RuntimeConfig,
     continue_id: int | None = None,
-    plans_identifier: str = "nnUNetPlans",
     verbose: bool = False,
     do_all: bool = False,
     force: bool = False,
@@ -52,20 +51,22 @@ def preprocess(
     dataset_name = convert_id_to_dataset_name(state.dataset_id)
     logger.info(f"Preprocessing dataset {dataset_name}")
     plans_file = join(
-        nnunetv2.paths.nnUNet_preprocessed, dataset_name, plans_identifier + ".json"
+        nnunetv2.paths.nnUNet_preprocessed, dataset_name, config.model_plans + ".json"
     )
     plans_manager = PlansManager(plans_file)
     for n, c in zip(num_processes, configurations):
         logger.info(f"Configuration: {c}...")
         if c not in plans_manager.available_configurations:
             raise FileNotFoundError(
-                f"INFO: Configuration {c} not found in plans file {plans_identifier + '.json'} of "
+                f"INFO: Configuration {c} not found in plans file {config.model_plans + '.json'} of "
                 f"dataset {dataset_name}. Skipping."
             )
             continue
         configuration_manager = plans_manager.get_configuration(c)
         preprocessor = nnActivePreprocessor(verbose=verbose)
-        preprocessor.run(state.dataset_id, c, plans_identifier, num_processes=n, do_all=do_all)
+        preprocessor.run(
+            state.dataset_id, c, config.model_plans, num_processes=n, do_all=do_all
+        )
     maybe_mkdir_p(
         join(nnunetv2.paths.nnUNet_preprocessed, dataset_name, "gt_segmentations")
     )

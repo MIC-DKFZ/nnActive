@@ -117,7 +117,7 @@ class ActiveConfig:
 @dataclass
 class RuntimeConfig:
     num_processes: int = 4
-    n_gpus: int = 1
+    n_gpus: int = 0
 
 
 @dataclass

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Type
 
 import numpy as np
 from loguru import logger
@@ -25,6 +27,7 @@ class AbstractQueryMethod(ABC):
         additional_overlap: float = 0.1,
         patch_overlap: float = 0,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         self.dataset_id = dataset_id
@@ -36,12 +39,13 @@ class AbstractQueryMethod(ABC):
         self.additional_overlap = additional_overlap
         self.patch_overlap = patch_overlap
         self.verbose = verbose
+        self.config = ActiveConfig.get_from_id(dataset_id) if config is None else config
 
     @abstractmethod
     def query(
         self,
         verbose=False,
-        n_gpus: int = 1,
+        n_gpus: int = 0,
     ) -> list[Patch]:
         pass
 
@@ -107,7 +111,9 @@ class AbstractQueryMethod(ABC):
         return selected_array
 
     @classmethod
-    def init_from_dataset_id(cls, config: ActiveConfig, dataset_id: int, **kwargs):
+    def init_from_dataset_id(
+        cls: Type[AbstractQueryMethod], config: ActiveConfig, dataset_id: int, **kwargs
+    ):
         # config_kwargs = config.to_dict()
         config_kwargs = asdict(config)
         config_kwargs.pop("seed")
@@ -115,9 +121,11 @@ class AbstractQueryMethod(ABC):
         additional_label_path: Path = get_raw_path(dataset_id) / "addTr"
         if not additional_label_path.is_dir():
             additional_label_path = None
-        return cls(
+        strategy = cls(
             dataset_id=dataset_id,
             additional_label_path=additional_label_path,
+            config=config,
             **config_kwargs,
             **kwargs,
         )
+        return strategy

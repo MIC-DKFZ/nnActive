@@ -7,6 +7,7 @@ import numpy as np
 from loguru import logger
 from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_to_id
 
+from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import read_dataset_json
@@ -172,6 +173,7 @@ class RandomLabelAllClasses(RandomLabel):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -186,11 +188,12 @@ class RandomLabelAllClasses(RandomLabel):
             additional_label_path,
             additional_overlap,
             verbose=verbose,
+            config=config,
             **kwargs,
         )
         random.seed(seed)
 
-    def query(self, verbose: bool = False, n_gpus: int = 1, **kwargs) -> List[Patch]:
+    def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times
         annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
         selected_patches = query_starting_budget_all_classes(
@@ -223,6 +226,7 @@ class RandomAllClasses(Random):
         additional_label_path: Path | None = None,
         additional_overlap: float = 0.1,
         verbose: bool = False,
+        config: ActiveConfig | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -236,11 +240,11 @@ class RandomAllClasses(Random):
             additional_label_path,
             additional_overlap,
             verbose=verbose,
-            **kwargs,
+            config=config**kwargs,
         )
         random.seed(seed)
 
-    def query(self, verbose: bool = False, n_gpus: int = 1, **kwargs) -> List[Patch]:
+    def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times
         annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
         selected_patches = query_starting_budget_all_classes(

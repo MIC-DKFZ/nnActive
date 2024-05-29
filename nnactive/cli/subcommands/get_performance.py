@@ -97,6 +97,7 @@ def wrap_prediction(
     device: torch.device,
     wandb_group: str,
 ):
+    config.set_nnunet_env()
     with monitor.active_run(group=wandb_group):
         logger.info(
             f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
@@ -146,7 +147,7 @@ def get_performance(
     loop_summary_cross_val_json = loop_results_path / "summary_cross_val.json"
 
     # TODO: redo add_validation in config!
-    if runtime_config.n_gpus == 1:
+    if runtime_config.n_gpus == 0:
         device = torch.device("cuda:0")
         predict_entry_point(
             input_folder=str(images_path),
