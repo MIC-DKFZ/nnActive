@@ -246,7 +246,7 @@ class RandomLabel(Random):
                     max_workers=1, mp_context=mp.get_context("spawn")
                 ) as executor:
                     for patch_final in executor.map(
-                        self.query, [verbose], [None], [1], [wandb.run.group]
+                        self.wrap_query, [verbose], [None], [0], [wandb.run.group]
                     ):
                         patch_list.append(patch_final)
                 return patch_list[0]

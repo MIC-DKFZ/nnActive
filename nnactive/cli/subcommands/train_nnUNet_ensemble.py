@@ -76,14 +76,20 @@ def train_nnUNet_ensemble(
 
     num_folds = config.train_folds
 
+    # Custom preprocessor handles deleting of old _seg.npy files
+    npp = (
+        runtime_config.num_processes
+        if runtime_config.n_gpus == 0
+        else runtime_config.num_processes * runtime_config.n_gpus
+    )
     unpack_dataset(
         folder=str(
             get_preprocessed_path(state.dataset_id)
-            / "_".join([config.model_plans, config.model_config])
+            / "_".join([config.model_plans, config.model_config]),
         ),
         unpack_segmentation=True,
         overwrite_existing=False,
-        num_processes=runtime_config.num_processes * runtime_config.n_gpus,
+        num_processes=npp,
         verify_npy=False,
     )
 
