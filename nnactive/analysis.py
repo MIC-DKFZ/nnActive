@@ -1,6 +1,7 @@
 import json
+from copy import deepcopy
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,10 +17,11 @@ PALETTE = {
     "random": "tab:blue",
     "pred_entropy": "tab:green",
     "mutual_information": "tab:orange",
-    # "other_1": "tab:purple",
+    "expected_dice": "tab:purple",
     "random-label": "tab:red",
     # "other_3": "tab:cyan",
 }
+FULL_LINESTYLE = ["-", "- "]
 
 DATASET_PERFORMANCES = []
 for result in (Path(__file__).parent.parent / "full_data_results").iterdir():
@@ -31,60 +33,127 @@ for result in (Path(__file__).parent.parent / "full_data_results").iterdir():
             DATASET_PERFORMANCES.append(summary)
 
 
-FULL_DATASET_PERFORMANCE = {
-    "Dataset004_Hippocampus": 0.895,
-}
+class MeanValue:
+    def __init__(self, value: str):
+        self.value = value
 
-for dataset_summary in DATASET_PERFORMANCES:
-    FULL_DATASET_PERFORMANCE[dataset_summary["Dataset"]] = dataset_summary[
-        "foreground_mean"
-    ]["Dice"]
+    def get_from_dict(self, file_dict: dict):
+        return file_dict["foreground_mean"]["Dice"]
 
-
-def load_results(filenames: list[Path]) -> list[dict]:
-    out_list = []
-    for filename in filenames:
-        out_dict = dict()
-        with open(filename, "r") as file:
-            file_dict = json.load(file)
-        out_dict["Mean Dice"] = file_dict["foreground_mean"]["Dice"]
-        # for cls in file_dict["mean"]:
-        #     out_dict[f"Class Dice {cls}"] = file_dict["mean"][cls]["Dice"]
-
-        out_dict["Loop"] = int(filename.parent.name.split("_")[1])
-        out_list.append(out_dict)
-    return out_list
+    @property
+    def name(self):
+        return "Mean Dice"
 
 
-def get_experiment_results(experiment_path: Path, filter=True) -> list[dict]:
-    # check that summary.jsons are read from loop_XXX in results format
-    filenames = [
-        fn for fn in experiment_path.rglob("summary.json") if "loop_" in fn.__str__()
-    ]
-    # make use of loop_XXX folder structure
-    filenames.sort()
-    dict_list = load_results(filenames)
+class ClassValue:
+    def __init__(self, value: str, cls: Any):
+        self.value = value
+        self.cls = cls
 
-    config_item = ActiveConfig.from_json(experiment_path / ActiveConfig.filename())
-    config_dict = config_item.to_dict()
+    def get_from_dict(self, file_dict: dict):
+        return file_dict["mean"][self.cls][self.value]
 
-    final_item = Final.from_json(experiment_path / Final.filename())
-    # final_dict = final_item.to_dict()
-    if filter:
-        if final_item.final is False:
-            print(f"Skipping Experiment: {experiment_path.name}")
-            return []
+    @property
+    def name(self):
+        return f"Class {self.value} {self.cls}"
 
-    for dictval in dict_list:
-        dictval["Experiment Name"] = experiment_path.name
-        dictval.update(config_dict)
-        # dictval.update(final_dict)
 
-    return dict_list
+class SingleExperimentResults:
+    def __init__(self, experiment_path):
+        self.experiment_path = experiment_path
+
+    @property
+    def summary_files(self) -> list[Path]:
+        filenames = [
+            fn
+            for fn in self.experiment_path.rglob("summary.json")
+            if "loop_" in fn.__str__()
+        ]
+        filenames.sort()
+        return filenames
+
+    @property
+    def config(self) -> ActiveConfig:
+        return ActiveConfig.from_json(self.experiment_path / ActiveConfig.filename())
+
+    @property
+    def results(self):
+        out_results = []
+        for summary_file in self.summary_files:
+            temp_dict = {}
+            temp_dict["summary"] = load_json(summary_file)
+            temp_dict["Loop"] = int(summary_file.parent.name.split("_")[1])
+            temp_dict["#Patches"] = (
+                temp_dict["Loop"] * self.config.query_size
+                + self.config.starting_budget_size
+            )
+            temp_dict["Experiment"] = self.experiment_path.name
+            out_results.append(temp_dict)
+        return out_results
+
+    # TODO: retrieve class names from dataset.json
+    @property
+    def label_names(self) -> dict[str, int]:
+        return {}
+
+    @property
+    def plot_name(self) -> str:
+        return "plot_val"
+
+    @property
+    def plot_skip_keys(self):
+        skip_keys = [
+            self.plot_name,
+            "Experiment",  # Possibly Experiment Name
+            "seed",
+            "Loop",
+            "uncertainty",
+            "#Patches",
+        ]
+        return skip_keys
+
+    def value_dict(self, plot_val: str = "Dice"):
+        # better to do this with classes for names of plots
+        plot_dict = {f"Mean {plot_val}": MeanValue(plot_val)}
+        for cls in self.results[0]["summary"]["mean"]:
+            # use deepcopy here as otherwise cls is changed in lambda function
+            plot_dict[f"Class {cls} {plot_val}"] = ClassValue(plot_val, cls)
+        return plot_dict
+
+    def to_df_row_dicts(self, plot_fct=lambda x: x["foreground_mean"]["Dice"]):
+        out = []
+        for result in self.results:
+            append_dict = {}
+            for k in result:
+                if k != "summary":
+                    append_dict[k] = result[k]
+            append_dict[self.plot_name] = plot_fct(result["summary"])
+            append_dict.update(self.config.to_dict())
+            out.append(append_dict)
+        return out
+
+    def full_dataset_performance(self, plot_fct=lambda x: x["foreground_mean"]["Dice"]):
+        y_fulls = []
+        for dataset_performance in DATASET_PERFORMANCES:
+            if dataset_performance["Dataset"] == self.config.dataset:
+                y_fulls.append(
+                    {
+                        "y": plot_fct(dataset_performance),
+                        "label": "{} full dataset performance".format(
+                            dataset_performance["Trainer"]
+                        ),
+                        "linestyle": FULL_LINESTYLE[len(y_fulls)],
+                        "color": "black",
+                    }
+                )
+        return y_fulls
 
 
 def compare_multi_experiment_results(
-    base_path: Path, base_dataset_id: Union[int, None] = None
+    base_path: Path,
+    base_dataset_id: Union[int, None] = None,
+    filter_final: bool = True,
+    all_plots: bool = True,
 ):
     """WIP version to plot and combine results of multiple experiments.
     Plots results of the current experiments in current folder.
@@ -92,104 +161,125 @@ def compare_multi_experiment_results(
     Args:
         base_path (Path): $nnActive_results
     """
-    experiment_vals = []
-
     experiment_paths = [fn.parent for fn in base_path.rglob("config.json")]
+    if filter_final:
+        experiment_paths = [
+            exp_path
+            for exp_path in experiment_paths
+            if Final.from_json(exp_path / Final.filename()).final
+        ]
 
-    # for exp_path in base_path.iterdir():
-    #     if exp_path.name.startswith("Dataset"):
+    unique_datasets = set()
+    experiments: list[SingleExperimentResults] = []
     for exp_path in experiment_paths:
-        experiment_vals.extend(get_experiment_results(exp_path))
-    df = pd.DataFrame(experiment_vals)
-    if base_dataset_id:
-        df = (
-            df[df["dataset"].str.startswith(f"Dataset{base_dataset_id:03d}")]
-            .reset_index()
-            .drop("index", axis=1)
-        )
+        single_exp = SingleExperimentResults(exp_path)
+        experiments.append(single_exp)
+        unique_datasets.add(single_exp.config.base_id)
 
-    df["#Patches"] = (df["Loop"]) * df["query_size"] + df["starting_budget_size"]
+    for unique_id in unique_datasets:
+        dataset_experiments = [
+            exp
+            for exp in experiments
+            if exp.config.base_id == unique_id and len(exp.results) > 0
+        ]
+        value = "Dice"
+        plot_name = "Mean Dice"
+        if all_plots:
+            plot_names = dataset_experiments[0].value_dict(plot_val=value).keys()
+        else:
+            plot_names = ["Mean Dice"]
 
-    skip_keys = [
-        "Experiment Name",
-        "seed",
-        "num_processes",
-        "Loop",
-        "Mean Dice",
-        "uncertainty",
-        "#Patches",
-    ]
-    query_key = "uncertainty"
-    vals = [seperator for seperator in df.columns if seperator not in skip_keys]
-    max_loop_ind = vals.index("query_steps")
-    dataset_ind = vals.index("dataset")
-    sb_ind = vals.index("starting_budget_size")
-    qs_ind = vals.index("query_size")
-    for key, df_g in df.groupby(vals):
-        dataset = key[dataset_ind]
-        fig, axs = plt.subplots()
-        sns.lineplot(
-            data=df_g,
-            x="Loop",
-            y="Mean Dice",
-            hue=query_key,
-            errorbar="sd",
-            ax=axs,
-            markers=True,
-            palette=PALETTE,
-        )
-
-        if dataset in FULL_DATASET_PERFORMANCE:
-            axs.axhline(
-                y=FULL_DATASET_PERFORMANCE[dataset],
-                label="Full Data Performance",
-                linestyle="-",
-                color="black",
+        for plot_name in plot_names:
+            plot_fct = dataset_experiments[0].value_dict(plot_val=value)[plot_name]
+            y_fulls = dataset_experiments[0].full_dataset_performance(
+                plot_fct.get_from_dict
             )
-        axs.set_xticks(np.arange(0, key[max_loop_ind]))
-        axs.legend(loc="best")
-        axs.set_title(dataset)
-        key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
-        plt.savefig(f"Performance-{dataset}__{key_plot}.png")
+            # print(unique_id)
+            # print(plot_name)
+            # print(y_fulls)
+            # print("--")
+            # for plot_val in plot_vals...
+            df_row_dicts = []
+            for exp in dataset_experiments:
+                df_row_dicts.extend(
+                    exp.to_df_row_dicts(plot_fct=plot_fct.get_from_dict)
+                )
 
-        fig, axs = plt.subplots()
-        sns.lineplot(
-            data=df_g,
-            x="#Patches",
-            y="Mean Dice",
-            hue=query_key,
-            errorbar="sd",
-            ax=axs,
-            markers="O",
-            palette=PALETTE,
-        )
+            df = pd.DataFrame(df_row_dicts)
 
-        # # Value for Hippocampus Dataset
-        if dataset in FULL_DATASET_PERFORMANCE:
-            axs.axhline(
-                y=FULL_DATASET_PERFORMANCE[dataset],
-                label="Full Data Performance",
-                linestyle="-",
-                color="black",
-            )
+            query_key = "uncertainty"
+            vals = [
+                seperator
+                for seperator in df.columns
+                if seperator not in dataset_experiments[0].plot_skip_keys
+            ]
+            max_loop_ind = vals.index("query_steps")
+            dataset_ind = vals.index("dataset")
+            sb_ind = vals.index("starting_budget_size")
+            qs_ind = vals.index("query_size")
 
-        axs.set_xticks(
-            np.arange(
-                key[sb_ind],
-                key[sb_ind] + (key[qs_ind] * key[max_loop_ind]),
-                key[qs_ind],
-            )
-        )
-        # axs.axhline(y=0.895, label="Ful Data Performance", linestyle="-", color="black")
-        # axs.set_ylim(0.84, 0.90)
-        # axs.set_xlim(10, 200)
-        # # axs.set_xticks(np.arange(0, key[max_loop_ind]))
-        # axs.legend(loc="best")
-        plt.savefig(f"PerformancePatch-{dataset}__{key_plot}.png")
+            # create plots for each unique setting for the respective dataset now
+            for key, df_g in df.groupby(vals):
+                dataset = key[dataset_ind]
+                x = "Loop"
+                x_name = "Loop"
 
-        ### Label Efficency Plot starts here
+                fig, axs = plt.subplots()
+                sns.lineplot(
+                    data=df_g,
+                    x=x,
+                    y=dataset_experiments[0].plot_name,
+                    hue=query_key,
+                    errorbar="sd",
+                    ax=axs,
+                    markers=True,
+                    palette=PALETTE,
+                )
+                axs.set_ylabel(plot_name)
+                for y_full in y_fulls:
+                    axs.axhline(**y_full)
+                axs.set_xticks(np.arange(0, key[max_loop_ind]))
+                axs.legend(loc="best")
+                axs.set_title(dataset)
+                key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
+                key_plot_file = f"{key_plot}".replace(" ", "")
+                plot_name_file = plot_name.replace(" ", "")
 
-        label_eff_plot = []
+                plt.savefig(f"{dataset}-{plot_name_file}-{x_name}__{key_plot_file}.png")
+
+                x = "#Patches"
+                x_name = "Patches"
+                fig, axs = plt.subplots()
+                sns.lineplot(
+                    data=df_g,
+                    x=x,
+                    y=dataset_experiments[0].plot_name,
+                    hue=query_key,
+                    errorbar="sd",
+                    ax=axs,
+                    markers=True,
+                    palette=PALETTE,
+                )
+                axs.set_ylabel(plot_name)
+
+                for y_full in y_fulls:
+                    axs.axhline(**y_full)
+
+                axs.set_xticks(
+                    np.arange(
+                        key[sb_ind],
+                        key[sb_ind] + (key[qs_ind] * key[max_loop_ind]),
+                        key[qs_ind],
+                    )
+                )
+                axs.set_title(dataset)
+                axs.legend(loc="best")
+                plt.savefig(f"{dataset}-{plot_name_file}-{x_name}__{key_plot_file}.png")
+                plt.close("all")
+
+        # #     ### Label Efficency Plot starts here
+
+        # #     label_eff_plot = []
 
         # try:
         if False:
