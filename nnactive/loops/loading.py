@@ -22,19 +22,38 @@ def get_patches_from_loop_files(
         list[Patch]: see description
     """
 
+    nested_patches = get_nested_patches_from_loop_files(data_path, loop_val)
+    patches = []
+    for patch in nested_patches:
+        patches.extend(patch)
+    return patches
+
+
+def get_nested_patches_from_loop_files(
+    data_path: Path, loop_val: Optional[int] = None
+) -> list[list[Patch]]:
+    """Returns list of labeled patches of all loop_xxx.json files within loop_val
+
+    Args:
+        data_path (Path): path to datafolder with loop_xxx.json files
+        loop_val (Optional[int], optional): int(xxx) to allow until corresponding file. Defaults to None.
+
+    Returns:
+        list[list[Patch]]: see description
+    """
+
     loop_files = get_sorted_loop_files(data_path)
 
     # Take only loop_files up to a certain loop_{loop_val}.json
     if loop_val is not None:
         loop_files = [loop_files[i] for i in range(loop_val + 1)]
     # load info
-    patches = []
+    nested_patches = []
     for loop_file in loop_files:
         with open(data_path / loop_file, "r") as file:
             patches_loop: list[dict] = json.load(file)["patches"]
-        patches.extend(patches_loop)
-    patches = [Patch(**patch) for patch in patches]
-    return patches
+        nested_patches.append(Patch(**patch) for patch in patches_loop)
+    return nested_patches
 
 
 def get_sorted_loop_files(data_path: Path) -> list[str]:
