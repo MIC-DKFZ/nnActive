@@ -1,15 +1,21 @@
+import os
+import shutil
 from argparse import Namespace
 
-import nnunetv2.paths
 from loguru import logger
 
+from nnactive import paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig
-from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, read_dataset_json
+from nnactive.nnunet.utils import (
+    get_preprocessed_path,
+    get_raw_path,
+    get_results_path,
+    read_dataset_json,
+)
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
-from nnactive import paths
 
 
 @register_subcommand("update_data")
@@ -81,5 +87,15 @@ def update_step(
 
     if not force and not no_state:
         state.update_data = True
+
+        results_path = get_results_path(state.dataset_id)
+        results_name = "__".join(
+            [config.trainer, config.model_plans, config.model_config]
+        )
+        results_save = f"loop_{state.loop:03d}__" + results_name
+        shutil.move(results_path / results_name, results_path / results_save)
+        shutil.move(
+            results_path / "predVal", results_path / f"loop_{state.loop:03d}__predVal"
+        )
         state.new_loop()
         state.save_state()

@@ -1,5 +1,4 @@
 import shutil
-from typing import List, Tuple, Union
 
 import nnunetv2.paths
 from batchgenerators.utilities.file_and_folder_operations import (
@@ -15,7 +14,6 @@ from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
 from nnactive.results.state import State
-from nnactive.results.utils import get_results_folder
 
 
 @register_subcommand("nnunet_preprocess")
