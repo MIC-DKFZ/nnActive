@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from loguru import logger
+from numpy.lib.npyio import NpzFile
 
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.utils.torchutils import (
@@ -13,6 +14,34 @@ from nnactive.utils.torchutils import (
 )
 
 DEVICE = torch.device("cuda:0")
+
+
+class Probs:
+    def __init__(self, data: list[Path] | torch.Tensor | np.ndarray):
+        """Internal Class to hold probs and return them for easy use.
+
+        Args:
+            data (list[Path] | torch.Tensor | np.ndarray): paths to probability maps for image
+            [C x XYZ] per item in list or [M x C x XYZ]
+
+        """
+        self.data = data
+        self.dictname = "probabilities"
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index: int) -> torch.Tensor:
+        if isinstance(self.data, torch.Tensor):
+            return self.data[index]
+        elif isinstance(self.data, np.ndarray):
+            return torch.from_numpy(self.data[index])
+        elif isinstance(self.data, list):
+            file = np.load(self.data[index])
+            if isinstance(file, np.ndarray):
+                return torch.from_numpy(file)
+            elif isinstance(file, NpzFile):
+                return torch.from_numpy(file[self.dictname])
 
 
 def log_entropy(probs: torch.Tensor):
@@ -35,7 +64,7 @@ def log_entropy(probs: torch.Tensor):
 
 
 def prob_pred_entropy(
-    probs: list[Path] | torch.Tensor, device: torch.device = DEVICE
+    probs: list[Path] | torch.Tensor | Probs, device: torch.device = DEVICE
 ) -> torch.Tensor:
     """Compute predictive entropyon list of paths saving npy arrays or a tensor.
 
@@ -48,29 +77,30 @@ def prob_pred_entropy(
         torch.Tensor: predictive entropy H x W x D (on device)
     """
     logger.info("Compute pred entropy")
+    if not isinstance(probs, Probs):
+        probs = Probs(probs)
     if device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(device)
+        try:
+            torch.cuda.reset_peak_memory_stats(device)
+        except RuntimeError:
+            # bypasses error
+            # RuntimeError: Invalid device argument 0: did you call init?
+            pass
         logger.debug("-" * 8)
         logger.debug("Before Compute of Mean Prob")
 
         log_cuda_memory_info(device)
 
-    def _compute_mean_prob(mean_prob: torch.Tensor, probs: list[Path] | torch.Tensor):
+    def _compute_mean_prob(mean_prob: torch.Tensor, probs: Probs):
         for fold in range(1, len(probs)):
-            if isinstance(probs, list):
-                temp_val = torch.from_numpy(np.load(probs[fold])).to(mean_prob.device)
-            else:
-                temp_val = deepcopy(probs[fold]).to(mean_prob.device)
+            temp_val = deepcopy(probs[fold]).to(mean_prob.device)
             mean_prob += temp_val
             del temp_val
         mean_prob /= len(probs)
         return mean_prob
 
     fold = 0
-    if isinstance(probs, list):
-        compute_val = torch.from_numpy(np.load(probs[fold])).to(device)
-    else:
-        compute_val = deepcopy(probs[fold]).to(device)
+    compute_val = deepcopy(probs[fold]).to(device)
     # check if it will fit into GPU
     if device.type == "cuda":
         if (get_tensor_memory_usage(compute_val) * 2) * 1.1 < estimate_free_cuda_memory(
@@ -104,7 +134,7 @@ def prob_pred_entropy(
 
 
 def prob_exp_entropy(
-    probs: list[Path] | torch.Tensor, device: torch.device = DEVICE
+    probs: list[Path] | torch.Tensor | Probs, device: torch.device = DEVICE
 ) -> torch.Tensor:
     """Compute expected entropy on list of paths saving npy arrays or a tensor.
 
@@ -116,11 +146,11 @@ def prob_exp_entropy(
     Returns:
         torch.Tensor: expected entropy H x W x D (on device)
     """
+    if not isinstance(probs, Probs):
+        probs = Probs(probs)
     logger.info("Compute exp entropy")
-    if isinstance(probs, list):
-        compute_val = torch.from_numpy(np.load(probs[0]))
-    else:
-        compute_val = deepcopy(probs[0])
+
+    compute_val = deepcopy(probs[0])
     if device.type == "cuda":
         if get_tensor_memory_usage(compute_val) * (
             2 + (2 / compute_val.shape[0])
@@ -142,10 +172,7 @@ def prob_exp_entropy(
         compute_val = compute_val.nan_to_num()
         compute_val = (-1 / len(probs)) * compute_val.sum(dim=0)
         for fold in range(1, len(probs)):
-            if isinstance(probs, list):
-                temp_val = torch.from_numpy(np.load(probs[fold])).to(use_device)
-            else:
-                temp_val = deepcopy(probs[fold]).to(use_device)
+            temp_val = deepcopy(probs[fold]).to(use_device)
             temp_val *= torch.log(temp_val)
             # set all nan values (nan, inf, -inf) to 0
             temp_val = temp_val.nan_to_num()

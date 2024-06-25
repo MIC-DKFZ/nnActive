@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from loguru import logger
 from pydantic.dataclasses import dataclass
 
 from nnactive.config.struct import ActiveConfig, Final
@@ -805,6 +806,9 @@ class MultiExperimentAnalysis:
         all_combi_plots: bool = True,
     ):
         for dataset_id in self.unique_datasets:
+            logger.log(
+                f"Analaying results for experiments derived from dataset id {dataset_id}"
+            )
             self.dataset_analyze_performance(
                 unique_id=dataset_id, all_plots=all_results_plots, output_dir=output_dir
             )
