@@ -11,7 +11,7 @@ class Patch:
     """Annotated image patch metadata.
 
     Args:
-        file: filename of the associated image. Note: This is not a path
+        file: filename of the associated image with file ending. Note: This is not a path
         coords: front lower left vertex of patch
         size: size in pixels in each direction
     """

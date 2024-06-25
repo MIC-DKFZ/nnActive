@@ -3,7 +3,9 @@ from typing import List
 from nnactive.data import Patch
 
 
-def get_slices_for_file_from_patch(patches: List[Patch], label_file: str):
+def get_slices_for_file_from_patch(
+    patches: List[Patch], label_file: str
+) -> list[tuple[slice, slice, slice]]:
     patches_file = [patch for patch in patches if patch.file == label_file]
     patch_access = []
     for patch in patches_file:
