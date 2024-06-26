@@ -52,7 +52,7 @@ def get_nested_patches_from_loop_files(
     for loop_file in loop_files:
         with open(data_path / loop_file, "r") as file:
             patches_loop: list[dict] = json.load(file)["patches"]
-        nested_patches.append(Patch(**patch) for patch in patches_loop)
+        nested_patches.append([Patch(**patch) for patch in patches_loop])
     return nested_patches
 
 
