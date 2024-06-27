@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
-from copy import deepcopy
 from functools import cached_property
 from itertools import product
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,13 +35,19 @@ PALETTE = {
 FULL_LINESTYLE = ["-", "- "]
 
 DATASET_PERFORMANCES = []
-for result in (Path(__file__).parent.parent / "full_data_results").iterdir():
-    if result.suffix == ".json":
-        with open(result, "r") as file:
-            summary = load_json(result)
-            summary["Dataset"] = result.name.split("__")[0]
-            summary["Trainer"] = result.name.split("__")[1].split(".")[0]
-            DATASET_PERFORMANCES.append(summary)
+full_data_results_folder = Path(__file__).parent.parent.parent / "full_data_results"
+if full_data_results_folder.is_dir():
+    for result in full_data_results_folder.iterdir():
+        if result.suffix == ".json":
+            with open(result, "r") as file:
+                summary = load_json(result)
+                summary["Dataset"] = result.name.split("__")[0]
+                summary["Trainer"] = result.name.split("__")[1].split(".")[0]
+                DATASET_PERFORMANCES.append(summary)
+else:
+    logger.info(
+        f"Folder for full_data_results does not exist.\n{full_data_results_folder}"
+    )
 
 CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches"]
 
@@ -312,6 +317,7 @@ class SingleExperimentStastistics:
         for key in self.full_data_statistic.to_dict():
             plot_vals.append(key)
             plot_vals.append(f"percentage_of_{key}")
+        plot_vals.append("avg_percentage_of_voxels_fg_cls")
         return plot_vals
 
     def skip_keys(self) -> list[str]:
@@ -326,6 +332,15 @@ class SingleExperimentStastistics:
             temp_dict = statistic.to_dict()
             for key in percentage_dict_keys:
                 temp_dict[f"percentage_of_{key}"] = temp_dict[key] / full_dict[key]
+
+            avg_fg_classes = []
+            for key in temp_dict:
+                if key.startswith("percentage_of_voxels_per_cls") and int(
+                    key.split("_")[-1]
+                ) not in [self.full_data_statistic.background_label]:
+                    avg_fg_classes.append(temp_dict[key])
+            avg_fg_classes = float(np.array(avg_fg_classes).mean())
+            temp_dict["avg_percentage_of_voxels_fg_cls"] = avg_fg_classes
             temp_dict["Loop"] = i
             temp_dict["Experiment"] = self.raw_path.name
 
@@ -806,8 +821,8 @@ class MultiExperimentAnalysis:
         all_combi_plots: bool = True,
     ):
         for dataset_id in self.unique_datasets:
-            logger.log(
-                f"Analaying results for experiments derived from dataset id {dataset_id}"
+            logger.info(
+                f"Analyzing results for experiments derived from dataset id {dataset_id}"
             )
             self.dataset_analyze_performance(
                 unique_id=dataset_id, all_plots=all_results_plots, output_dir=output_dir
