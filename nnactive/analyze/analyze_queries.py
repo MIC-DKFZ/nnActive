@@ -43,6 +43,7 @@ class AnalyzeQueries:
         self.config = config
         self.config.set_nnunet_env()
         self.dataset_id = dataset_id
+        self.loop_val = loop_val
         if dataset_id is None:
             state = State.latest(config)
             dataset_id = state.dataset_id
@@ -66,7 +67,7 @@ class AnalyzeQueries:
 
     @property
     def base_folder(self) -> Path:
-        return self.raw_folder / "analysis" / f"loop_{self.dataset_id:03d}"
+        return self.raw_folder / "analysis" / f"loop_{self.loop_val:03d}"
 
     @property
     def probs_folders(self) -> list[Path]:
