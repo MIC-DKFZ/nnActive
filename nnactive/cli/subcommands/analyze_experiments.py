@@ -35,7 +35,7 @@ def entry_visualize_queries_from_probs_from_results_folder(
     analyze_queries_from_probs(results_folder, loop_val)
 
 
-@register_subcommand("visualize_queries_from_results_path")
+@register_subcommand("visualize_query_trajectory")
 def entry_visualize_query_trajectory(raw_folder: str, output_folder: str | None = None):
     raw_folder = Path(raw_folder)
     if output_folder is None:
