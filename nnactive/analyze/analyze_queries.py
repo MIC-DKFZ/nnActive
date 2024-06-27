@@ -66,7 +66,7 @@ class AnalyzeQueries:
 
     @property
     def base_folder(self) -> Path:
-        return self.raw_folder / analysis / f"loop_{self.dataset_id:03d}"
+        return self.raw_folder / "analysis" / f"loop_{self.dataset_id:03d}"
 
     @property
     def probs_folders(self) -> list[Path]:
