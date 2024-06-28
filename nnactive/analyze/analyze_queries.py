@@ -118,6 +118,8 @@ class AnalyzeQueries:
                     probs, image_shape=[0, 0, 0], label_file=label_file
                 )
                 uncertainty_dict[qm_name] = uncertainty.cpu()
+                del aggregated
+                torch.cuda.empty_cache()
 
             elif isinstance(qm, ExpectedDiceQuery):
                 print("No analysis for this class")
