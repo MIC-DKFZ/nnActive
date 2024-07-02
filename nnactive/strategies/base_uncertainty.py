@@ -7,6 +7,7 @@ import traceback
 from abc import abstractmethod
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Union
 
@@ -178,7 +179,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         image_shape: Iterable[int],
         label_file: str,
         device: torch.device = torch.device("cuda:0"),
-    ):
+    ) -> tuple[torch.Tensor, np.ndarray]:
         """Computes potential queries for a single input image and adds best queries to the internal list of queries.
 
         Args:
@@ -186,7 +187,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             image_shape (Iterable[int]): shape of image
             label_file (str): name of label file
         """
-        with monitor.timer("query_from_probs"):
+        with (
+            monitor.timer("query_from_probs") if monitor.is_active() else nullcontext()
+        ):
             with torch.no_grad():
                 logger.info("Compute uncertaintes...")
                 uncertainty = self.get_uncertainty(probs, device=device)
@@ -217,6 +220,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             )
             logger.info("Finished patch selection.")
             self.top_patches += selected_patches
+        return uncertainty, agg_uncertainty
 
     @abstractmethod
     def get_uncertainty(
@@ -323,7 +327,11 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         return selected_patches
 
     def compose_query_of_patches(self):
-        with monitor.timer("compose_query_of_patches"):
+        with (
+            monitor.timer("compose_query_of_patches")
+            if monitor.is_active()
+            else nullcontext()
+        ):
             sorted_top_patches = sorted(
                 self.top_patches, key=lambda d: d["score"], reverse=True
             )[: self.query_size]

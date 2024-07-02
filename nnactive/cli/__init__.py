@@ -6,6 +6,7 @@ from nnactive.cli.registry import add_subcommands, run_subcommand
 from .subcommands import (
     analyze_experiments,
     manual_crop_pred,
+    manual_vis_annotated,
     nnunet_preprocess,
     run_al_loops,
     setup,
