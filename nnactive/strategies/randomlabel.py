@@ -15,12 +15,12 @@ from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import set_raw_paths
-from nnactive.query.get_locs import get_locs_from_segmentation
 from nnactive.strategies.random import Random
 from nnactive.strategies.utils import (
     _get_infinte_iter,
     _obtain_random_patch_for_img,
     _obtain_random_patch_from_locs,
+    get_locs_from_segmentation,
     query_starting_budget_all_classes,
 )
 from nnactive.utils.io import load_label_map

@@ -14,7 +14,6 @@ from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.nnunet.utils import get_raw_path
-from nnactive.query.random import create_patch_mask_for_image
 from nnactive.results.state import State
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
@@ -24,6 +23,7 @@ from nnactive.strategies.entropy_pred import PredictiveEntropy
 from nnactive.strategies.random import Random
 from nnactive.strategies.randomlabel import RandomLabel
 from nnactive.utils.io import get_clean_dataclass_dict, load_json, save_json
+from nnactive.utils.patches import create_patch_mask_for_image
 
 QUERY_METHODS: list[Type[AbstractQueryMethod]] = [
     BALD,

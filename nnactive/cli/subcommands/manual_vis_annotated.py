@@ -13,9 +13,9 @@ from nnactive.loops.loading import (
     get_sorted_loop_files,
 )
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
-from nnactive.query.random import create_patch_mask_for_image
 from nnactive.results.state import State
 from nnactive.utils.io import load_json, load_label_map
+from nnactive.utils.patches import create_patch_mask_for_image
 
 
 @register_subcommand(
