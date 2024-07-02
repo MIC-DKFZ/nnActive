@@ -10,6 +10,13 @@ from nnactive.utils.io import load_json
 
 
 def visualize_query_trajectory(raw_folder: Path, output_folder: Path):
+    """Create a folder structure with output_folder/loop_XXX containing binary masks with
+    patches.
+
+    Args:
+        raw_folder (Path): experiment path in nnActive_data/.../nnUNet_raw/experiment
+        output_folder (Path): folder to save masks for each loop
+    """
     file_ending = load_json(raw_folder / "dataset.json")["file_ending"]
     save_folder = output_folder
     loop_patches = get_nested_patches_from_loop_files(raw_folder)

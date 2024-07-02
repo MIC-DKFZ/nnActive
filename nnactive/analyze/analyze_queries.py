@@ -40,6 +40,14 @@ class AnalyzeQueries:
         dataset_id: int | None,
         loop_val: int | None = None,
     ):
+        """Class Analyzing Queries using nnActive Structure.
+        Can only be executed when experiment info is stored and accessible from Paths.
+
+        Args:
+            config (ActiveConfig): Config for experiment
+            dataset_id (int | None): dataset id, if None use most recent
+            loop_val (int | None, optional): loop to verify, if None use most recent. Defaults to None.
+        """
         self.config = config
         self.config.set_nnunet_env()
         self.dataset_id = dataset_id
@@ -228,6 +236,15 @@ class AnalyzeQueries:
 
 
 def analyze_queries_from_probs(results_folder: Path, loop_val: int | None = None):
+    """Simulate and visualize queries from probs.
+    Probs are expected to be stored in structure:
+    {experiment_raw_folder}/analysis/loop_{loop_val}/predTr_{fold}
+
+
+    Args:
+        results_folder (str): Path to exact experiment results.
+        loop_val (int | None, optional): loop value. Defaults to None.
+    """
     analysis = AnalyzeQueries.initialize_from_config_path(
         results_folder, loop_val=loop_val
     )

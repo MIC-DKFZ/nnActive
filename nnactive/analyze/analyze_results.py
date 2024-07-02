@@ -472,6 +472,16 @@ class MultiExperimentAnalysis:
         base_raw_path: Path | None = None,
         filter_final: bool = True,
     ):
+        """Allows analysis of multiple experiments from a base_folder.
+        Finding all subsequent folders containing results and aggregates and plots them.
+
+        For in-depth analysis with statistics it requires info from $nnActive_raw/nnUNet_raw/DatasetXXX
+
+        Args:
+            base_results_path (Path): Base_folder for analysis
+            base_raw_path (Path | None, optional): Base_folder for Raw Data. Defaults to None.
+            filter_final (bool, optional): Filter out based on final.json. Defaults to True.
+        """
         self.base_results_path = base_results_path
         self.base_raw_path = base_raw_path
         self.filter_final = filter_final
@@ -842,6 +852,16 @@ def analyze_multi_experiment_results(
     all_plots: bool = True,
     output_dir: bool = Path("."),
 ):
+    """Analyze Experiments return a multi folder structure contatining plots for performance,
+    query statistics and performance vs. query statistics.
+
+    Args:
+        base_path (Path): path containing nnActive_results
+        base_raw_path (Path | None): path containing nnActive_data
+        filter_final (bool, optional): filtering. Defaults to True.
+        all_plots (bool, optional): create all plots or only subset. Defaults to True.
+        output_dir (bool, optional): where to save output images. Defaults to Path(".").
+    """
     analysis = MultiExperimentAnalysis(
         base_results_path=base_path,
         base_raw_path=base_raw_path,
@@ -967,12 +987,10 @@ def analyze_multi_experiment_results(
 if __name__ == "__main__":
     # exp_path = "/home/c817h/network/cluster-data/Dataset004_Hippocampus/nnUNet_raw/Dataset005_Hippocampus__patch-20_20_20__qs-20__unc-mutual_information__seed-12345"
 
-    # TODO: Doublecheck plot_experiment after this again!
-
     # exp_path = "/home/c817h/network/cluster-data/Dataset135_KiTS2021/nnUNet_raw/Dataset001_KiTS2021__patch-64_64_64__qs-20__unc-random-label__seed-12345"
     # exp_path = Path(exp_path)
     # statistics = SingleExperimentStastistics(exp_path)
-    output_path = Path(__file__).parent.parent / "results" / "raw_plots"
+    # output_path = Path(__file__).parent.parent / "results" / "raw_plots"
 
     # statistics.plot_experiment(output_path=output_path)
 
