@@ -8,6 +8,7 @@ from .subcommands import (
     manual_crop_pred,
     manual_vis_annotated,
     nnunet_preprocess,
+    query_pool,
     run_al_loops,
     setup,
     train_nnUNet_ensemble,
@@ -23,6 +24,10 @@ def main() -> None:
     shtab.add_argument_to(parser, ["-s", "--print-completion"])
 
     add_subcommands(parser)
-
     args = parser.parse_args()
+
+    import multiprocessing
+
+    multiprocessing.set_start_method("spawn")
+
     run_subcommand(args)

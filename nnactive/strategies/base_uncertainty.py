@@ -14,7 +14,6 @@ from typing import Callable, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
-import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -30,6 +29,7 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
+import wandb
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -376,7 +376,7 @@ class nnActivePredictor(nnUNetPredictor):
         conversion_timer.start()
         logger.info(f"Shape before postprocessing: {logits.shape}")
         out_prob = convert_predicted_logits_to_probs_with_correct_shape(
-            logits,
+            logits.cpu(),
             self.plans_manager,
             self.configuration_manager,
             self.label_manager,
@@ -521,10 +521,10 @@ class nnActivePredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            out_probs: list[Path] | np.ndarray = (
-                self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_path, temp_name
-                )
+            out_probs: list[
+                Path
+            ] | np.ndarray = self.predict_fold_logits_from_preprocessed_data(
+                data, properties, temp_path, temp_name
             )
 
             logger.info("Start Query")

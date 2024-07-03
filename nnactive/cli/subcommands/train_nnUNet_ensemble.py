@@ -7,21 +7,27 @@ import time
 from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import contextmanager
 from typing import Iterable
 
 import nnunetv2.paths
 import torch
-import wandb
 from loguru import logger
 from nnunetv2.run.run_training import run_training
 from nnunetv2.training.dataloading.utils import unpack_dataset
 
+import wandb
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_preprocessed_path
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
+
+
+@contextmanager
+def noop_context_manager(**kwargs):
+    yield
 
 
 def wrap_training(
@@ -32,7 +38,18 @@ def wrap_training(
     wandbgroup: str,
 ):
     config.set_nnunet_env()
-    with monitor.active_run(group=wandbgroup):
+
+    if wandb.run is None:
+        # No active wandb run, create a new one
+        wandb_context = monitor.active_run(config=config)
+    elif wandbgroup is None:
+        # Do nothing, assuming active wandb context
+        wandb_context = noop_context_manager()
+    else:
+        # Initialize with wandb group (for multi gpu compatibility)
+        wandb_context = monitor.active_run(group=wandbgroup)
+
+    with wandb_context:
         # ensure that each fold/fork is mapped onto one gpu
         torch.cuda.set_device(device)
         for fold in folds:
@@ -94,18 +111,13 @@ def train_nnUNet_ensemble(
     )
 
     if runtime_config.n_gpus == 0:
-        device = torch.device("cuda:0")
-        for fold in range(num_folds):
-            run_training(
-                str(
-                    state.dataset_id
-                ),  # TODO: fix this bug in nnU-Net requiring input to be string.
-                config.model_config,
-                fold,
-                trainer_class_name=config.trainer,
-                device=device,
-                logger=monitor.get_logger(),
-            )
+        wrap_training(
+            dataset_id=state.dataset_id,
+            config=config,
+            folds=list(range(num_folds)),
+            device=torch.device("cuda:0"),
+            wandbgroup=None,
+        )
     else:
         devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
         folds = [
