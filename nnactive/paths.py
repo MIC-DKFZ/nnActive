@@ -39,21 +39,29 @@ def get_nnActive_results() -> Path | None:
     return __paths["nnActive_results"]
 
 
+def get_nnActive_data() -> Path | None:
+    return __paths["nnActive_data"]
+
+
 @contextmanager
 def set_raw_paths():
     temp_raw = paths.nnUNet_raw
     temp_preprocessed = paths.nnUNet_raw
     temp_results = paths.nnUNet_results
-    # we set nnUnet_results to nnActive_raw/nnUNet_raw  
+    # we set nnUnet_results to nnActive_raw/nnUNet_raw
     # nnUNet_resuls is not needed for most use cases
     # nnUNet_results can lead to multiple identical names!
     paths.set_paths(
         nnUNet_raw=__paths["nnActive_raw"] / "nnUNet_raw",
         nnUNet_preprocessed=__paths["nnActive_raw"] / "nnUNet_preprocessed",
-        nnUNet_results=__paths["nnActive_raw"] / "nnUNet_raw"
+        nnUNet_results=__paths["nnActive_raw"] / "nnUNet_raw",
     )
     yield
-    paths.set_paths(nnUNet_raw=temp_raw, nnUNet_preprocessed=temp_preprocessed, nnUNet_results=temp_results)
+    paths.set_paths(
+        nnUNet_raw=temp_raw,
+        nnUNet_preprocessed=temp_preprocessed,
+        nnUNet_results=temp_results,
+    )
 
 
 # if nnActive_results is None:

@@ -1,3 +1,4 @@
+import argparse
 import types
 import typing
 from contextlib import contextmanager
@@ -6,7 +7,6 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Callable, ParamSpec, TypeVar
 
-import argparse
 from jsonargparse import ArgumentParser, Namespace
 from jsonargparse._common import Action
 
@@ -76,6 +76,8 @@ P = ParamSpec("P")
 
 
 T = TypeVar("T", bound=type)
+
+
 def _dict_to_dataclass(cfg: dict, cls: T) -> T:
     def __dict_to_dataclass(cfg, cls: type, key: str):  # noqa: ANN202,ANN001
         try:
@@ -116,9 +118,7 @@ def _dict_to_dataclass(cfg: dict, cls: T) -> T:
             raise
         return cfg
 
-    return __dict_to_dataclass(
-        cfg, cls, ""
-    )  # pyright: ignore [reportReturnType]
+    return __dict_to_dataclass(cfg, cls, "")  # pyright: ignore [reportReturnType]
 
 
 def register_subcommand(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
@@ -147,10 +147,14 @@ def add_subcommands(parser: ArgumentParser):
 
 def run_subcommand(args: Namespace):
     kwargs = args[args.command].as_dict()
-    kwargs["config"] = _dict_to_dataclass(args[args.command].config, ActiveConfig)
+    if "config" in kwargs:
+        kwargs["config"] = _dict_to_dataclass(args[args.command].config, ActiveConfig)
 
     if "runtime_config" in kwargs:
-        kwargs["runtime_config"] = _dict_to_dataclass(args[args.command].runtime_config, RuntimeConfig)
+        kwargs["runtime_config"] = _dict_to_dataclass(
+            args[args.command].runtime_config, RuntimeConfig
+        )
 
-    del kwargs["experiment"]
+    if "experiment" in kwargs:
+        del kwargs["experiment"]
     __subcommands[args.command](**kwargs)

@@ -52,7 +52,7 @@ def get_nested_patches_from_loop_files(
     for loop_file in loop_files:
         with open(data_path / loop_file, "r") as file:
             patches_loop: list[dict] = json.load(file)["patches"]
-        nested_patches.append(Patch(**patch) for patch in patches_loop)
+        nested_patches.append([Patch(**patch) for patch in patches_loop])
     return nested_patches
 
 
@@ -60,7 +60,7 @@ def get_sorted_loop_files(data_path: Path) -> list[str]:
     """Returns an ascending list of all loop file names in the data_path"""
     loop_files = []
     for file in os.listdir(data_path):
-        if file[: len(LOOP_PATTERN)] == LOOP_PATTERN:
+        if file[: len(LOOP_PATTERN)] == LOOP_PATTERN and file.endswith(".json"):
             loop_files.append(file)
 
     loop_files.sort(key=lambda x: int(x.split(LOOP_PATTERN)[1].split(".json")[0]))

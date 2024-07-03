@@ -40,6 +40,9 @@ class AbstractQueryMethod(ABC):
         self.patch_overlap = patch_overlap
         self.verbose = verbose
         self.config = ActiveConfig.get_from_id(dataset_id) if config is None else config
+        self.annotated_patches = get_patches_from_loop_files(
+            get_raw_path(self.dataset_id)
+        )
 
     @abstractmethod
     def query(
@@ -49,9 +52,9 @@ class AbstractQueryMethod(ABC):
     ) -> list[Patch]:
         pass
 
-    @property
-    def annotated_patches(self) -> list[Patch]:
-        return get_patches_from_loop_files(get_raw_path(self.dataset_id))
+    # @property
+    # def annotated_patches(self) -> list[Patch]:
+    #     return get_patches_from_loop_files(get_raw_path(self.dataset_id))
 
     def check_overlap(
         self,
