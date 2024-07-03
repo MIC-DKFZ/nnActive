@@ -97,6 +97,36 @@ def make_kits_config(
     )
 
 
+def make_kits_debug_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 3,
+    patch_size: list[int] = [64, 64, 64],
+):
+    with set_raw_paths():
+        base_id = 982
+        dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    return ActiveConfig(
+        trainer="nnActiveTrainer_5epochs",
+        base_id=base_id,
+        patch_size=patch_size,
+        uncertainty=uncertainty,
+        query_size=query_size,
+        query_steps=query_steps,
+        starting_budget="random-label-all-classes",
+        seed=seed,
+        dataset=dataset_name,
+        pre_suffix=f"_DEBUG",
+        train_folds=2,
+        full_folds=5,
+        agg_stride=8,
+        patch_overlap=0,
+    )
+
+
 def make_brats_small_config(
     seed: int,
     uncertainty: str,
@@ -186,6 +216,36 @@ def make_hippocampus_config(
         dataset=dataset_name,
         pre_suffix=f"__patch-{patch_size_str}__qs-{query_size}",
         train_folds=5,
+        full_folds=5,
+        agg_stride=8,
+        patch_overlap=0,
+    )
+
+
+def make_hippocampus_debug_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 3,
+    patch_size: list[int] = [20, 20, 20],
+):
+    with set_raw_paths():
+        base_id = 4
+        dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    return ActiveConfig(
+        trainer="nnActiveTrainer_5epochs",
+        base_id=base_id,
+        patch_size=patch_size,
+        uncertainty=uncertainty,
+        query_size=query_size,
+        query_steps=query_steps,
+        starting_budget="random-label-all-classes",
+        seed=seed,
+        dataset=dataset_name,
+        pre_suffix=f"_DEBUG",
+        train_folds=2,
         full_folds=5,
         agg_stride=8,
         patch_overlap=0,
@@ -461,4 +521,16 @@ register(
     make_airway_small_config,
     seeds=[12345, 12346, 12347],
     uncertainties=["pred_entropy", "mutual_information", "random-label", "random"],
+)
+
+register(
+    make_kits_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
+)
+
+register(
+    make_hippocampus_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
 )
