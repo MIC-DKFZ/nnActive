@@ -28,7 +28,7 @@ def main(
 
     print(f"{continue_id=}")
     if continue_id is None:
-        state = State.latest(config, verify=not force)
+        state = State.latest(config)
     else:
         state = State.get_id_state(continue_id, verify=not force)
 
