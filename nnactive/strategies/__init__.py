@@ -8,11 +8,11 @@ from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PredictiveEntropy
-from nnactive.strategies.random import Random
-from nnactive.strategies.randomlabel import RandomLabel
-from nnactive.strategies.randomlabel_all_classes import (
-    RandomAllClasses,
-    RandomLabelAllClasses,
+from nnactive.strategies.random import Random, RandomAllClasses
+from nnactive.strategies.randomlabel import RandomLabel, RandomLabelAllClasses
+from nnactive.strategies.randomlabel2 import (
+    RandomRandomLabel,
+    RandomRandomLabelAllClasses,
 )
 
 
@@ -61,4 +61,6 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "random-label": RandomLabel,
     "random-all-classes": RandomAllClasses,
     "random-label-all-classes": RandomLabelAllClasses,
+    "random-label2": RandomRandomLabel,
+    "random-label2-all-classes": RandomRandomLabelAllClasses,
 }

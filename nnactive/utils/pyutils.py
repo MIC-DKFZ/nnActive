@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import deepcopy
 from typing import Any
 
 from pydantic import dataclasses
@@ -28,7 +29,7 @@ def invert_dict(d: dict[list[Any]]) -> dict[list[Any]]:
 
 
 def get_clean_dataclass_dict(data: dataclasses) -> dict:
-    datadict = data.__dict__
+    datadict = deepcopy(data.__dict__)
     popkeys = []
     for key in datadict:
         if isinstance(key, str):

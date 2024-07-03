@@ -1,6 +1,5 @@
 import json
 import os
-from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
@@ -11,8 +10,7 @@ from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_current_loop, get_loop_patches
-from nnactive.nnunet.utils import get_raw_path, read_dataset_json
-from nnactive.query.random import create_patch_mask_for_image, load_label_map
+from nnactive.utils.io import load_label_map
 
 
 @register_subcommand(

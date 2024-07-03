@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Union
+from typing import Any, Iterable, Union
 
 import nnunetv2.paths
 from loguru import logger
@@ -90,8 +90,26 @@ class ActiveConfig:
         fn = get_results_folder(dataset_id) / cls.filename()
         return ActiveConfig.from_json(fn)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return get_clean_dataclass_dict(self)
+
+    def to_str_dict(self) -> dict[str, str]:
+        temp_dict = self.to_dict()
+        for key in temp_dict:
+            if not isinstance(temp_dict[key], str):
+                if isinstance(temp_dict[key], (float, int, complex)):
+                    temp_dict[key] = str(temp_dict[key])
+                elif isinstance(temp_dict[key], Iterable):
+                    temp_dict[key] = "_".join(map(lambda x: str(x), temp_dict[key]))
+                else:
+                    raise NotImplementedError(
+                        f"KV {key}:{temp_dict[key]} is of a not supported type."
+                    )
+        return temp_dict
+
+    def set_pre_suffix(self, pre_suffix: str):
+        """Set config.pre_suffix with a format on all values in config."""
+        self.pre_suffix = pre_suffix.format(**self.to_str_dict())
 
     def save_id(self, dataset_id: int):
         try:
@@ -110,7 +128,7 @@ class ActiveConfig:
         save_dataclass_to_json(self, save_path)
 
     @staticmethod
-    def filename():
+    def filename() -> str:
         return "config.json"
 
 

@@ -1,25 +1,21 @@
 import json
-import random
 from pathlib import Path
-from typing import List
+from typing import Generator, Iterable, Union
 
 import numpy as np
 from loguru import logger
-from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_to_id
+from skimage.morphology import ball
+from torch.backends import cudnn
 
-from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.masking import does_overlap, percentage_overlap_array
-from nnactive.nnunet.utils import read_dataset_json
-from nnactive.strategies.random import Random
-from nnactive.strategies.randomlabel import RandomLabel, _obtain_random_patch_from_locs
 from nnactive.utils.io import load_label_map
+from nnactive.utils.torchutils import maybe_gpu_binary_erosion
 
 
 def query_starting_budget_all_classes(
     raw_labels_path: Path,
     file_ending: str,
-    annotated_id: int,
     annotated_patches: list[Patch],
     patch_size: tuple[int],
     rng=np.random.default_rng(),
@@ -29,7 +25,6 @@ def query_starting_budget_all_classes(
     additional_label_path: Path | None = None,
     additional_overlap: float = 0.8,
 ) -> list[Patch]:
-    # dataset_json = read_dataset_json(annotated_id)
     with (raw_labels_path.parent / "dataset.json").open() as file:
         dataset_json = json.load(file)
     label_dict_dataset_json = dataset_json["labels"]
@@ -159,106 +154,111 @@ def query_starting_budget_all_classes(
     return patches
 
 
-class RandomLabelAllClasses(RandomLabel):
-    def __init__(
-        self,
-        dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
-        seed: int,
-        trials_per_img: int = 600,
-        file_ending: str = ".nii.gz",
-        raw_labels_path: Path | None = None,
-        background_cls: int | None = None,
-        additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
-        verbose: bool = False,
-        config: ActiveConfig | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            seed,
-            trials_per_img,
-            file_ending,
-            raw_labels_path,
-            background_cls,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
-            config=config,
-            **kwargs,
-        )
-        random.seed(seed)
+def _obtain_random_patch_for_img(
+    img_size: list, patch_size: list, rng: Generator = np.random.default_rng()
+) -> tuple[list[int], list[int]]:
+    """Generates a complete random patch fitting inside the image
 
-    def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
-        # Do stuff to ensure all lables are represented two times
-        annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
-        selected_patches = query_starting_budget_all_classes(
-            self.raw_labels_path,
-            self.file_ending,
-            annotated_id,
-            annotated_patches=self.annotated_patches,
-            patch_size=self.patch_size,
-            rng=self.rng,
-            trials_per_img=self.trials_per_img,
-            additional_label_path=self.additional_label_path,
-            additional_overlap=self.additional_overlap,
-            verbose=verbose,
-        )
-        return super().query(
-            verbose=verbose, already_annotated_patches=selected_patches
-        )
+    Args:
+        img_size (list): size of image
+        patch_size (list): size of patch
+        rng (Generator, optional): generator for seeding. Defaults to np.random.default_rng().
+
+    Returns:
+        tuple[list[int], list[int]]: (location, patch_size)
+    """
+    patch_loc_ranges = []
+    patch_real_size = []
+    for dim_img, dim_patch in zip(img_size, patch_size):
+        if dim_patch >= dim_img:
+            patch_loc_ranges.append([0])
+            patch_real_size.append(dim_img)
+        else:
+            patch_loc_ranges.append([i for i in range(dim_img - dim_patch)])
+            patch_real_size.append(dim_patch)
+
+    patch_loc = []
+    for loc_range in patch_loc_ranges:
+        patch_loc.append(rng.choice(loc_range))
+
+    return (patch_loc, patch_real_size)
 
 
-class RandomAllClasses(Random):
-    def __init__(
-        self,
-        dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
-        seed: int,
-        trials_per_img: int = 600,
-        file_ending: str = ".nii.gz",
-        raw_labels_path: Path | None = None,
-        additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
-        verbose: bool = False,
-        config: ActiveConfig | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            seed,
-            trials_per_img,
-            file_ending,
-            raw_labels_path,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
-            config=config**kwargs,
-        )
-        random.seed(seed)
+def _get_infinte_iter(finite_list: Iterable):
+    while True:
+        for elt in finite_list:
+            yield elt
 
-    def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
-        # Do stuff to ensure all lables are represented two times
-        annotated_id = convert_dataset_name_to_id(self.raw_labels_path.parent.name)
-        selected_patches = query_starting_budget_all_classes(
-            self.raw_labels_path,
-            self.file_ending,
-            annotated_id,
-            annotated_patches=self.annotated_patches,
-            patch_size=self.patch_size,
-            rng=self.rng,
-            trials_per_img=self.trials_per_img,
-            additional_label_path=self.additional_label_path,
-            additional_overlap=self.additional_overlap,
-            verbose=verbose,
-        )
-        return super().query(
-            verbose=verbose, already_annotated_patches=selected_patches
-        )
+
+def get_locs_from_segmentation(
+    orig_seg: np.ndarray,
+    area="seg",
+    state: np.random.RandomState = np.random.default_rng(),
+    background_cls: Union[int, None] = 0,
+    verbose: bool = False,
+):
+    unique_cls = np.unique(orig_seg)
+    delete_cls = [cl for cl in unique_cls if cl < 0]
+    if len(delete_cls) > 0:
+        logger.warning("Ignoring Cls < 0 for Patch Selection: {delete_cls}")
+
+    if verbose:
+        logger.debug(f"Ignoring Background Class for Selection: {background_cls}")
+    unique_cls = np.array([cl for cl in unique_cls if cl not in delete_cls])
+    counter = 0
+    selected_cls = background_cls
+    while selected_cls == background_cls:
+        if counter == 200:
+            raise RuntimeError("There is no non-background class in this image!")
+        selected_cls = state.choice(unique_cls, 1).item()
+        counter += 1
+    if verbose:
+        logger.debug(f"Select Area for Class {selected_cls}")
+    use_seg = (orig_seg == selected_cls).astype(np.int8)
+
+    cudnn.deterministic = False
+    cudnn.benchmark = False
+    if area == "border":
+        use_seg_border = use_seg - maybe_gpu_binary_erosion(use_seg > 0, ball(1))
+        return np.argwhere(use_seg_border > 0)
+    elif area == "seg":
+        return np.argwhere(use_seg > 0)
+    else:
+        raise NotImplementedError
+
+
+def _obtain_random_patch_from_locs(
+    locs: Union[tuple, list],
+    img_size: list,
+    patch_size: list,
+    rng: Generator = np.random.default_rng(),
+) -> tuple[list[int], list[int]]:
+    """Locs describe the center of the area that should be cropped. Can be np.argwhere(img>0)"""
+    patch_real_size = []
+    # Get correct size of patch
+    for dim_img, dim_patch in zip(img_size, patch_size):
+        if dim_patch >= dim_img:
+            patch_real_size.append(dim_img)
+        else:
+            patch_real_size.append(dim_patch)
+
+    loc = locs[rng.choice(len(locs))]
+    patch_loc = []
+
+    for dim_loc, dim_img, dim_patch in zip(loc, img_size, patch_real_size):
+        if dim_patch >= dim_img:
+            patch_loc.append(0)
+        else:
+            # patch fits right into the image
+            if dim_loc + dim_patch // 2 <= dim_img and dim_loc - dim_patch // 2 >= 0:
+                patch_loc.append(dim_loc - dim_patch // 2)
+            # patch overshoots, set to maximal possible value
+            elif dim_loc + dim_patch // 2 > dim_img:
+                patch_loc.append(dim_img - dim_patch)
+            # patch undershoots, set to minimal possible value
+            elif dim_loc - dim_patch // 2 < 0:
+                patch_loc.append(0)
+            else:
+                raise NotImplementedError
+
+    return (patch_loc, patch_real_size)

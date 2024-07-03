@@ -5,8 +5,8 @@ import SimpleITK as sitk
 
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_nested_patches_from_loop_files
-from nnactive.query.random import create_patch_mask_for_image
 from nnactive.utils.io import load_json
+from nnactive.utils.patches import create_patch_mask_for_image
 
 
 def visualize_query_trajectory(raw_folder: Path, output_folder: Path):

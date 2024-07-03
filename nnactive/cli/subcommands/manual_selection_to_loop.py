@@ -16,8 +16,8 @@ from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_sorted_loop_files, save_loop
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import get_nnActive_results
-from nnactive.query.random import create_patch_mask_for_image
 from nnactive.utils import create_mitk_geometry_patch
+from nnactive.utils.patches import create_patch_mask_for_image
 
 
 def does_overlap(patch_seg: np.array, indices: List[slice]):
