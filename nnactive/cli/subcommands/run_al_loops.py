@@ -1,6 +1,6 @@
 import os
-from argparse import Namespace
 
+import nnunetv2.paths
 import torch
 from loguru import logger
 
@@ -11,16 +11,13 @@ from nnactive.logger import monitor
 from nnactive.query_pool import query_pool
 from nnactive.results.state import State
 
-from .get_performance import get_performance
-from .nnunet_preprocess import preprocess
-from .train_nnUNet_ensemble import train_nnUNet_ensemble
-from .update_data import update_step
+from .steps import preprocess, step_performance, step_train, step_update
 
 
-@register_subcommand("run_al_loops")
+@register_subcommand("run_experiment")
 def main(
     config: ActiveConfig,
-    runtime_config: RuntimeConfig,
+    runtime_config: RuntimeConfig = RuntimeConfig(),
     continue_id: int | None = None,
     verbose: bool = False,
 ) -> None:
@@ -70,11 +67,11 @@ def main(
             if state.training is False:
                 # verbose not necessary here.
                 monitor.log("task", "training", epoch=al_iteration)
-                train_nnUNet_ensemble(config, runtime_config, continue_id=continue_id)
+                step_train(config, runtime_config, continue_id=continue_id)
                 state = State.get_id_state(dataset_id)
             if state.get_performance is False:
                 monitor.log("task", "get_performance", epoch=al_iteration)
-                get_performance(
+                step_performance(
                     config,
                     runtime_config,
                     continue_id=continue_id,
@@ -93,5 +90,5 @@ def main(
                     state = State.get_id_state(dataset_id)
                 if state.update_data is False:
                     monitor.log("task", "update_step", epoch=al_iteration)
-                    update_step(config, continue_id=continue_id, annotated=True)
+                    step_update(config, continue_id=continue_id, annotated=True)
                     state = State.get_id_state(dataset_id)

@@ -1,0 +1,149 @@
+import os.path
+import shutil
+from pathlib import Path
+
+import numpy as np
+import SimpleITK as sitk
+from loguru import logger
+
+from nnactive.cli.registry import register_subcommand
+from nnactive.cli.subcommands.steps import preprocess, step_update
+from nnactive.config.struct import ActiveConfig
+from nnactive.loops.loading import (
+    get_loop_patches,
+    get_patches_from_loop_files,
+    get_sorted_loop_files,
+)
+from nnactive.nnunet.utils import get_raw_path
+from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
+from nnactive.utils.io import load_json
+
+
+# TODO: delete old trainings in nnUNet_results and artifacts in nnActive_results??
+@register_subcommand("util_reset_loops")
+def util_reset_loops(nnActive_results_folder: str, loop: int = 0, npp: int = 4) -> None:
+    """Reset experiment to which nnActive_results_folder belongs to loop {loop}.
+    Deletes all loop files which are bigger than {loop}.
+    If reset to loop 0, no preprocessing is performed to completely reset the dataset.
+
+    Currently neither old training files in nnUNet_results nor artifacts in nnActive_results are deleted.
+
+
+    Args:
+        nnActive_results_folder (str): folder with config.json
+        loop (int, optional): value to which experiment is to be resetted. Defaults to 0.
+        npp(int, optional): num processes for preprocessing. Defaults to 4.
+    """
+    nnActive_results_folder: Path = Path(nnActive_results_folder)
+    config = ActiveConfig.from_json(nnActive_results_folder / ActiveConfig.filename)
+    config.set_nnunet_env()
+    dataset_id = int(nnActive_results_folder.name.split("_")[0][-3:])
+    reset_loop_nr = loop
+    raw_dataset_path = get_raw_path(dataset_id)
+    state = State.get_id_state(dataset_id)
+    if reset_loop_nr > state.loop:
+        raise AttributeError(
+            "Loop number to reset to is higher than the current loop number."
+        )
+
+    for file in os.listdir(raw_dataset_path):
+        if file.startswith(f"{config.uncertainty}_") and file.endswith(".json"):
+            if int(file.split("_")[-1].split(".")[0]) > reset_loop_nr:
+                print("Deleting file ", str(raw_dataset_path / file))
+                os.remove(raw_dataset_path / file)
+
+    step_update(dataset_id, loop_val=reset_loop_nr, annotated=True, force=True)
+
+    for loop_file in get_sorted_loop_files(raw_dataset_path)[reset_loop_nr + 1 :]:
+        logger.info("Deleting file ", str(raw_dataset_path / loop_file))
+        os.remove(raw_dataset_path / loop_file)
+
+    nnactive_results_folder = get_nnactive_results_folder(dataset_id)
+    for folder in os.listdir(nnactive_results_folder):
+        if folder.startswith("loop"):
+            if int(folder.split("_")[-1]) >= reset_loop_nr:
+                logger.info("Deleting folder ", str(nnactive_results_folder / folder))
+                shutil.rmtree(nnactive_results_folder / folder)
+
+    logger.info("Resetting State file...")
+    state.reset()
+    if reset_loop_nr > 0:
+        state.loop = reset_loop_nr
+    state.save_state()
+
+    # Preprocess with do_all is esp. needed for loop larger 0
+    if reset_loop_nr > 0:
+        preprocess(
+            [dataset_id],
+            configurations=[config.model_config],
+            num_processes=[npp],
+            do_all=True,
+        )
+
+
+@register_subcommand("util_verify_data")
+def util_verify_data(
+    raw_folder: str,
+    loop_val: int = None,
+    no_state: bool = False,
+):
+    """Verify that patches in loop files contain no ignore label.
+
+    Args:
+        raw_folder (str): folder to raw_experiment
+        loop_val (int, optional): up to which loop val to check. Defaults to None.
+        no_state (bool, optional): Do not load state. Defaults to False.
+    """
+    data_path = Path(raw_folder)
+    label_dir = data_path / "labelsTr"
+    if loop_val is not None:
+        pass
+    elif loop_val is None and no_state is False:
+        state = State.from_json(data_path / State.filename)
+        loop_val = state.loop
+        if state.query:
+            loop_val -= 1
+    else:
+        raise NotImplementedError()
+    patches = get_patches_from_loop_files(data_path, loop_val)
+    logger.info(
+        f"Veryfing labels for loop {loop_val}.\n Cumulative sum of patches: {len(patches)}"
+    )
+    dataset_json = load_json(raw_folder / "dataset.json")
+    ignore_label = dataset_json["labels"]["ignore"]
+
+    for loop_check in range(loop_val + 1):
+        patches = get_loop_patches(data_path, loop_check)
+        logger.info(
+            f"Verifying labels for loop {loop_check} with {len(patches)} patches."
+        )
+
+        unique_files = np.unique([patch.file for patch in patches])
+        for file in unique_files:
+            patch_file = [patch for patch in patches if patch.file == file]
+            file_p = label_dir / file
+            seg = sitk.GetArrayFromImage(sitk.ReadImage(file_p)).astype(np.uint8)
+            for patch in patch_file:
+                slices = []
+                for start_index, size in zip(patch.coords, patch.size):
+                    slices.append(slice(start_index, start_index + size))
+                if np.any(seg[tuple(slices)] == ignore_label):
+                    raise RuntimeError(
+                        f"For loop {loop_check} patch in file {file} has ignore_label {ignore_label}"
+                    )
+
+    add_path = data_path / "addTr"
+    if add_path.is_dir():
+        logger.info(f"Verifying that labels contain addTr data.")
+        for file in label_dir.iterdir():
+            if file.name.endswith(dataset_json["file_ending"]):
+                seg = sitk.GetArrayFromImage(sitk.ReadImage(file)).astype(np.uint8)
+                add_seg = sitk.GetArrayFromImage(
+                    sitk.ReadImage(add_path / file.name)
+                ).astype(np.uint8)
+                equal = seg == add_seg
+                if not np.all(equal[add_seg != 255]):
+                    raise RuntimeError(
+                        f"For file {file.name} in labelsTr the labels from addTr were not added."
+                    )

@@ -20,11 +20,11 @@ from nnactive.utils import create_mitk_geometry_patch
 from nnactive.utils.patches import create_patch_mask_for_image
 
 
-def does_overlap(patch_seg: np.array, indices: List[slice]):
+def does_overlap(patch_seg: np.ndarray, indices: List[slice]):
     """
     Check if a patch with given indices does overlap with other patches stored in a segmentation map.
     Args:
-        patch_seg (np.array): segmentation map with the already selected patches
+        patch_seg (np.ndarray): segmentation map with the already selected patches
         indices (List[slice]): indices of the patch that should be checked for overlapping
 
     Returns:
@@ -267,67 +267,3 @@ def get_file_patch_list(
             patches_image_list, original_image, image_id, file_ending, patch_seg_path
         )
     return patches_image_list, save_preliminary
-
-
-@register_subcommand(
-    "manual_selection",
-    [
-        (("-d", "--dataset_id"), {"type": int, "required": True, "help": "Dataset ID"}),
-        (
-            "--debug",
-            {
-                "dest": "debug",
-                "action": "store_true",
-                "help": "Store segmentation of selected parches for debugging",
-            },
-        ),
-    ],
-)
-def main(args: Namespace) -> None:
-    """
-    Create a loop_XXX file that contains the manually selected patches as a list that should be included for
-    training in the next cycle. The manual selected patches are stored as cropped versions of the original images
-    in the patches_manual_selected folder in the raw data path.
-    If some of the manually selected patches overlap, the loop file will not be created and the user is asked to
-    create the patches again without overlap.
-    """
-    dataset_id = args.dataset_id
-
-    # create an empty dict to store all patches that should be in the loop_XXX.json file
-    all_patches_dict = {"patches": []}
-
-    # setup path and get image names
-    data_path = get_raw_path(dataset_id)
-    dataset_json = read_dataset_json(dataset_id)
-    file_ending = dataset_json["file_ending"]
-
-    images_tr_dir = data_path / "imagesTr"
-    selected_patch_dir = data_path / "patches_manual_selected"
-    os.makedirs(selected_patch_dir, exist_ok=True)
-    images = [
-        images_tr_dir / image
-        for image in os.listdir(images_tr_dir)
-        if image.endswith(file_ending)
-    ]
-
-    # preliminary is set to true as soon as some patches overlap, which means no loop file is created
-    preliminary = False
-
-    # iterate through images and get patch list for the images
-    for image in images:
-        patches_image_list, preliminary_image = get_file_patch_list(
-            original_image_path=image,
-            cropped_path=selected_patch_dir,
-            data_path=data_path,
-            debug=args.debug,
-        )
-        all_patches_dict["patches"].extend(patches_image_list)
-        if preliminary_image:
-            preliminary = True
-    # store loop file if no patches overlap
-    if not preliminary:
-        loop = len(get_sorted_loop_files(data_path))
-        save_loop(data_path, all_patches_dict, loop)
-        # prelim_patches is the folder where overlapping patches are stored as .mitkgeometry files
-        if os.path.isdir(selected_patch_dir / "prelim_patches"):
-            shutil.rmtree(selected_patch_dir / "prelim_patches")
