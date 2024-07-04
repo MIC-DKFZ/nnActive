@@ -108,6 +108,7 @@ def make_kits_config(
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -207,6 +208,7 @@ def make_brats_config(
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -242,6 +244,7 @@ def make_hippocampus_config(
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -306,6 +309,7 @@ def make_acdc_config(
         query_steps=query_steps,
         starting_budget=starting_budget,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -376,6 +380,7 @@ def make_amos_config(
         starting_budget=starting_budget,
         starting_budget_size=40,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -411,6 +416,7 @@ def make_amos_small_config(
         starting_budget=starting_budget,
         starting_budget_size=40,
         seed=seed,
+        n_patch_per_image=20,
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
@@ -500,6 +506,8 @@ register(
     make_kits_config,
     seeds=__seeds,
     uncertainties=__strategies,
+    query_size=40,
+    query_steps=5,
 )
 
 register(
@@ -512,6 +520,8 @@ register(
     make_brats_config,
     seeds=__seeds,
     uncertainties=__strategies,
+    query_size=40,
+    query_steps=5,
 )
 
 register(
@@ -534,6 +544,8 @@ register(
     make_acdc_config,
     seeds=__seeds,
     uncertainties=__strategies,
+    query_size=30,
+    query_steps=5,
 )
 
 register(
@@ -546,6 +558,8 @@ register(
     make_amos_config,
     seeds=__seeds,
     uncertainties=__strategies,
+    query_size=40,
+    query_steps=5,
 )
 
 register(
