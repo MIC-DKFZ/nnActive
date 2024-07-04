@@ -391,7 +391,7 @@ def make_amos_config(
     return config
 
 
-def make_amos_small_config(
+def make_amos_prototyping_config(
     seed: int,
     uncertainty: str,
     query_size: int = 20,
@@ -407,7 +407,7 @@ def make_amos_small_config(
             patch_size = get_patch_size(base_id)
 
     config = ActiveConfig(
-        trainer="nnActiveTrainer_5epochs",
+        trainer=__standard_trainer,
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
@@ -563,12 +563,6 @@ register(
 )
 
 register(
-    make_amos_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
-
-register(
     make_airway_config,
     seeds=__seeds,
     uncertainties=__strategies,
@@ -578,6 +572,26 @@ register(
     make_airway_small_config,
     seeds=__seeds,
     uncertainties=__strategies,
+)
+
+################## Prototyping Experiments #########
+register(
+    make_amos_prototyping_config,
+    seeds=__seeds,
+    uncertainties=__strategies,
+)
+
+################## Debug Experiments ###############
+register(
+    make_kits_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
+)
+
+register(
+    make_hippocampus_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
 )
 
 ################## Old Experiments #################
@@ -632,16 +646,4 @@ register(
     query_steps=10,
     starting_budget=__old_starting_budget,
     pre_suffix_format=__old_pre_suffix_format,
-)
-
-register(
-    make_kits_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
-)
-
-register(
-    make_hippocampus_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
 )
