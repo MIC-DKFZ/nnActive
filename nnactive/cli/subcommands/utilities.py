@@ -9,6 +9,7 @@ from loguru import logger
 from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.steps import preprocess, step_update
 from nnactive.config.struct import ActiveConfig
+from nnactive.experiments import list_experiments, list_prepared_experiments
 from nnactive.loops.loading import (
     get_loop_patches,
     get_patches_from_loop_files,
@@ -147,3 +148,17 @@ def util_verify_data(
                     raise RuntimeError(
                         f"For file {file.name} in labelsTr the labels from addTr were not added."
                     )
+
+
+@register_subcommand("util_list_experiments")
+def util_list_experiments():
+    """List all configured experiments each experiment in one row."""
+    for experiment in list_experiments():
+        print(experiment)
+
+
+@register_subcommand("util_list_prepared_experiments")
+def util_list_prepared_experiments(base_id: int):
+    """List all prepared experiments with dataset rowwise for a specific base_id."""
+    for experiment in list_prepared_experiments(base_id):
+        print(experiment)
