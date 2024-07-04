@@ -54,7 +54,8 @@ def list_experiments():
 def list_prepared_experiments(base_id: int):
     with set_raw_paths():
         dataset_name = convert_id_to_dataset_name(base_id)
-    results_path: Path = get_nnActive_data() / dataset_name / "nnActive_results"
+    # use preprocessed path to ensure that entire setup pipeline finished.
+    results_path: Path = get_nnActive_data() / dataset_name / "nnUNet_preprocessed"
     out_list = [
         file.name for file in results_path.iterdir() if file.name.startswith("Dataset")
     ]
