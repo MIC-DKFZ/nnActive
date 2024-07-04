@@ -125,28 +125,31 @@ def make_kits_debug_config(
     query_size: int = 10,
     query_steps: int = 3,
     patch_size: list[int] = [64, 64, 64],
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = "__DEBUG" + __standard_pre_suffix_format,
 ):
     with set_raw_paths():
         base_id = 982
         dataset_name = convert_id_to_dataset_name(base_id)
         if patch_size is None:
             patch_size = get_patch_size(base_id)
-    return ActiveConfig(
+    config = ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
-        starting_budget="random-label-all-classes",
+        starting_budget=starting_budget,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix=f"_DEBUG",
         train_folds=2,
         full_folds=5,
         agg_stride=8,
         patch_overlap=0,
     )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
 
 
 def make_brats_small_config(
@@ -261,28 +264,31 @@ def make_hippocampus_debug_config(
     query_size: int = 10,
     query_steps: int = 3,
     patch_size: list[int] = [20, 20, 20],
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = "__DEBUG" + __standard_pre_suffix_format,
 ):
     with set_raw_paths():
         base_id = 4
         dataset_name = convert_id_to_dataset_name(base_id)
         if patch_size is None:
             patch_size = get_patch_size(base_id)
-    return ActiveConfig(
+    config = ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
-        starting_budget="random-label-all-classes",
+        starting_budget=starting_budget,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix=f"_DEBUG",
         train_folds=2,
         full_folds=5,
         agg_stride=8,
         patch_overlap=0,
     )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
 
 
 def make_acdc_config(
@@ -577,8 +583,9 @@ register(
 ################## Prototyping Experiments #########
 register(
     make_amos_prototyping_config,
-    seeds=__seeds,
+    seeds=[12345],
     uncertainties=__strategies,
+    pre_suffix_format="__PROTOTYPE" + __standard_pre_suffix_format,
 )
 
 ################## Debug Experiments ###############
