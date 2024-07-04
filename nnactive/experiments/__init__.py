@@ -582,7 +582,7 @@ register(
 
 ################## Old Experiments #################
 __old_pre_suffix_format = "__patch-{patch_size}__qs-{query_size}"
-__old_starting_budget = "random-label2-all-classes"
+__old_starting_budget = "random-label-all-classes"
 
 register(
     make_amos_config,
