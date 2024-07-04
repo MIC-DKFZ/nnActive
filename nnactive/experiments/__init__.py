@@ -1,4 +1,5 @@
 from itertools import product
+from pathlib import Path
 from typing import Callable
 
 import nnunetv2.paths as paths
@@ -6,7 +7,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 
 from nnactive.config.struct import ActiveConfig
 from nnactive.nnunet.utils import get_patch_size
-from nnactive.paths import set_raw_paths
+from nnactive.paths import get_nnActive_data, set_raw_paths
 
 __experiments = {}
 
@@ -48,6 +49,18 @@ def get_experiment(name):
 
 def list_experiments():
     return __experiments.keys()
+
+
+def list_prepared_experiments(base_id: int):
+    with set_raw_paths():
+        dataset_name = convert_id_to_dataset_name(base_id)
+    # use preprocessed path to ensure that entire setup pipeline finished.
+    results_path: Path = get_nnActive_data() / dataset_name / "nnUNet_preprocessed"
+    out_list = [
+        file.name for file in results_path.iterdir() if file.name.startswith("Dataset")
+    ]
+    out_list.sort()
+    return out_list
 
 
 def make_kits_small_config(

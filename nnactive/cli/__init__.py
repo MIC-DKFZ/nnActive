@@ -5,13 +5,12 @@ from nnactive.cli.registry import add_subcommands, run_subcommand
 
 from .subcommands import (
     analyze_experiments,
-    manual_crop_pred,
-    manual_vis_annotated,
-    nnunet_preprocess,
-    query_pool,
+    human_al_workflow,
+    init_data,
+    init_resampling,
     run_al_loops,
     setup,
-    train_nnUNet_ensemble,
+    utilities,
 )
 
 

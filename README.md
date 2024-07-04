@@ -11,14 +11,13 @@ pip install -e '.[dev]'
 ## Set up nnActive
 Set up paths as follows:
 ```bash
-export nnActive_raw=Path_to_raw_nnunet_data
-export nnActive_data=Path_to_nnactive_data
-export nnActive_results=Path_to_nnactive_results
-export nnUNet_raw=$nnActive_raw/nnUNet_raw
-export nnUNet_preprocessed=$nnActive_raw/nnUNet_preprocessed
-export nnUNet_results=Path_to_nnUnet_results
+export nnActive_raw=Path_to_raw_nnunet_data # contains base datasets are derived
+export nnActive_data=Path_to_nnactive_data # contains data for Active Learning experiments
+export nnActive_results=Path_to_nnactive_results # contains results from Active Learning experiments
+export nnUNet_raw=$nnActive_raw/nnUNet_raw # base_datasets (ID)
+export nnUNet_preprocessed=$nnActive_raw/nnUNet_preprocessed # base datasets (ID)
+export nnUNet_results=Path_to_nnUnet_results # base datasets (ID)
 ```
-
 ### Autocompletion
 
 #### Usage:
@@ -44,23 +43,151 @@ nnactive -s zsh > $HOME/.oh-my-zsh/completions/_nnactive
 #### Add a new function to CLI
 Add import to file which carries function in: `nnactive/cli/__init__.py`
 
-## Contributing
+### Setting up the data
+Each dataset needs to be in the standard nnU-Netv2 format.
+E.g. do so with the Medical Segmentation Decathlon Hippocampus Dataset
+Create Raw Data:
+```bash
+nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
+```
+Inside of these paths the following files 
+```bash
+$nnUNet_raw
+├── Dataset004_Hippocampus
+│   ├── dataset.json
+│   ├── imagesTr
+│   └── labelsTr
+...
+```
 
-- *Run `pre-commit install` every time you clone the repo*
-- Turn on `pylint` in your editor, if it shows errors:
-    1. Fix the error
-    2. If it is a false positive or if you have a good reason to disagree in
-       this instance add `# pylint: disable=<msg>` or `# pylint: disable-next=<msg>`
-       (see [message control](https://pylint.readthedocs.io/en/latest/user_guide/messages/message_control.html) and [list of checkers](https://pylint.readthedocs.io/en/latest/user_guide/checkers/features.html))
-    3. If you think this error should never be reported add it to `pyproject.toml`
-        ```toml
-        [tool.pylint]
-        disable = [
-            <msg 1>,
-            <msg 2>,
-            ...
-        ]
-        ```
+Now create the seperation into validation and training set for Active Learning.
+```bash
+nnactive init_create_val_split --dataset_id 4 
+```
+```bash
+$nnUNet_raw
+├── Dataset004_Hippocampus
+│   ├── dataset.json
+│   ├── imagesTr
+│   ├── imagesVal
+│   ├── labelsTr
+│   └── labelsVal
+...
+```
+
+Now set everything into the spacing used for the nnU-Net configuration.
+```bash
+nnUNetv2_plan_and_preprocess -d 4 -c 3d_fullres -np 8
+nnactive init_resample_from_id --dataset_id 4 
+```
+```bash
+$nnUNet_raw
+├── Dataset004_Hippocampus
+│   ├── dataset.json
+│   ├── imagesTr #resampled data
+│   ├── imagesTr_original 
+│   ├── imagesVal #resampled data
+│   ├── imagesVal_original
+│   ├── labelsTr #resampled data
+│   ├── labelsTr_original
+│   ├── labelsVal #resampled data
+│   └── labelsVal_original
+...
+```
+
+Creation of small derivative datasets
+```bash
+nnactive nnactive init_create_small_dataset ----base_dataset_id 4 --target_dataset_id 999
+```
+```bash
+$nnUNet_raw
+├── Dataset004_Hippocampus
+│   ├── dataset.json
+│   ├── imagesTr #resampled data
+│   ├── imagesTr_original 
+│   ├── imagesVal #resampled data
+│   ├── imagesVal_original
+│   ├── labelsTr #resampled data
+│   ├── labelsTr_original
+│   ├── labelsVal #resampled data
+│   └── labelsVal_original
+├── Dataset999_Hippocampus_small
+│   ├── dataset.json
+│   ├── imagesTr #resampled data
+│   ├── imagesVal #resampled data
+│   ├── labelsTr #resampled data
+│   └── labelsVal #resampled data
+...
+```
+
+
+## Active Learning Experiment
+After the base dataset has been set up we create an experiment with the setup function
+```bash
+nnactive setup_experiment --experiment Hippocampus__patch-20_20_20__qs-40__unc-random__seed-12345
+```
+This creates the following folders:
+```bash
+$nnActive_data
+├── Dataset004_Hippocampus # base_dataset folder
+│   ├── nnUNet_preprocessed
+│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   │   ├── nnUNetPlans.json
+│   │   │   ├── gt_segmentations
+│   │   │   └── nnUNetPlans_3d_fullres
+│   ├── nnUNet_raw
+│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   │   ├── loop_000.json # contains annotated patches
+│   │   │   ├── imagesTr -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/imagesTr
+│   │   │   ├── imagesTs -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/imagesTs
+│   │   │   ├── imagesVal -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/imagesVal
+│   │   │   ├── labelsTr # contains data with ignore label where only patches are annotated
+│   │   │   ├── labelsVal -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/labelsVal
+│   │   │   └── labelsVal -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/labelsVal
+│   ...
+...
+
+$nnActive_results
+│   ├── nnActive_results
+│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   │   └── config.json
+│   │   │   └── loop_000 # these will be created for validation and performance etc.
+```
+
+After the experiment has been set up, it can now be run.
+```bash
+nnactive run_experiment --experiment Hippocampus__patch-20_20_20__qs-40__unc-random__seed-12345
+```
+
+
+
+## Requirements
+dataset.json in raw data
+```json
+{
+    "channel_names": {
+        "0": "MRI"
+    },
+    "description": "Left and right hippocampus segmentation",
+    "file_ending": ".nii.gz",
+    "labels": {
+        "Anterior": 1,
+        "Posterior": 2,
+        "background": 0,
+        "ignore": 3
+    },
+    "licence": "CC-BY-SA 4.0",
+    "name": "Hippocampus-partanno",
+    "numTest": 130,
+    "numTraining": 260,
+    "reference": " Vanderbilt University Medical Center",
+    "relase": "1.0 04/05/2018",
+    "tensorImageSize": "3D",
+    "annotated_id" : 4 
+    // id to annotated dataset 
+}
+```
+
 
 ## Additional labels path
 Additional labels can be added in the `addTr` folder, these will then be written to the `labelsTr` folder.
@@ -69,7 +196,7 @@ Implementation checking overlap will be implemented in the future version.
 
 ## Active Learning Integration
 
-The annotated data for each loop is saved in the `loop_XXX.json` file situated in $nnUNet_raw.
+The annotated data for each loop is saved in the `loop_XXX.json` file situated in the respective nnUNet_raw folder for each experiment.
 These files are used for creating the validation splits for training.
 It is structured as follows:
 ```json
@@ -102,179 +229,20 @@ It is structured as follows:
 To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_001.json` and `loop_000.json`.
 
 
-## Active Learning Setup
-### Prepare Source Dataset (Fully Annotated)
-Create Raw Data:
-```bash
-nnUNetv2_convert_MSD_dataset -i {Path-to}/Task04_Hippocampus
-```
+## Contributing
 
-1. Create Validation Split
-```bash
-nnactive create_val_split.py -d 4
-```
-Creates folders `imagesVal` and `labelsVal` while taking some images out of the `imagesTr` and `labelsTr` folder.
-
-2. Obtain nnU-Net preprocessing instructions
-```bash
-nnactive nnunet_extract_fingerprint  -d 4 --clean
-nnUNetv2_plan_experiment -d 4
-```
-3. Resample images
-```bash
-nnactive resample_nnunet_dataset -d 4
-```
-resamples images in imagesTr and labelsTr to target space. Original images are saved in `imagesTr_original` and `labelsTr_original`
-Creates Folders imagesVal and labelsVal while taking some images out of the imagesTr and labelsTr folder.
-4. Redo nnU-Net preprocessing instructions
-```bash
-nnactive nnunet_extract_fingerprint  -d 4 --clean
-nnUNetv2_plan_experiment -d 4
-```
-### Create Partially annotated dataset
-4. Create Dataset
-```bash
-python nnactive convert -d 4
-```
-Creates dataset with offset of 500. In this case dataset 504.
-Creates: 
-    1. `${nnUNet_raw}/Dataset504_Hippocampus-partanno` folder structure
-    2. `${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json`
-
-
-5. Create Plans
-```bash
-nnUNetv2_extract_fingerprint -d 504
-nnUNetv2_plan_experiment -d 504 -c 3d_fullres
-
-# Alternatively:
-nnUNetv2_plan_and_preprocess -d 504 -c 3d_fullres -np 4
-```
-
-7. Create Config and Set Up AL experiment folder
-    - [ ] TODO: make this generalizable
-```bash
-python nnactive setup_al_experiment.py -d 504
-```
-
-## Active Learning whole loop
-```bash
-nnactive run_al_loops -d 504
-```
-
-### Deprecated
-```bash
-nnactive multi_loop_AL -d 504
-```
-
-## Active Learning Workflow
-### Training Step
-Plan & Preprocess
-```bash
-nnUNetv2_preprocess -d 504 -c 3d_fullres -np 4
-```
-#### Manual
-for each fold X in (0, 1, 2, 3, 4):
-```bash
-nnUNetv2_train 504 3d_fullres X -tr nnUNetDebugTrainer 
-```
-#### nnUNet
-Alternative:
-```bash
-python nnactive train_nnUNet_ensemble.py -d 504
-```
-
-### Prediction on external Validation/Test Set
-#### nnUNet
-```bash
-python nnactive get_performance.py -d 504
-```
-Uses ensemble to compute final performance on `imagesVal` and `labelsVal` saving them in `${nnActive_results}/{dataset_name}/loop_XXX/summary.json`.
-
-### Pool Prediction Step
-#### Manual
-for each fold X in (0, 1, 2, 3, 4):
-```bash
-nnUNetv2_predict -d 504 -c 3d_fullres -i ${nnUNet_raw}/Dataset504_Hippocampus-partanno/imagesTr -o ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/fold_X -tr nnUNetDebugTrainer --save_probabilities -f X
-```
-#### nnUNet
-```bash
-python nnactive predict_nnUNet_ensemble.py -d 504
-```
-
-
-### Query Step
-#### Manual
-Then calculate uncertainties from softmax outputs
-```bash
-python nnactive/calculate_uncertainties.py -p ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr
-```
-Uncertainties are now in folder: `${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties` 
-
-These uncertainties are now aggregated:
-```bash
-python nnactive/uncertainty_aggregation/aggregate_uncertainties.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties -o  ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated -d ${nnUNet_raw}/Dataset504_Hippocampus-partanno/dataset.json 
-```
-These uncertainties are now aggregated in the folder: `${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated`
-
-These are used to query patches for loop X:
-```bash
-python nnactive/query_patches.py -i ${nnUNet_results}/Dataset504_Hippocampus-partanno/predTr/uncertainties_aggregated -u mutual_information -n 20 -o ${nnUNet_raw}/Dataset504_Hippocampus-partanno -l X
-```
-#### nnUNet
-```bash
-python nnactive query_pool.py -d 504
-```
-
-##### Deprecated
-```bash
-python nnactive query_step.py -d 504
-```
-
-#### Outcome
-Then two files are created in `${nnUNet_raw}/Dataset504_Hippocampus-partanno`:
-1. `loop_00X.json`
-2. `{uncertainty_type}_loop00X.json`
-
-### Update Dataset
-#### Manual
-Now the dataset needs to be updated according to all `loop_XXX.json` files:
-```bash
-python nnactive/update_data.py -i ${nnUNet_raw}/Dataset004_Hippocampus -p ${nnUNet_raw}/Dataset504_Hippocampus-partanno --save_splits_file ${nnUNet_preprocessed}/Dataset504_Hippocampus-partanno/splits_final.json
-```
-
-#### nnUNet
-```bash
-python nnactive update_data.py -d 504
-```
-
-Start with Training of all folds and repeat....
-
-
-
-## Requirements
-dataset.json in raw data
-```json
-{
-    "channel_names": {
-        "0": "MRI"
-    },
-    "description": "Left and right hippocampus segmentation",
-    "file_ending": ".nii.gz",
-    "labels": {
-        "Anterior": 1,
-        "Posterior": 2,
-        "background": 0,
-        "ignore": 3
-    },
-    "licence": "CC-BY-SA 4.0",
-    "name": "Hippocampus-partanno",
-    "numTest": 130,
-    "numTraining": 260,
-    "reference": " Vanderbilt University Medical Center",
-    "relase": "1.0 04/05/2018",
-    "tensorImageSize": "3D",
-    "annotated_id" : 4 
-    // id to annotated dataset 
-}
-```
+- *Run `pre-commit install` every time you clone the repo*
+- Turn on `pylint` in your editor, if it shows errors:
+    1. Fix the error
+    2. If it is a false positive or if you have a good reason to disagree in
+       this instance add `# pylint: disable=<msg>` or `# pylint: disable-next=<msg>`
+       (see [message control](https://pylint.readthedocs.io/en/latest/user_guide/messages/message_control.html) and [list of checkers](https://pylint.readthedocs.io/en/latest/user_guide/checkers/features.html))
+    3. If you think this error should never be reported add it to `pyproject.toml`
+        ```toml
+        [tool.pylint]
+        disable = [
+            <msg 1>,
+            <msg 2>,
+            ...
+        ]
+        ```

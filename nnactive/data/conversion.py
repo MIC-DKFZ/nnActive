@@ -1,18 +1,14 @@
-# TODO: Split this into two different files, s.a. in other folders
 import json
 import os
-import shutil
-from argparse import Namespace
 from copy import deepcopy
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 from loguru import logger
 from nnunetv2 import paths
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 
-from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
 from nnactive.data.annotate import create_labels_from_patches
 from nnactive.data.create_empty_masks import (
@@ -20,19 +16,9 @@ from nnactive.data.create_empty_masks import (
     read_dataset_json,
 )
 from nnactive.loops.loading import save_loop
-from nnactive.nnunet.io import generate_custom_splits_file
-from nnactive.nnunet.utils import get_patch_size
-from nnactive.paths import nnActive_data, nnActive_raw, set_raw_paths
-from nnactive.results.utils import (
-    convert_id_to_dataset_name as nnactive_id_to_dataset_name,
-)
+from nnactive.paths import nnActive_data, set_raw_paths
 from nnactive.strategies import init_strategy
 from nnactive.utils.hostutils import get_verbose
-
-NNACTIVE_RAW = nnActive_raw
-assert NNACTIVE_RAW is not None
-NNACTIVE_DATA = nnActive_data
-assert NNACTIVE_DATA is not None
 
 
 def convert_dataset_to_partannotated(
@@ -52,27 +38,6 @@ def convert_dataset_to_partannotated(
     force: only use for development!
     """
     already_exists = False
-    # try:
-    #     exists_name = convert_id_to_dataset_name(target_id)
-    #     logger.info(
-    #         f"Dataset with ID {target_id} already exists in nnU-Net under name {exists_name}."
-    #     )
-    #     already_exists = True
-    # except RuntimeError:
-    #     logger.info("No naming conflict with nnU-Net")
-    # try:
-    #     exists_name = nnactive_id_to_dataset_name(base_id)
-    #     logger.info(
-    #         f"Dataset with ID {base_id} already exists in nnActive under name {exists_name}."
-    #     )
-    #     already_exists = True
-    # except FileNotFoundError:
-    #     logger.info("No naming conflict with nnActive")
-
-    # if already_exists and not force:
-    #     raise NotImplementedError(
-    #         "Dataset ID already exists, check corresponding folders."
-    #     )
     if not already_exists or force:
         # load base_dataset_json
         with set_raw_paths():
@@ -88,7 +53,7 @@ def convert_dataset_to_partannotated(
         target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
         target_dataset_json["annotated_id"] = base_id
         target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = NNACTIVE_DATA / base_dataset / "nnUNet_raw" / target_dataset
+        target_dir = nnActive_data / base_dataset / "nnUNet_raw" / target_dataset
         target_dir.mkdir(exist_ok=True, parents=True)
         # Save target dataset.json
         with open(target_dir / "dataset.json", "w") as file:
@@ -231,136 +196,3 @@ def get_patches_for_partannotation(
     patches = patches_partial + patches
 
     return patches
-
-
-# @register_subcommand(
-#     "convert",
-#     [
-#         (
-#             ("-d", "--dataset-id"),
-#             {
-#                 "type": int,
-#                 "required": True,
-#                 "help": "dataset ID for nnU-Net, needs to be present in $nnUNet_raw",
-#             },
-#         ),
-#         (
-#             ("-o", "--output-id"),
-#             {
-#                 "type": int,
-#                 "default": None,
-#                 "help": "target dataset ID for nnU-Net, default base on offset",
-#             },
-#         ),
-#         (
-#             "--offset",
-#             {"type": int, "default": 500, "help": "ouput_id = dataset_id + offset"},
-#         ),
-#         (
-#             "--seed",
-#             {
-#                 "default": 12345,
-#                 "type": int,
-#                 "help": "Random seed for creation of datasets",
-#             },
-#         ),
-#         (
-#             "--full-labeled",
-#             {
-#                 "type": float,
-#                 "default": 0,
-#                 "help": "0.X = percentage, int = full number of completely annotated images",
-#             },
-#         ),  # how to make float and integers
-#         (
-#             "--strategy",
-#             {
-#                 "type": str,
-#                 "default": "random",
-#                 "help": "strategy employed to select random patches",
-#             },
-#         ),
-#         (
-#             "--num-patches",
-#             {
-#                 "type": int,
-#                 "default": 0,
-#                 "help": "Number of randomly drawn patches",
-#             },
-#         ),  # how to make float and integers
-#         (
-#             "--patch-size",
-#             {
-#                 "type": int,
-#                 "nargs": "+",
-#                 "default": None,
-#                 "help": "patch size of the object, default is nnU-Net Patch Size",
-#             },
-#         ),
-#         (
-#             "--additional_overlap",
-#             {
-#                 "type": float,
-#                 "default": 0.4,
-#                 "help": "Allowed overlap of drawn patches with free labels e.g. brain free regions in BraTS.",
-#             },
-#         ),
-#         (
-#             "--name-suffix",
-#             {
-#                 "type": str,
-#                 "default": "partanno",
-#                 "help": "Suffix for the name of the output dataset",
-#             },
-#         ),
-#         (
-#             "--force",
-#             {
-#                 "action": "store_true",
-#                 "help": "Forces override of existing datasets. Use it with care for e.g. development processes!",
-#             },
-#         ),
-#     ],
-# )
-def main(args: Namespace) -> None:
-    full_images = args.full_labeled
-
-    num_patches = args.num_patches
-    strategy = args.strategy
-
-    base_dataset_id = args.dataset_id
-    target_id = args.output_id
-    id_offset = args.offset
-    seed = args.seed
-    name_suffx = args.name_suffix
-    additional_overlap = args.additional_overlap
-    force = args.force
-
-    if args.patch_size is not None:
-        if len(args.patch_size) == 1:
-            # todo make it possible for other input sizes as well
-            patch_size = [args.patch_size] * 3
-        else:
-            patch_size = args.patch_size
-    elif base_dataset_id is not None:
-        patch_size = get_patch_size(base_dataset_id)
-    else:
-        raise AttributeError("Either base_dataset or patch-size has to be set.")
-
-    if not isinstance(target_id, int):
-        target_id = base_dataset_id + id_offset
-    logger.info(f"output_id is {target_id}")
-    logger.info(args)
-    convert_dataset_to_partannotated(
-        base_dataset_id,
-        target_id,
-        full_images,
-        name_suffix=name_suffx,
-        patch_size=patch_size,
-        num_patches=num_patches,
-        seed=seed,
-        strategy=strategy,
-        additional_overlap=additional_overlap,
-        force=force,
-    )
-    generate_custom_splits_file(target_id, 0, 5)
