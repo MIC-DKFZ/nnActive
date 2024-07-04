@@ -59,7 +59,7 @@ def wrap_training(
     config: ActiveConfig,
     folds: Iterable[int],
     device: torch.device,
-    wandbgroup: str,
+    wandbgroup: str | None,
 ):
     config.set_nnunet_env()
 
@@ -137,18 +137,13 @@ def step_train(
     )
 
     if runtime_config.n_gpus == 0:
-        device = torch.device("cuda:0")
-        for fold in range(num_folds):
-            run_training(
-                str(
-                    state.dataset_id
-                ),  # TODO: fix this bug in nnU-Net requiring input to be string.
-                config.model_config,
-                fold,
-                trainer_class_name=config.trainer,
-                device=device,
-                logger=monitor.get_logger(),
-            )
+        wrap_training(
+            dataset_id=state.dataset_id,
+            config=config,
+            folds=list(range(num_folds)),
+            device=torch.device("cuda:0"),
+            wandbgroup=None,
+        )
     else:
         devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
         folds = [
