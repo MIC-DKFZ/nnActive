@@ -47,6 +47,11 @@ class MultiExperimentAnalysis:
 
         For in-depth analysis with statistics it requires info from $nnActive_raw/nnUNet_raw/DatasetXXX
 
+        We do all work on a dataset level as performance metrics and statistics do change across datasets.
+        e.g. amount of classes etc.
+        Therefore to avoid dataframes with missing values etc. the dataframes are separately created for each dataset.
+        Also experiment comparisons only make sense for the same dataset.
+
         Args:
             base_results_path (Path): Base_folder for analysis
             base_raw_path (Path | None, optional): Base_folder for Raw Data. Defaults to None.
