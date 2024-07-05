@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any
+from typing import Any, Hashable
 
 from pydantic import dataclasses
 
@@ -38,3 +38,26 @@ def get_clean_dataclass_dict(data: dataclasses) -> dict:
     for key in popkeys:
         datadict.pop(key)
     return datadict
+
+
+def merge_dict_lists_on_indices(
+    init_dict: list[dict], update_dict: list[dict], indices: list[Hashable]
+) -> list[dict]:
+    merged_dicts = []
+    for i in range(len(init_dict)):
+        merged_dict = init_dict[i].copy()
+        extended = False
+        for j in range(len(update_dict)):
+            accept = True
+            for index in indices:
+                if merged_dict[index] != update_dict[j][index]:
+                    accept = False
+            if accept:
+                merged_dict.update(update_dict[j])
+                extended = True
+                break
+        if not extended:
+            raise ValueError("One dictionary in the list does not have a partner.")
+        else:
+            merged_dicts.append(merged_dict)
+    return merged_dicts
