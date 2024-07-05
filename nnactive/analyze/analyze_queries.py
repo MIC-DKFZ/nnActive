@@ -13,7 +13,8 @@ from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_patches_from_loop_files
-from nnactive.nnunet.utils import get_raw_path
+from nnactive.nnunet.predict import predict_from_model_folder
+from nnactive.nnunet.utils import get_raw_path, get_results_path
 from nnactive.results.state import State
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
@@ -72,6 +73,10 @@ class AnalyzeQueries:
     @property
     def raw_folder(self) -> Path:
         return get_raw_path(self.dataset_id)
+
+    @property
+    def results_folder(self) -> Path:
+        return get_results_path(self.dataset_id)
 
     @property
     def base_folder(self) -> Path:
@@ -158,6 +163,51 @@ class AnalyzeQueries:
                 raise NotImplementedError
         return final_query_patches, scores_all
 
+    def predict_training_set_fold(
+        self,
+        folds: int | list[int] | str,
+        npp: int = 3,
+        nps: int = 3,
+        disable_progress_bar: bool = False,
+        num_parts: int = 1,
+        part_id: int = 0,
+        verbose: bool = False,
+    ):
+        results_folder_name = "__".join(
+            [
+                f"loop_{self.loop_val:03d}",
+                self.config.trainer,
+                self.config.model_plans,
+                self.config.model_config,
+            ]
+        )
+        model_folder = self.results_folder / results_folder_name
+        if isinstance(folds, int):
+            out_path = self.probs_folders[folds]
+            folds = [folds]
+        elif isinstance(folds, list):
+            assert len(folds) == self.config.train_folds
+            out_path = self.base_folder / "predTr"
+        else:
+            raise NotImplementedError
+
+        predict_from_model_folder(
+            str(self.raw_folder / "imagesTr"),
+            str(out_path),
+            model_folder=str(model_folder),
+            folds=folds,
+            step_size=self.config.tile_step_size,
+            disable_tta=not self.config.use_mirroring,
+            verbose=verbose,
+            save_probabilities=True,
+            continue_prediction=False,
+            npp=npp,
+            nps=nps,
+            num_parts=num_parts,
+            part_id=part_id,
+            disable_progress_bar=disable_progress_bar,
+        )
+
     def query_from_probs(self):
         fns = [f.name for f in self.probs_folders[0].iterdir() if f.suffix == ".npz"]
         probs_paths = [[bf / f for bf in self.probs_folders] for f in fns]
@@ -242,7 +292,7 @@ def analyze_queries_from_probs(results_folder: Path, loop_val: int | None = None
 
 
     Args:
-        results_folder (str): Path to exact experiment results.
+        results_folder (str): Path to exact experiment results with config.json.
         loop_val (int | None, optional): loop value. Defaults to None.
     """
     analysis = AnalyzeQueries.initialize_from_config_path(
@@ -252,15 +302,56 @@ def analyze_queries_from_probs(results_folder: Path, loop_val: int | None = None
     analysis.visualize_from_query()
 
 
-if __name__ == "__main__":
-    nnactive_results_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    )
+def predict_trainingset_model(
+    results_folder: Path,
+    folds: int | list[int],
+    loop_val: int | None = None,
+    npp: int = 3,
+    nps: int = 3,
+    disable_progress_bar: bool = False,
+    num_parts: int = 1,
+    part_id: int = 0,
+    verbose: bool = False,
+):
+    """Predict fold models on training set for specified loop and saves predictions and outputs.
+    Outputs will be stored in structure:
+    {experiment_raw_folder}/analysis/loop_{loop_val}/predTr_{fold}
+
+    Args:
+        results_folder (Path): Path to exact experiment results with config.json.
+        folds (int | list[int]): folds for prediction (if list give all)
+        loop_val (int | None, optional): loop value. Defaults to None.
+        npp (int, optional): num processes preprocessing. Defaults to 3.
+        nps (int, optional): num processes postprocessing. Defaults to 3.
+        disable_progress_bar (bool, optional): useful on cluster. Defaults to False.
+        num_parts (int, optional): splits prediction into multiple parts (filewise). Defaults to 1.
+        part_id (int, optional): which part is executed (starts with 0). Defaults to 0.
+        verbose (bool, optional): read a lot. Defaults to False.
+    """
     analysis = AnalyzeQueries.initialize_from_config_path(
-        nnactive_results_folder, loop_val=0
+        results_folder, loop_val=loop_val
     )
-    analysis.query_from_probs()
-    analysis.visualize_from_query()
+    analysis.predict_training_set_fold(
+        folds,
+        npp,
+        nps,
+        disable_progress_bar,
+        num_parts,
+        part_id,
+        verbose,
+    )
+
+
+if __name__ == "__main__":
+    # Verify Results
+    # nnactive_results_folder = Path(
+    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
+    # )
+    # analysis = AnalyzeQueries.initialize_from_config_path(
+    #     nnactive_results_folder, loop_val=0
+    # )
+    # analysis.query_from_probs()
+    # analysis.visualize_from_query()
 
     # model_folder = "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/nnActiveTrainer_5epochs__nnUNetPlans__3d_fullres"
     # raw_folder = Path(
@@ -276,6 +367,14 @@ if __name__ == "__main__":
     #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/probTr_0",
     #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/probTr_1",
     # ]
+
+    nnactive_results_folder = Path(
+        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset021_Hippocampus__patch-20_20_20__qs-20__unc-random-label2__seed-12345"
+    )
+    analysis = AnalyzeQueries.initialize_from_config_path(
+        nnactive_results_folder, loop_val=0
+    )
+    analysis.predict_training_set_fold(0)
 
     # base_folders = [Path(bf) for bf in base_folders]
 

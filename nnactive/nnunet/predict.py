@@ -37,6 +37,46 @@ def predict_entry_point(
         dataset_id, train_identifier, plans_identifier, configuration_identifier
     )
 
+    predict_from_model_folder(
+        input_folder,
+        output_folder,
+        model_folder,
+        folds,
+        step_size,
+        disable_tta,
+        verbose,
+        save_probabilities,
+        continue_prediction,
+        checkpoint,
+        npp,
+        nps,
+        prev_stage_predictions,
+        num_parts,
+        part_id,
+        device,
+        disable_progress_bar,
+    )
+
+
+def predict_from_model_folder(
+    input_folder: str,
+    output_folder: str,
+    model_folder: str,
+    folds: Union[str, list[int], tuple[int]] = (0, 1, 2, 3, 4),
+    step_size: float = 0.5,
+    disable_tta: bool = False,
+    verbose: bool = False,
+    save_probabilities: bool = False,
+    continue_prediction: bool = False,
+    checkpoint: str = "checkpoint_final.pth",
+    npp: int = 3,
+    nps: int = 3,
+    prev_stage_predictions: str = None,
+    num_parts: int = 1,
+    part_id: int = 0,
+    device: Union[torch.device, str, int] = "cuda",
+    disable_progress_bar: bool = False,
+):
     if not isdir(output_folder):
         maybe_mkdir_p(output_folder)
 
@@ -81,7 +121,7 @@ def predict_entry_point(
         verbose=verbose,
         verbose_preprocessing=verbose,
         allow_tqdm=not disable_progress_bar,
-        log_times=monitor,
+        log_times=monitor if monitor.is_active() else None,
     )
     predictor.initialize_from_trained_model_folder(
         model_folder, folds, checkpoint_name=checkpoint

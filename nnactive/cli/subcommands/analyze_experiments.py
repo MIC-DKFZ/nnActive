@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from nnactive.analyze.analyze_queries import analyze_queries_from_probs
+from nnactive.analyze.analyze_queries import (
+    analyze_queries_from_probs,
+    predict_trainingset_model,
+)
 from nnactive.analyze.analyze_results import analyze_multi_experiment_results
 from nnactive.analyze.qualitative_loops import visualize_query_trajectory
 from nnactive.cli.registry import register_subcommand
@@ -35,21 +38,60 @@ def analyze_experiments(
     )
 
 
-@register_subcommand("visualize_queries_from_results_path")
-def entry_visualize_queries_from_probs_from_results_folder(
-    results_folder: str, loop_val: int | None = None
-):
+@register_subcommand("visualize_queries_from_probs")
+def visualize_queries_from_probs(results_folder: str, loop_val: int | None = None):
     """Simulate and visualize queries from probs.
     Probs are expected to be stored in structure:
     {experiment_raw_folder}/analysis/loop_{loop_val}/predTr_{fold}
 
 
     Args:
-        results_folder (str): Path to exact experiment results.
+        results_folder (str): Path to exact experiment results with config.json.
         loop_val (int | None, optional): loop value. Defaults to None.
     """
     results_folder = Path(results_folder)
     analyze_queries_from_probs(results_folder, loop_val)
+
+
+@register_subcommand("analyze_predict_trainingset_model")
+def analyze_predict_trainingset_model(
+    results_folder: Path,
+    folds: int | list[int],
+    loop_val: int | None = None,
+    npp: int = 3,
+    nps: int = 3,
+    disable_progress_bar: bool = False,
+    num_parts: int = 1,
+    part_id: int = 0,
+    verbose: bool = False,
+):
+    """Predict fold models on training set for specified loop and saves predictions and outputs.
+    Outputs will be stored in structure:
+    {experiment_raw_folder}/analysis/loop_{loop_val}/predTr_{fold}
+
+    Args:
+        results_folder (Path): Path to exact experiment results with config.json.
+        folds (int | list[int]): folds for prediction (if list give all)
+        loop_val (int | None, optional): loop value. Defaults to None.
+        npp (int, optional): num processes preprocessing. Defaults to 3.
+        nps (int, optional): num processes postprocessing. Defaults to 3.
+        disable_progress_bar (bool, optional): useful on cluster. Defaults to False.
+        num_parts (int, optional): splits prediction into multiple parts (filewise). Defaults to 1.
+        part_id (int, optional): which part is executed (starts with 0). Defaults to 0.
+        verbose (bool, optional): read a lot. Defaults to False.
+    """
+    results_folder = Path(results_folder)
+    predict_trainingset_model(
+        results_folder,
+        folds,
+        loop_val,
+        npp,
+        nps,
+        disable_progress_bar,
+        num_parts,
+        part_id,
+        verbose,
+    )
 
 
 @register_subcommand("visualize_query_trajectory")
