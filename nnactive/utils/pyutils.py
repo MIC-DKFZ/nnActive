@@ -1,8 +1,36 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Hashable
+from pathlib import Path
+from typing import Any, Hashable, List
 
 from pydantic import dataclasses
+
+
+def get_subitems(folder: Path, level: int) -> List[Path]:
+    """Retrieve subitems in a folder up to a specified directory depth.
+
+    This function returns a sorted list of subitems (files and directories) within the specified
+    folder, up to a given directory depth. If the depth level is 0, the function returns the folder itself.
+
+    Args:
+        folder (Path): The path to the root folder from which subitems are to be retrieved.
+        level (int): The depth level up to which subitems should be retrieved.
+
+    Returns:
+        List[Path]: A sorted list of Paths representing the subitems in the folder up to the specified depth level.
+
+    Example:
+        >>> from pathlib import Path
+        >>> folder = Path('/path/to/folder')
+        >>> level = 1
+        >>> get_subitems(folder, level)
+        [PosixPath('/path/to/folder/file1.txt'), PosixPath('/path/to/folder/file2.txt'), PosixPath('/path/to/folder/subfolder')]
+    """
+
+    if level == 0:
+        return [folder]
+    pattern = "/".join(["*"] * level)
+    return sorted(folder.glob(pattern))
 
 
 def invert_dict(d: dict[list[Any]]) -> dict[list[Any]]:
