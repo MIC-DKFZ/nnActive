@@ -5,7 +5,10 @@ from nnactive.analyze.analyze_queries import (
     predict_trainingset_model,
 )
 from nnactive.analyze.analyze_results import analyze_multi_experiment_results
-from nnactive.analyze.qualitative_loops import visualize_query_trajectory
+from nnactive.analyze.qualitative_loops import (
+    plot_query_trajectory,
+    visualize_query_trajectory,
+)
 from nnactive.cli.registry import register_subcommand
 from nnactive.paths import get_nnActive_data, get_nnActive_results
 
@@ -108,3 +111,22 @@ def entry_visualize_query_trajectory(raw_folder: str, output_folder: str | None 
         output_folder = raw_folder / "query__analysis"
     output_folder = Path(output_folder)
     visualize_query_trajectory(raw_folder, output_folder)
+
+
+@register_subcommand("visualize_queries_images")
+def entry_visualize_queries_iamges(
+    raw_folder: str, output_folder: str | None = None, img_folder: str | None = None
+):
+    raw_folder = Path(raw_folder)
+    if output_folder is None:
+        output_folder = raw_folder / "query__images"
+    else:
+        output_folder = Path(output_folder) / raw_folder.name
+
+    if img_folder is None:
+        img_folder = raw_folder / "imagesTr"
+    img_folder = Path(img_folder)
+
+    plot_query_trajectory(
+        raw_folder=raw_folder, img_folder=img_folder, save_folder=output_folder
+    )
