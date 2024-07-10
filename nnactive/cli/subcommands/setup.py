@@ -3,11 +3,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import nnunetv2.paths
+
 from nnactive.cli.registry import register_subcommand
-from nnactive.cli.subcommands.convert_to_partannotated import (
-    convert_dataset_to_partannotated,
-)
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
+from nnactive.data.conversion import convert_dataset_to_partannotated
 from nnactive.paths import nnActive_data
 from nnactive.results.state import State
 
@@ -22,7 +22,7 @@ def base_dataset_name(dataset_id: int):
 def data_path():
     data_path = os.getenv("nnActive_raw")
     if data_path is None:
-        raise ValueError("OS variable nnUNet_raw is not set.")
+        raise ValueError("OS variable nnActive_raw is not set.")
     return Path(data_path)
 
 
@@ -102,7 +102,7 @@ def setup_al(config: ActiveConfig):
     return state
 
 
-@register_subcommand("setup")
+@register_subcommand("setup_experiment")
 def main(
     config: ActiveConfig,
     runtime_config: RuntimeConfig,
