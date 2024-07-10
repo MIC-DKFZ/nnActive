@@ -4,23 +4,20 @@ import os
 from functools import cached_property
 from itertools import product
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from loguru import logger
-from pydantic.dataclasses import dataclass
 
-from nnactive.config.struct import ActiveConfig, Final
-from nnactive.data import Patch
-from nnactive.loops.loading import get_nested_patches_from_loop_files
-from nnactive.nnunet.utils import get_raw_path
-from nnactive.paths import set_raw_paths
-from nnactive.utils.io import load_json, load_label_map, save_json
-from nnactive.utils.patches import get_slices_for_file_from_patch
-from nnactive.utils.pyutils import get_clean_dataclass_dict
+from nnactive.analyze.experiment_results import SingleExperimentResults
+from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
+from nnactive.config.struct import Final
+from nnactive.utils.io import load_json
+from nnactive.utils.plot import create_unique_name, plot_dataframe
+from nnactive.utils.pyutils import merge_dict_lists_on_indices
 
 sns.set_style("whitegrid")
 
@@ -30,439 +27,12 @@ PALETTE = {
     "mutual_information": "tab:orange",
     "expected_dice": "tab:purple",
     "random-label": "tab:red",
-    # "other_3": "tab:cyan",
+    "random-label2": "tab:cyan",
+    # "other_3": "tab:brown",
+    # "other_4": "tab:gray",
+    # "other_5": "tab:pink",
+    # "other_6": "tab:olive",
 }
-FULL_LINESTYLE = ["-", "- "]
-
-DATASET_PERFORMANCES = []
-full_data_results_folder = Path(__file__).parent.parent.parent / "full_data_results"
-if full_data_results_folder.is_dir():
-    for result in full_data_results_folder.iterdir():
-        if result.suffix == ".json":
-            with open(result, "r") as file:
-                summary = load_json(result)
-                summary["Dataset"] = result.name.split("__")[0]
-                summary["Trainer"] = result.name.split("__")[1].split(".")[0]
-                DATASET_PERFORMANCES.append(summary)
-else:
-    logger.info(
-        f"Folder for full_data_results does not exist.\n{full_data_results_folder}"
-    )
-
-CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches"]
-
-
-class MeanValue:
-    def __init__(self, value: str):
-        self.value = value
-
-    def get_from_dict(self, file_dict: dict):
-        return file_dict["foreground_mean"]["Dice"]
-
-    @property
-    def name(self):
-        return "Mean Dice"
-
-
-class ClassValue:
-    def __init__(self, value: str, cls: Any):
-        self.value = value
-        self.cls = cls
-
-    def get_from_dict(self, file_dict: dict):
-        return file_dict["mean"][self.cls][self.value]
-
-    @property
-    def name(self):
-        return f"Class {self.value} {self.cls}"
-
-
-@dataclass
-class Statistics:
-    files: list[str]
-    classes: list[int]
-    background_label: None | int = 0
-
-    @staticmethod
-    def internal_values():
-        return ["patches_per_cls", "voxels_per_cls", "patches_background"]
-
-    def __post_init__(self):
-        self.patches_per_cls = {c: 0 for c in self.classes}
-        self.voxels_per_cls = {c: 0 for c in self.classes}
-        self.patches_background = 0
-
-    def update_patch(self, patch_labels: dict[int, int]):
-        background_patch = True
-        for patch_class, class_count in patch_labels.items():
-            if class_count > 0:
-                self.patches_per_cls[patch_class] += 1
-                if (
-                    self.background_label is not None
-                    and patch_class != self.background_label
-                ):
-                    background_patch = False
-            self.voxels_per_cls[patch_class] += class_count
-        if background_patch:
-            self.patches_background += 1
-
-    def update_statistics(self, statistics: Statistics):
-        assert self.classes == statistics.classes
-        assert self.background_label == statistics.background_label
-        self.files += statistics.files
-        self.patches_background += statistics.patches_background
-        for c in self.classes:
-            self.voxels_per_cls[c] += statistics.voxels_per_cls[c]
-            self.patches_per_cls[c] += statistics.patches_per_cls[c]
-
-    @property
-    def voxels_foreground(self) -> int:
-        foreground_voxels = 0
-        for c in self.classes:
-            if self.background_label is not None and c != self.background_label:
-                foreground_voxels += self.voxels_per_cls[c]
-        return foreground_voxels
-
-    @property
-    def num_voxels(self) -> int:
-        num_voxels = 0
-        for c in self.classes:
-            num_voxels += self.voxels_per_cls[c]
-        return num_voxels
-
-    @property
-    def patches_foreground(self) -> int:
-        return self.num_patches - self.patches_background
-
-    @property
-    def num_unique_files(self) -> int:
-        return len(set(self.files))
-
-    @property
-    def num_patches(self) -> int:
-        # num files gives the amount of patches as each patch has one file
-        return len(self.files)
-
-    def to_dict(self) -> dict[str, Any]:
-        out_dict = {
-            "voxels_foreground": self.voxels_foreground,
-            "num_voxels": self.num_voxels,
-            "patches_foreground": self.patches_foreground,
-            "num_patches": self.num_patches,
-            "num_unique_files": self.num_unique_files,
-            "voxel_percentage_foreground": self.voxels_foreground / self.num_voxels,
-            "patches_percentage_foreground": self.patches_foreground / self.num_patches,
-        }
-        for c in self.classes:
-            out_dict[f"voxels_per_cls_{c}"] = self.voxels_per_cls[c]
-            out_dict[f"patches_per_cls_{c}"] = self.patches_per_cls[c]
-        return out_dict
-
-    @staticmethod
-    def from_json(filepath: Path | str) -> Statistics:
-        file_dict = load_json(filepath)
-        out = Statistics(
-            [],
-            [],
-        )
-        for key in file_dict:
-            out.__setattr__(key, file_dict[key])
-
-        for c in out.classes:
-            str_c = str(c)
-            if str_c in out.voxels_per_cls.keys():
-                out.voxels_per_cls[c] = out.voxels_per_cls.pop(str(c))
-            if str_c in out.patches_per_cls.keys():
-                out.patches_per_cls[c] = out.patches_per_cls.pop(str(c))
-
-        return out
-
-    def to_json_dict(self) -> dict[str, dict[str, Any]]:
-        return get_clean_dataclass_dict(self)
-
-
-# TODO: Possibly delete results depending on ease of aggregation!
-class SingleExperimentStastistics:
-    def __init__(self, raw_path: Path, results_path: Path | None = None):
-        self.raw_path = raw_path
-        self.results_path = results_path
-
-    @property
-    def dataset_json(self) -> dict:
-        return load_json(self.raw_path / "dataset.json")
-
-    @property
-    def config(self) -> ActiveConfig | None:
-        if self.results_path is not None:
-            return ActiveConfig.from_json(self.results_path / ActiveConfig.filename())
-        else:
-            return None
-
-    @cached_property
-    def full_data_statistic(self):
-        savefile = self.source_dataset_path / "labelsTr_statistics.json"
-        if savefile.is_file():
-            return Statistics.from_json(savefile)
-        else:
-            labels_path = self.source_dataset_path / "labelsTr"
-            files = [
-                f.name
-                for f in (labels_path).iterdir()
-                if (f.name).endswith(self.dataset_json["file_ending"])
-            ]
-            full_data_stat = Statistics(files, self.unique_dataset_classes())
-            for f in files:
-                patch_labels = load_label_map(f, labels_path, "")
-                unique_cls, counts = np.unique(patch_labels, return_counts=True)
-
-                patch_stastics = {
-                    int(unique_cl): int(count)
-                    for unique_cl, count in zip(unique_cls, counts)
-                }
-                full_data_stat.update_patch(patch_stastics)
-            save_json(full_data_stat.to_json_dict(), savefile)
-            return full_data_stat
-
-    @property
-    def base_id(self) -> int:
-        base_id = self.dataset_json["annotated_id"]
-        return base_id
-
-    @property
-    def source_dataset_path(self) -> Path:
-        with set_raw_paths():
-            source_path = get_raw_path(self.base_id)
-        return source_path
-
-    @property
-    def dataset_labels(self) -> dict[str, int | list[int]]:
-        return self.dataset_json["labels"]
-
-    def unique_dataset_classes(
-        self,
-        no_ignore: bool = True,
-        no_background: bool = False,
-    ) -> list[int]:
-        out = []
-        ignore_list = []
-        if no_ignore:
-            ignore_list.append("ignore")
-        if no_background:
-            ignore_list.append("background")
-        for dataset_label in self.dataset_labels:
-            if dataset_label not in ignore_list:
-                classes = self.dataset_labels[dataset_label]
-                if isinstance(classes, int):
-                    out.append(classes)
-                elif isinstance(classes, (list, tuple)):
-                    out.extend(list(classes))
-                else:
-                    raise NotImplementedError
-        out = list(set(out))
-        out.sort()
-        return out
-
-    @property
-    def nested_patches(self) -> list[list[Patch]]:
-        return get_nested_patches_from_loop_files(self.raw_path)
-
-    @cached_property
-    def nested_patch_labels(self) -> list[list[dict[int, int]]]:
-        nested_labels = []
-        for loop_patches in self.nested_patches:
-            loop_labels = []
-            for patch in loop_patches:
-                label_image = load_label_map(
-                    patch.file, self.source_dataset_path / "labelsTr", ""
-                )
-                patch_access = get_slices_for_file_from_patch([patch], patch.file)[0]
-                patch_labels = label_image[patch_access]
-                # fill statistics
-                unique_cls, counts = np.unique(patch_labels, return_counts=True)
-
-                patch_stastics = {
-                    int(unique_cl): int(count)
-                    for unique_cl, count in zip(unique_cls, counts)
-                }
-                loop_labels.append(patch_stastics)
-            nested_labels.append(loop_labels)
-        return nested_labels
-
-    @property
-    def nested_statstics(self) -> list[Statistics]:
-        nested_statistics = []
-        for loop_labels, loop_patches in zip(
-            self.nested_patch_labels, self.nested_patches
-        ):
-            loop_statistics = Statistics(
-                [patch.file for patch in loop_patches],
-                self.unique_dataset_classes(no_ignore=True),
-            )
-
-            for patch_labels in loop_labels:
-                loop_statistics.update_patch(patch_labels)
-            nested_statistics.append(loop_statistics)
-        return nested_statistics
-
-    @property
-    def statistics(self) -> list[Statistics]:
-        statistics = self.nested_statstics
-        for i in range(1, len(statistics)):
-            statistics[i].update_statistics(statistics[i - 1])
-        return statistics
-
-    @property
-    def plot_vals(self) -> list[str]:
-        plot_vals = []
-        for key in self.full_data_statistic.to_dict():
-            plot_vals.append(key)
-            plot_vals.append(f"percentage_of_{key}")
-        plot_vals.append("avg_percentage_of_voxels_fg_cls")
-        return plot_vals
-
-    def skip_keys(self) -> list[str]:
-        skip_keys = ["Loop", "Experiment"]
-        return skip_keys
-
-    def to_df_row_dicts(self) -> tuple[list[dict], list[str]]:
-        out_results = []
-        full_dict = self.full_data_statistic.to_dict()
-        percentage_dict_keys = full_dict.keys()
-        for i, statistic in enumerate(self.statistics):
-            temp_dict = statistic.to_dict()
-            for key in percentage_dict_keys:
-                temp_dict[f"percentage_of_{key}"] = temp_dict[key] / full_dict[key]
-
-            avg_fg_classes = []
-            for key in temp_dict:
-                if key.startswith("percentage_of_voxels_per_cls") and int(
-                    key.split("_")[-1]
-                ) not in [self.full_data_statistic.background_label]:
-                    avg_fg_classes.append(temp_dict[key])
-            avg_fg_classes = float(np.array(avg_fg_classes).mean())
-            temp_dict["avg_percentage_of_voxels_fg_cls"] = avg_fg_classes
-            temp_dict["Loop"] = i
-            temp_dict["Experiment"] = self.raw_path.name
-
-            skip_keys = list(temp_dict.keys()) + CONFIGSKIPKEYS
-            if self.config is not None:
-                temp_dict.update(self.config.to_dict())
-            out_results.append(temp_dict)
-        return out_results, skip_keys
-
-    def plot_experiment(self, output_path: Path | str | None = None):
-        df = pd.DataFrame(self.statistics.to_df_row_dicts())
-        for key in df.columns:
-            if key in ["Loop", "Experiment"]:
-                continue
-            if self.config is not None and key in self.config.to_dict().keys():
-                continue
-
-            fig, axs = plt.subplots()
-            sns.lineplot(df, x="Loop", y=key, ax=axs)
-            if output_path is None:
-                plt.show()
-            else:
-                output_path = Path(output_path)
-                os.makedirs(output_path, exist_ok=True)
-
-                plt.savefig(output_path / f"{self.raw_path.name}-{key}.png")
-            plt.close("all")
-
-
-class SingleExperimentResults:
-    def __init__(self, experiment_path: Path):
-        self.experiment_path = experiment_path
-
-    @property
-    def summary_files(self) -> list[Path]:
-        filenames = [
-            fn
-            for fn in self.experiment_path.rglob("summary.json")
-            if "loop_" in fn.__str__()
-        ]
-        filenames.sort()
-        return filenames
-
-    @property
-    def config(self) -> ActiveConfig:
-        return ActiveConfig.from_json(self.experiment_path / ActiveConfig.filename())
-
-    @property
-    def results(self) -> list[dict]:
-        out_results = []
-        for summary_file in self.summary_files:
-            temp_dict = {}
-            temp_dict["summary"] = load_json(summary_file)
-            temp_dict["Loop"] = int(summary_file.parent.name.split("_")[1])
-            temp_dict["#Patches"] = (
-                temp_dict["Loop"] * self.config.query_size
-                + self.config.starting_budget_size
-            )
-            temp_dict["Experiment"] = self.experiment_path.name
-            out_results.append(temp_dict)
-        return out_results
-
-    # TODO: retrieve class names from dataset.json
-    @property
-    def label_names(self) -> dict[str, int]:
-        return {}
-
-    @property
-    def plot_name(self) -> str:
-        return "plot_val"
-
-    @property
-    def plot_skip_keys(self):
-        skip_keys = [
-            self.plot_name,
-            "Experiment",  # Possibly Experiment Name
-            "seed",
-            "Loop",
-            "uncertainty",
-            "#Patches",
-        ]
-        return skip_keys
-
-    def value_dict(self, plot_val: str = "Dice"):
-        # better to do this with classes for names of plots
-        plot_dict = {f"Mean {plot_val}": MeanValue(plot_val)}
-        for cls in self.results[0]["summary"]["mean"]:
-            # use deepcopy here as otherwise cls is changed in lambda function
-            plot_dict[f"Class {cls} {plot_val}"] = ClassValue(plot_val, cls)
-        return plot_dict
-
-    def to_df_row_dicts(
-        self, plot_fct=lambda x: x["foreground_mean"]["Dice"]
-    ) -> list[dict]:
-        out = []
-        for result in self.results:
-            append_dict = {}
-            for k in result:
-                if k != "summary":
-                    append_dict[k] = result[k]
-            append_dict[self.plot_name] = plot_fct(result["summary"])
-            append_dict.update(self.config.to_dict())
-            out.append(append_dict)
-        return out
-
-    def full_dataset_performance(
-        self, plot_fct=lambda x: x["foreground_mean"]["Dice"]
-    ) -> list[dict]:
-        y_fulls = []
-        for dataset_performance in DATASET_PERFORMANCES:
-            if dataset_performance["Dataset"] == self.config.dataset:
-                y_fulls.append(
-                    {
-                        "y": plot_fct(dataset_performance),
-                        "label": "{} full dataset performance".format(
-                            dataset_performance["Trainer"]
-                        ),
-                        "linestyle": FULL_LINESTYLE[len(y_fulls)],
-                        "color": "black",
-                    }
-                )
-        return y_fulls
 
 
 class MultiExperimentAnalysis:
@@ -476,6 +46,11 @@ class MultiExperimentAnalysis:
         Finding all subsequent folders containing results and aggregates and plots them.
 
         For in-depth analysis with statistics it requires info from $nnActive_raw/nnUNet_raw/DatasetXXX
+
+        We do all work on a dataset level as performance metrics and statistics do change across datasets.
+        e.g. amount of classes etc.
+        Therefore to avoid dataframes with missing values etc. the dataframes are separately created for each dataset.
+        Also experiment comparisons only make sense for the same dataset.
 
         Args:
             base_results_path (Path): Base_folder for analysis
@@ -514,10 +89,10 @@ class MultiExperimentAnalysis:
     def exp_raw_paths(self):
         raw_paths = []
         for experiment in self.exp_results:
-            rel_raw_path: str = experiment.experiment_path.__str__()[
-                len(self.base_raw_path.__str__()) + 1 :
+            rel_raw_path = str(experiment.experiment_path)[
+                len(str(self.base_results_path)) + 1 :
             ]
-            rel_raw_path = rel_raw_path.replace("/nnActive_results/", "/nnUNet_raw/")
+            rel_raw_path = rel_raw_path.replace("nnActive_results/", "nnUNet_raw/")
             raw_paths.append(self.base_raw_path / rel_raw_path)
         return raw_paths
 
@@ -540,111 +115,99 @@ class MultiExperimentAnalysis:
     def query_key(self) -> str:
         return "uncertainty"
 
+    def plot_single_experiment(
+        self,
+        df_g: pd.DataFrame,
+        y_name: str,
+        x_name: str,
+        dataset: str | None = None,
+        x_ticks: Iterable | None = None,
+        hline_printers: list[dict, Any] | None = None,
+    ):
+        fig, axs = plt.subplots()
+        axs = plot_dataframe(
+            axs,
+            df_g,
+            x_name,
+            y_name,
+            hue_key=self.query_key,
+            plot_title=dataset,
+            palette=PALETTE,
+            x_ticks=x_ticks,
+        )
+
+        # add vertical line
+        if hline_printers is not None:
+            for y_full in hline_printers:
+                axs.axhline(**y_full)
+        return fig, axs
+
     def dataset_analyze_performance(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
     ):
         dataset_results = [
             exp for exp in self.exp_results if exp.config.base_id == unique_id
         ]
+        value = "Dice"
 
-        output_dir = output_dir / dataset_results[0].config.dataset / "performance"
+        df, vals = self.create_df(dataset_results, value)
+
+        y_full_dict = dataset_results[0].to_full_dataset_performance_dict(value)
+
+        output_dir = output_dir / dataset_results[0].config.dataset
         if not output_dir.is_dir():
             os.makedirs(output_dir)
 
-        value = "Dice"
         if all_plots:
-            plot_names = dataset_results[0].value_dict(plot_val=value).keys()
+            y_names = dataset_results[0].get_value_dict(plot_val=value).keys()
         else:
-            plot_names = ["Mean Dice"]
+            y_names = ["Mean Dice"]
 
-        for plot_name in plot_names:
-            plot_fct = dataset_results[0].value_dict(plot_val=value)[plot_name]
-            y_fulls = dataset_results[0].full_dataset_performance(
-                plot_fct.get_from_dict
-            )
+        max_loop_ind = vals.index("query_steps")
+        dataset_ind = vals.index("dataset")
+        sb_ind = vals.index("starting_budget_size")
+        qs_ind = vals.index("query_size")
+        pre_suffix_ind = vals.index("pre_suffix")
 
-            df_row_dicts = []
-            for exp in dataset_results:
-                df_row_dicts.extend(
-                    exp.to_df_row_dicts(plot_fct=plot_fct.get_from_dict)
-                )
-
-            df = pd.DataFrame(df_row_dicts)
-
-            vals = [
-                seperator
-                for seperator in df.columns
-                if seperator not in dataset_results[0].plot_skip_keys
-            ]
-            max_loop_ind = vals.index("query_steps")
-            dataset_ind = vals.index("dataset")
-            sb_ind = vals.index("starting_budget_size")
-            qs_ind = vals.index("query_size")
-
-            # create plots for each unique setting for the respective dataset now
-            for key, df_g in df.groupby(vals):
-                dataset = key[dataset_ind]
-                x = "Loop"
-                x_name = "Loop"
-
-                fig, axs = plt.subplots()
-                sns.lineplot(
-                    data=df_g,
-                    x=x,
-                    y=dataset_results[0].plot_name,
-                    hue=self.query_key,
-                    errorbar="sd",
-                    ax=axs,
-                    markers=True,
-                    palette=PALETTE,
-                )
-                axs.set_ylabel(plot_name)
-                for y_full in y_fulls:
-                    axs.axhline(**y_full)
-                axs.set_xticks(np.arange(0, key[max_loop_ind]))
-                axs.legend(loc="best")
-                axs.set_title(dataset)
-                key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
-                key_plot_file = f"{key_plot}".replace(" ", "")
-                plot_name_file = plot_name.replace(" ", "")
-
-                plt.savefig(
-                    output_dir
-                    / f"{dataset}-{plot_name_file}-{x_name}__{key_plot_file}.png"
-                )
-
-                x = "#Patches"
-                x_name = "Patches"
-                fig, axs = plt.subplots()
-                sns.lineplot(
-                    data=df_g,
-                    x=x,
-                    y=dataset_results[0].plot_name,
-                    hue=self.query_key,
-                    errorbar="sd",
-                    ax=axs,
-                    markers=True,
-                    palette=PALETTE,
-                )
-                axs.set_ylabel(plot_name)
-
-                for y_full in y_fulls:
-                    axs.axhline(**y_full)
-
-                axs.set_xticks(
-                    np.arange(
-                        key[sb_ind],
-                        key[sb_ind] + (key[qs_ind] * key[max_loop_ind]),
-                        key[qs_ind],
+        # create plots for each unique setting of the respective dataset
+        for key, df_g in df.groupby(vals):
+            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "performance"
+            if not save_dir.is_dir():
+                os.makedirs(save_dir)
+            dataset = key[dataset_ind]
+            x_name_dict = {
+                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind])},
+                "#Patches": {
+                    "x_ticks": np.arange(
+                        key[sb_ind], key[qs_ind] * key[max_loop_ind], key[qs_ind]
                     )
+                },
+            }
+            for y_name, x_name in product(y_names, x_name_dict):
+                fig, axs = self.plot_single_experiment(
+                    df_g,
+                    y_name,
+                    x_name,
+                    dataset,
+                    hline_printers=y_full_dict[y_name],
+                    **x_name_dict[x_name],
                 )
-                axs.set_title(dataset)
-                axs.legend(loc="best")
-                plt.savefig(
-                    output_dir
-                    / f"{dataset}-{plot_name_file}-{x_name}__{key_plot_file}.png"
+                file_name = create_unique_name(
+                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
                 )
+
+                plt.savefig(save_dir / f"{file_name}.png")
                 plt.close("all")
+
+    def create_df(self, dataset_results, value):
+        df_results_dicts: list[dict] = []
+        for exp in dataset_results:
+            df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
+            df_results_dicts.extend(df_exp_dict)
+
+        df = pd.DataFrame(df_results_dicts)
+        vals = [seperator for seperator in df.columns if seperator not in exp_skip_keys]
+        return df, vals
 
     def dataset_analyze_statistics(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
@@ -655,61 +218,45 @@ class MultiExperimentAnalysis:
             exp for exp in self.exp_statistics if exp.base_id == unique_id
         ]
 
-        output_dir = (
-            output_dir / dataset_statistics[0].source_dataset_path.name / "statistics"
-        )
-        if not output_dir.is_dir():
-            os.makedirs(output_dir)
+        # how to get pre_suffix?
+        output_dir = output_dir / dataset_statistics[0].source_dataset_path.name
 
         if all_plots:
-            plot_names = dataset_statistics[0].plot_vals
+            y_names = dataset_statistics[0].plot_vals
         else:
-            plot_names = ["percentage_of_voxels_foreground"]
+            y_names = ["percentage_of_voxels_foreground"]
 
-        for plot_name in plot_names:
-            df_row_dicts = []
-            for exp in dataset_statistics:
-                df_row_dict, skip_keys = exp.to_df_row_dicts()
-                df_row_dicts.extend(df_row_dict)
+        df_row_dicts = []
+        for exp in dataset_statistics:
+            df_row_dict, skip_keys = exp.to_df_row_dicts()
+            df_row_dicts.extend(df_row_dict)
 
-            df = pd.DataFrame(df_row_dicts)
+        df = pd.DataFrame(df_row_dicts)
 
-            vals = [seperator for seperator in df.columns if seperator not in skip_keys]
-            max_loop_ind = vals.index("query_steps")
-            dataset_ind = vals.index("dataset")
-            sb_ind = vals.index("starting_budget_size")
-            qs_ind = vals.index("query_size")
+        vals = [seperator for seperator in df.columns if seperator not in skip_keys]
+        max_loop_ind = vals.index("query_steps")
+        dataset_ind = vals.index("dataset")
+        pre_suffix_ind = vals.index("pre_suffix")
 
-            # create plots for each unique setting for the respective dataset now
-            for key, df_g in df.groupby(vals):
-                dataset = key[dataset_ind]
-                x = "Loop"
-                x_name = "Loop"
+        # create plots for each unique setting of the respective dataset
+        for key, df_g in df.groupby(vals):
+            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "statistics"
+            if not save_dir.is_dir():
+                os.makedirs(save_dir)
+            dataset = key[dataset_ind]
+            x_name_dict = {"Loop": {"x_ticks": np.arange(0, key[max_loop_ind])}}
+            for y_name, x_name in product(y_names, x_name_dict):
 
-                fig, axs = plt.subplots()
-                sns.lineplot(
-                    data=df_g,
-                    x=x,
-                    y=plot_name,
-                    hue=self.query_key,
-                    errorbar="sd",
-                    ax=axs,
-                    markers=True,
-                    palette=PALETTE,
+                fig, axs = self.plot_single_experiment(
+                    df_g,
+                    y_name,
+                    x_name,
+                    dataset,
+                    **x_name_dict[x_name],
                 )
-                axs.set_ylabel(plot_name)
-                axs.set_xticks(np.arange(0, key[max_loop_ind]))
-                axs.legend(loc="best")
-                axs.set_title(dataset)
-                key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
-                key_plot_file = f"{key_plot}".replace(" ", "")
-                plot_name_file = plot_name.replace(" ", "")
-                plot_x_name = x_name.replace("_", "")
-                file_name = f"{dataset}-{plot_name_file}-{plot_x_name}__{key_plot_file}"
-                file_name = file_name[:250]  # can exceed max filename!
-                save_dir = output_dir
-                if not save_dir.is_dir():
-                    os.makedirs(save_dir)
+                file_name = create_unique_name(
+                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
+                )
 
                 plt.savefig(save_dir / f"{file_name}.png")
                 plt.close("all")
@@ -728,9 +275,7 @@ class MultiExperimentAnalysis:
             exp for exp in self.exp_results if exp.config.base_id == unique_id
         ]
 
-        output_dir = (
-            output_dir / dataset_results[0].config.dataset / "performance_statistics"
-        )
+        output_dir = output_dir / dataset_results[0].config.dataset
         if not output_dir.is_dir():
             os.makedirs(output_dir)
 
@@ -739,88 +284,64 @@ class MultiExperimentAnalysis:
             df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
             df_stat_dicts.extend(df_stat_dict)
 
+        df_results_dicts: list[dict] = []
+        for exp in dataset_results:
+            df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
+            df_results_dicts.extend(df_exp_dict)
+
+        indices = ["Experiment", "Loop"]
+        merged_dicts = merge_dict_lists_on_indices(
+            df_results_dicts, df_stat_dicts, indices
+        )
+
+        df = pd.DataFrame(merged_dicts)
+
+        vals = [
+            seperator
+            for seperator in df.columns
+            if seperator not in (exp_skip_keys + stat_skip_keys)
+        ]
+
+        dataset_ind = vals.index("dataset")
+
         if all_plots:
             x_names = dataset_statistics[0].plot_vals
-            y_names = dataset_results[0].value_dict(plot_val=value).keys()
+            y_names = dataset_results[0].get_value_dict(plot_val=value).keys()
         else:
             x_names = ["percentage_of_voxels_foreground"]
             y_names = ["Mean Dice"]
 
-        for x_name, y_name in product(x_names, y_names):
-            plot_fct = dataset_results[0].value_dict(plot_val=value)[y_name]
-            y_fulls = dataset_results[0].full_dataset_performance(
-                plot_fct.get_from_dict
-            )
+        y_full_dict = dataset_results[0].to_full_dataset_performance_dict(value)
 
-            df_results_dicts: list[dict] = []
-            for exp in dataset_results:
-                df_results_dicts.extend(
-                    exp.to_df_row_dicts(plot_fct=plot_fct.get_from_dict)
+        pre_suffix_ind = vals.index("pre_suffix")
+        for key, df_g in df.groupby(vals):
+            # create plots for each unique setting of the respective dataset
+            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "result_statistics"
+            if not save_dir.is_dir():
+                os.makedirs(save_dir)
+            dataset = key[dataset_ind]
+            x_name_dict = {x_n: {} for x_n in x_names}
+            for x_name, y_name in product(x_name_dict, y_names):
+                # create plots for each value to be plotted
+
+                fig, axs = self.plot_single_experiment(
+                    df_g,
+                    y_name,
+                    x_name,
+                    dataset,
+                    **x_name_dict[x_name],
                 )
 
-            results_skip_keys = dataset_results[0].plot_skip_keys
-
-            indices = ["Experiment", "Loop"]
-            merged_dicts = []
-            for i in range(len(df_results_dicts)):
-                merged_dict = df_results_dicts[i].copy()
-                extended = False
-                for j in range(len(df_stat_dicts)):
-                    accept = True
-                    for index in indices:
-                        if merged_dict[index] != df_stat_dicts[j][index]:
-                            accept = False
-                    if accept:
-                        merged_dict.update(df_stat_dicts[j])
-                        extended = True
-                        break
-                if not extended:
-                    raise ValueError(
-                        "One dictionary in the list does not have a partner."
-                    )
-                else:
-                    merged_dicts.append(merged_dict)
-
-            df = pd.DataFrame(merged_dicts)
-
-            vals = [
-                seperator
-                for seperator in df.columns
-                if seperator not in (results_skip_keys + stat_skip_keys)
-            ]
-
-            dataset_ind = vals.index("dataset")
-
-            # create plots for each unique setting for the respective dataset now
-            for key, df_g in df.groupby(vals):
-                dataset = key[dataset_ind]
-
-                fig, axs = plt.subplots()
-                sns.lineplot(
-                    data=df_g,
-                    x=x_name,
-                    y=dataset_results[0].plot_name,
-                    hue=self.query_key,
-                    errorbar="sd",
-                    ax=axs,
-                    markers=True,
-                    palette=PALETTE,
+                file_name = create_unique_name(
+                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
                 )
-                axs.set_ylabel(y_name)
-                axs.legend(loc="best")
-                axs.set_title(dataset)
 
-                key_plot = tuple([k for i, k in enumerate(key) if i != dataset_ind])
-                key_plot_file = f"{key_plot}".replace(" ", "")
-                plot_name_file = y_name.replace(" ", "")
-                plot_x_name = x_name.replace("_", "")
-                file_name = f"{dataset}-{plot_name_file}-{plot_x_name}__{key_plot_file}"
-                file_name = file_name[:250]  # can exceed max filename!
-                save_dir = output_dir / plot_name_file
-                if not save_dir.is_dir():
-                    os.makedirs(save_dir)
+                plot_name_file = file_name.split("-")[0]  # y_name
+                save_dir_final = save_dir / plot_name_file
+                if not save_dir_final.is_dir():
+                    os.makedirs(save_dir_final)
 
-                plt.savefig(save_dir / f"{file_name}.png")
+                plt.savefig(save_dir_final / f"{file_name}.png")
                 plt.close("all")
 
     def analyze_multi_datasets(
