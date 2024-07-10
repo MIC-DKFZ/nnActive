@@ -132,34 +132,71 @@ def make_kits_config(
     return config
 
 
-def make_kits_debug_config(
+def make_kits_prototyping_config(
     seed: int,
     uncertainty: str,
-    query_size: int = 10,
+    query_size: int = 20,
     query_steps: int = 3,
     patch_size: list[int] = [64, 64, 64],
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = "__PROTOTYPE" + __standard_pre_suffix_format,
 ):
     with set_raw_paths():
         base_id = 982
         dataset_name = convert_id_to_dataset_name(base_id)
         if patch_size is None:
             patch_size = get_patch_size(base_id)
-    return ActiveConfig(
+
+    config = ActiveConfig(
+        trainer=__standard_trainer,
+        base_id=base_id,
+        patch_size=patch_size,
+        uncertainty=uncertainty,
+        query_size=query_size,
+        query_steps=query_steps,
+        starting_budget=starting_budget,
+        seed=seed,
+        dataset=dataset_name,
+        train_folds=5,
+        full_folds=5,
+        agg_stride=8,
+        patch_overlap=0,
+    )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
+
+
+def make_kits_debug_config(
+    seed: int,
+    uncertainty: str,
+    query_size: int = 10,
+    query_steps: int = 3,
+    patch_size: list[int] = [64, 64, 64],
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = "__DEBUG" + __standard_pre_suffix_format,
+):
+    with set_raw_paths():
+        base_id = 982
+        dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+    config = ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
-        starting_budget="random-label-all-classes",
+        starting_budget=starting_budget,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix=f"_DEBUG",
         train_folds=2,
         full_folds=5,
         agg_stride=8,
         patch_overlap=0,
     )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
 
 
 def make_brats_small_config(
@@ -274,28 +311,31 @@ def make_hippocampus_debug_config(
     query_size: int = 10,
     query_steps: int = 3,
     patch_size: list[int] = [20, 20, 20],
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = "__DEBUG" + __standard_pre_suffix_format,
 ):
     with set_raw_paths():
         base_id = 4
         dataset_name = convert_id_to_dataset_name(base_id)
         if patch_size is None:
             patch_size = get_patch_size(base_id)
-    return ActiveConfig(
+    config = ActiveConfig(
         trainer="nnActiveTrainer_5epochs",
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
         query_size=query_size,
         query_steps=query_steps,
-        starting_budget="random-label-all-classes",
+        starting_budget=starting_budget,
         seed=seed,
         dataset=dataset_name,
-        pre_suffix=f"_DEBUG",
         train_folds=2,
         full_folds=5,
         agg_stride=8,
         patch_overlap=0,
     )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
 
 
 def make_acdc_config(
@@ -404,14 +444,14 @@ def make_amos_config(
     return config
 
 
-def make_amos_small_config(
+def make_amos_prototyping_config(
     seed: int,
     uncertainty: str,
     query_size: int = 20,
     query_steps: int = 3,
     patch_size: list[int] = [32, 74, 74],
     starting_budget: str = __standard_starting_budget,
-    pre_suffix_format: str = __standard_pre_suffix_format,
+    pre_suffix_format: str = "__PROTOTYPE" + __standard_pre_suffix_format,
 ):
     with set_raw_paths():
         base_id = 984
@@ -420,7 +460,7 @@ def make_amos_small_config(
             patch_size = get_patch_size(base_id)
 
     config = ActiveConfig(
-        trainer="nnActiveTrainer_5epochs",
+        trainer=__standard_trainer,
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
@@ -576,12 +616,6 @@ register(
 )
 
 register(
-    make_amos_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
-
-register(
     make_airway_config,
     seeds=__seeds,
     uncertainties=__strategies,
@@ -591,6 +625,32 @@ register(
     make_airway_small_config,
     seeds=__seeds,
     uncertainties=__strategies,
+)
+
+################## Prototyping Experiments #########
+register(
+    make_amos_prototyping_config,
+    seeds=[12345],
+    uncertainties=__strategies,
+)
+
+register(
+    make_kits_prototyping_config,
+    seeds=[12345],
+    uncertainties=__strategies,
+)
+
+################## Debug Experiments ###############
+register(
+    make_kits_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
+)
+
+register(
+    make_hippocampus_debug_config,
+    seeds=[12345],
+    uncertainties=["mutual_information"],
 )
 
 ################## Old Experiments #################
@@ -645,16 +705,4 @@ register(
     query_steps=10,
     starting_budget=__old_starting_budget,
     pre_suffix_format=__old_pre_suffix_format,
-)
-
-register(
-    make_kits_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
-)
-
-register(
-    make_hippocampus_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
 )
