@@ -158,7 +158,7 @@ class SoftRankBALD(BALD):
             )
             soft_scores = -np.log(
                 np.arange(len(self.top_patches)) + 1
-            ) + self.rng.gumbel(0, 1, size=soft_scores.shape)
+            ) + self.rng.gumbel(0, 1, size=len(self.top_patches))
             soft_rankings = np.argsort(soft_scores)[::-1]
             sorted_top_patches: list[dict] = []
             for soft_rank in soft_rankings[: self.query_size]:
