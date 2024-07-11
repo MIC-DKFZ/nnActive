@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Generator, Iterable, Union
 
 import numpy as np
+import torch
 from loguru import logger
 from skimage.morphology import ball
 from torch.backends import cudnn
@@ -11,6 +12,27 @@ from nnactive.data import Patch
 from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.utils.io import load_label_map
 from nnactive.utils.torchutils import maybe_gpu_binary_erosion
+
+
+def power_noising(
+    scores: np.ndarray | torch.Tensor, beta: float
+) -> np.ndarray | torch.Tensor:
+    """Perform power noising of samples with gumbel distribution.
+
+    Args:
+        scores (np.ndarray | torch.Tensor): scores #N
+        beta (float): beta value for gumbel distribution
+
+    Returns:
+        np.ndarray | torch.Tensor: scores + epsilon #N
+    """
+    gumbel_samples = np.random.gumbel(0, beta**-1, size=scores.shape)
+
+    if isinstance(scores, np.ndarray):
+        power_s = np.log(scores) + gumbel_samples
+    else:
+        power_s = scores.log() + torch.from_numpy(gumbel_samples).to(scores.device)
+    return power_s
 
 
 def query_starting_budget_all_classes(

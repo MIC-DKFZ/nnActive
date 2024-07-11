@@ -3,11 +3,11 @@ from typing import Union
 from loguru import logger
 
 from nnactive.config.struct import ActiveConfig
-from nnactive.strategies.bald import BALD
+from nnactive.strategies.bald import BALD, PowerBALD
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
-from nnactive.strategies.entropy_pred import PredictiveEntropy
+from nnactive.strategies.entropy_pred import PowerPredictiveEntropy, PredictiveEntropy
 from nnactive.strategies.random import Random, RandomAllClasses
 from nnactive.strategies.randomlabel import RandomLabel, RandomLabelAllClasses
 from nnactive.strategies.randomlabel2 import (
@@ -54,7 +54,9 @@ def init_strategy(
 
 strategydict: dict[str, type[AbstractQueryMethod]] = {
     "mutual_information": BALD,
+    "power_bald": PowerBALD,
     "pred_entropy": PredictiveEntropy,
+    "power_pe": PowerPredictiveEntropy,
     "exp_entropy": ExpectedEntropy,
     "expected_dice": ExpectedDiceQuery,
     "random": Random,

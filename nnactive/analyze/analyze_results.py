@@ -28,8 +28,8 @@ PALETTE = {
     "expected_dice": "tab:purple",
     "random-label": "tab:red",
     "random-label2": "tab:cyan",
-    # "other_3": "tab:brown",
-    # "other_4": "tab:gray",
+    "power_bald": "tab:brown",
+    "power_pe": "tab:gray",
     # "other_5": "tab:pink",
     # "other_6": "tab:olive",
 }

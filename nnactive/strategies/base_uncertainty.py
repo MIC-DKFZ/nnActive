@@ -14,6 +14,7 @@ from typing import Callable, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
+import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -29,7 +30,6 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
-import wandb
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -190,18 +190,13 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         with (
             monitor.timer("query_from_probs") if monitor.is_active() else nullcontext()
         ):
-            with torch.no_grad():
-                logger.info("Compute uncertaintes...")
-                uncertainty = self.get_uncertainty(probs, device=device)
-
-                if torch.any(torch.isnan(uncertainty)):
-                    # unc_num_nan = torch.sum(torch.isnan(uncertainty))
-                    # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
-                    raise ValueError(
-                        f" NAN values in uncertainties for image {label_file}"
-                    )
-                logger.info("Aggregate uncertainties...")
-                agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
+            uncertainty, agg_uncertainty, kernel_size = self.compute_scores(
+                probs, device
+            )
+            if torch.any(torch.isnan(uncertainty)):
+                # unc_num_nan = torch.sum(torch.isnan(uncertainty))
+                # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
+                raise ValueError(f" NAN values in uncertainties for image {label_file}")
 
             logger.info("Initialize selected array...")
             annotated_patches = [
@@ -221,6 +216,18 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             logger.info("Finished patch selection.")
             self.top_patches += selected_patches
         return uncertainty, agg_uncertainty
+
+    def compute_scores(
+        self,
+        probs: list[Path] | np.ndarray,
+        device: torch.device = torch.device("cuda:0"),
+    ):
+        with torch.no_grad():
+            logger.info("Compute uncertaintes...")
+            uncertainty = self.get_uncertainty(probs, device=device)
+            logger.info("Aggregate uncertainties...")
+            agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
+        return uncertainty, agg_uncertainty, kernel_size
 
     @abstractmethod
     def get_uncertainty(
@@ -521,10 +528,10 @@ class nnActivePredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            out_probs: list[
-                Path
-            ] | np.ndarray = self.predict_fold_logits_from_preprocessed_data(
-                data, properties, temp_path, temp_name
+            out_probs: list[Path] | np.ndarray = (
+                self.predict_fold_logits_from_preprocessed_data(
+                    data, properties, temp_path, temp_name
+                )
             )
 
             logger.info("Start Query")
