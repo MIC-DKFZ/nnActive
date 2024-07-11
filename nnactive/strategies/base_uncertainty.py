@@ -87,6 +87,10 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         logger.info(
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
         )
+        self.__post_init__()
+
+    def __post_init__(self):
+        pass
 
     def query_part(
         self,
@@ -268,12 +272,9 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         selected_patches = []
         # sort only once since this can take a significant amount of time
         logger.info("Sort potential queries")
-        flat_aggregated_uncertainties = aggregated.flatten()
-
-        sorted_uncertainty_indices = np.flip(np.argsort(flat_aggregated_uncertainties))
-        sorted_uncertainty_scores: list[float] = np.take_along_axis(
-            flat_aggregated_uncertainties, sorted_uncertainty_indices, axis=0
-        ).tolist()
+        sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
+            aggregated
+        )
         logger.info("Start finding non-overlapping patches.")
         # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
@@ -332,6 +333,17 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         pbar0.close()
         logger.info(f"Finished patch selection for image {label_file}")
         return selected_patches
+
+    def get_top_scores(self, aggregated: np.ndarray) -> tuple[list[int], list[float]]:
+        flat_aggregated_uncertainties = aggregated.flatten()
+
+        sorted_uncertainty_indices = np.flip(np.argsort(flat_aggregated_uncertainties))
+        sorted_uncertainty_scores: list[float] = np.take_along_axis(
+            flat_aggregated_uncertainties, sorted_uncertainty_indices, axis=0
+        ).tolist()
+        sorted_uncertainty_indices: list[int] = sorted_uncertainty_indices.tolist()
+
+        return sorted_uncertainty_indices, sorted_uncertainty_scores
 
     def compose_query_of_patches(self):
         with (

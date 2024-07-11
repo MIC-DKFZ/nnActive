@@ -15,7 +15,9 @@ from nnactive.utils.torchutils import maybe_gpu_binary_erosion
 
 
 def power_noising(
-    scores: np.ndarray | torch.Tensor, beta: float
+    scores: np.ndarray | torch.Tensor,
+    beta: float,
+    rng: np.random.Generator = np.random.default_rng(),
 ) -> np.ndarray | torch.Tensor:
     """Perform power noising of samples with gumbel distribution.
 
@@ -26,7 +28,7 @@ def power_noising(
     Returns:
         np.ndarray | torch.Tensor: scores + epsilon #N
     """
-    gumbel_samples = np.random.gumbel(0, beta**-1, size=scores.shape)
+    gumbel_samples = rng.gumbel(0, beta**-1, size=scores.shape)
 
     if isinstance(scores, np.ndarray):
         power_s = np.log(scores) + gumbel_samples
