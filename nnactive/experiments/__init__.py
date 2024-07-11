@@ -19,6 +19,8 @@ __strategies = [
     "random",
     "pred_entropy",
     "mutual_information",
+    "power_bald",
+    "power_pe",
 ]
 
 __standard_trainer = "nnActiveTrainer_200epochs"
