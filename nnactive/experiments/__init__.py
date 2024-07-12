@@ -21,6 +21,7 @@ __strategies = [
     "mutual_information",
     "power_bald",
     "power_pe",
+    "softrank_bald",
 ]
 
 __standard_trainer = "nnActiveTrainer_200epochs"
