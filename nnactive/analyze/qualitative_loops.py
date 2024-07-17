@@ -139,7 +139,7 @@ def plot_query_trajectory(
 
                 fig, axs = plt.subplots(1, len(center_axs))
                 for c in range(len(center_axs)):
-                    axs[c].imshow(views[c], cmap="gray")
+                    axs[c].imshow(views[c], cmap="gray", vmin=0, vmax=1)
                     axs[c].imshow(masks[c], cmap=plt.cm.Reds, alpha=0.3)
                     axs[c].set_xticks([])
                     axs[c].set_yticks([])

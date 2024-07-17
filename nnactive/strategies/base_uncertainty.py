@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import multiprocessing as mp
 import os
-import shutil
-import traceback
 from abc import abstractmethod
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
@@ -23,7 +22,6 @@ from nnunetv2.inference.export_probs import (
 )
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.inference.sliding_window_prediction import compute_gaussian
-from nnunetv2.utilities.dataset_name_id_conversion import convert_dataset_name_to_id
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
@@ -36,7 +34,6 @@ from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.masking import does_overlap
 from nnactive.nnunet.utils import get_raw_path
-from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.utils.io import load_label_map
 from nnactive.utils.timer import CudaTimer, Timer

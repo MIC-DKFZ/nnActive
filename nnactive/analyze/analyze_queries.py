@@ -57,13 +57,18 @@ class AnalyzeQueries:
             state = State.latest(config)
             dataset_id = state.dataset_id
 
+        self.initialize_querymethods(query_methods=QUERY_METHODS)
+
+    def initialize_querymethods(self, query_methods: list[Type[AbstractQueryMethod]]):
         self.query_methods: dict[str, AbstractQueryMethod] = {
-            cls_.__name__: cls_.init_from_dataset_id(config, dataset_id=dataset_id)
-            for cls_ in QUERY_METHODS
+            cls_.__name__: cls_.init_from_dataset_id(
+                self.config, dataset_id=self.dataset_id
+            )
+            for cls_ in query_methods
         }
         for q_n in self.query_methods:
             self.query_methods[q_n].annotated_patches = get_patches_from_loop_files(
-                get_raw_path(self.dataset_id), loop_val=loop_val
+                get_raw_path(self.dataset_id), loop_val=self.loop_val
             )
 
     @property
