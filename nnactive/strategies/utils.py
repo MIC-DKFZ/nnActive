@@ -11,7 +11,84 @@ from torch.backends import cudnn
 from nnactive.data import Patch
 from nnactive.masking import does_overlap, percentage_overlap_array
 from nnactive.utils.io import load_label_map
+from nnactive.utils.padding import obtain_center_padding_slicers
 from nnactive.utils.torchutils import maybe_gpu_binary_erosion
+
+
+class RepresentationHandler:
+    def __init__(
+        self,
+        input_shape: Iterable[int],
+        repr_dim: int | None = None,
+        scaling_factor: Iterable[int] | None = None,
+        orig_shape: Iterable[int] | None = None,
+        device=torch.device("cpu"),
+    ):
+        self.que: list[torch.Tensor] = []
+        self.image: torch.Tensor = None
+        self.n_predictions: torch.Tensor = None
+        self.dtype = torch.float16
+        self.input_shape = input_shape
+        self.repr_dim = repr_dim
+        self.scaling_factor = scaling_factor
+        self.device = device
+        self.built = False
+        self.init = False
+        self.orig_shape = orig_shape
+
+    def init_representation(self):
+        representation_size = [
+            i // s for i, s in zip(self.input_shape, self.scaling_factor)
+        ]
+        self.image = torch.zeros(
+            [self.repr_dim] + representation_size, dtype=self.dtype, device=self.device
+        )
+        self.n_predictions = torch.zeros(
+            representation_size, dtype=torch.uint8, device=self.device
+        )
+        self.init = True
+
+    def set_orig_shape(self, orig_shape: Iterable[int]):
+        self.orig_shape = orig_shape
+
+    def add_to_que(self, tensor: torch.Tensor):
+        self.que.append(tensor)
+
+    def update_representation(self, slices: tuple[slice, ...], que_index: int = 0):
+        repr_slice = self.image_slice_to_representation_slice(slices)
+        data = self.que.pop(que_index)
+        self.n_predictions[repr_slice[1:]] += 1
+        self.image[repr_slice] += data
+
+    def build_representation(self):
+        assert self.init
+        assert len(self.que) == 0
+        self.image /= self.n_predictions.to(self.dtype)[None]
+        slicers = obtain_center_padding_slicers(
+            old_shape=self.orig_shape, cur_shape=self.input_shape
+        )
+        slicers = self.image_slice_to_representation_slice(slicers)
+        self.image = self.image[(slice(None), *slicers)]
+        del self.n_predictions
+        self.built = True
+
+    def image_slice_to_representation_slice(
+        self, slices: tuple[slice, ...]
+    ) -> tuple[slice, ...]:
+        out_slices = [slice(None)]
+        if len(slices) == len(self.input_shape):
+            start_ind = 0
+        elif len(slices) == len(self.input_shape) + 1:
+            start_ind = 1
+
+        for i in range(start_ind, len(slices)):
+            out_slices.append(
+                slice(
+                    slices[i].start // self.scaling_factor[i - start_ind],
+                    slices[i].stop // self.scaling_factor[i - start_ind],
+                )
+            )
+        return out_slices
 
 
 def power_noising(
