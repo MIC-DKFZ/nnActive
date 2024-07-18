@@ -18,6 +18,7 @@ from nnactive.nnunet.utils import get_raw_path, get_results_path
 from nnactive.results.state import State
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.strategies.base_diversity import DiversityQueryMethod
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_pred import PredictiveEntropy
@@ -133,7 +134,7 @@ class AnalyzeQueries:
         for qm_name, qm in self.query_methods.items():
             if isinstance(qm, AbstractUncertainQueryMethod):
                 uncertainty, aggregated = qm.query_from_probs(
-                    probs, image_shape=[0, 0, 0], label_file=label_file
+                    probs, label_file=label_file
                 )
                 uncertainty_dict[qm_name] = uncertainty.cpu()
                 del aggregated
@@ -212,6 +213,10 @@ class AnalyzeQueries:
             part_id=part_id,
             disable_progress_bar=disable_progress_bar,
         )
+
+    def get_representations(self):
+        qm = DiversityQueryMethod.init_from_dataset_id(self.config, self.dataset_id)
+        qm.query()
 
     def query_from_probs(self):
         fns = [f.name for f in self.probs_folders[0].iterdir() if f.suffix == ".npz"]
@@ -348,6 +353,7 @@ def predict_trainingset_model(
 
 
 if __name__ == "__main__":
+    ######################## Developing general functionality ####################
     # Verify Results
     # nnactive_results_folder = Path(
     #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
@@ -358,95 +364,20 @@ if __name__ == "__main__":
     # analysis.query_from_probs()
     # analysis.visualize_from_query()
 
-    # model_folder = "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/nnActiveTrainer_5epochs__nnUNetPlans__3d_fullres"
-    # raw_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
+    ######################## Developing predict to probs ####################
+    # nnactive_results_folder = Path(
+    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset021_Hippocampus__patch-20_20_20__qs-20__unc-random-label2__seed-12345"
     # )
-    # input_folder = "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/imagesTr"
-    # output_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/loop_000__analysis"
+    # analysis = AnalyzeQueries.initialize_from_config_path(
+    #     nnactive_results_folder, loop_val=0
     # )
+    # analysis.predict_training_set_fold(0)
 
-    # nnactive_results_folder = "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    # base_folders = [
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/probTr_0",
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/probTr_1",
-    # ]
-
+    ####################### Developing Diversity QM #########################
     nnactive_results_folder = Path(
         "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset021_Hippocampus__patch-20_20_20__qs-20__unc-random-label2__seed-12345"
     )
     analysis = AnalyzeQueries.initialize_from_config_path(
         nnactive_results_folder, loop_val=0
     )
-    analysis.predict_training_set_fold(0)
-
-    # base_folders = [Path(bf) for bf in base_folders]
-
-    # file_ending = ".nii.gz"
-
-    # fns = [f.name for f in base_folders[0].iterdir() if f.suffix == ".npz"]
-
-    # probs_paths = [
-    #     [bf / f for bf in base_folders] for f in fns
-    # ]  # for each file the paths
-
-    # config = ActiveConfig.from_json(Path(nnactive_results_folder) / "config.json")
-
-    # config.set_nnunet_env()
-    # analysis = AnalyzeQueries(config, dataset_id=0, base_path=base_folders, loop_val=0)
-    # for prob_paths in probs_paths:
-    #     fn = prob_paths[0].name.split(".")[0]
-    #     uncertainty_dict = analysis.probs_to_voxel_uncertainty(
-    #         prob_paths, label_file=fn
-    #     )
-    #     for u_n in uncertainty_dict:
-    #         nii_name = fn + ".nii.gz"
-    #         nii_image = sitk.ReadImage(raw_folder / "labelsTr" / nii_name)
-    #         save_image = sitk.GetImageFromArray(uncertainty_dict[u_n].numpy())
-    #         save_image = copy_geometry_sitk(save_image, nii_image)
-    #         if not (output_folder / u_n).is_dir():
-    #             os.makedirs(output_folder / u_n)
-    #         sitk.WriteImage(save_image, output_folder / u_n / nii_name)
-
-    # final_query_patches, scores_all = analysis.get_final_queries()
-    # final_query_patches_json = {
-    #     k: [get_clean_dataclass_dict(p) for p in final_query_patches[k]]
-    #     for k in final_query_patches
-    # }
-    # save_json(
-    #     final_query_patches_json,
-    #     save_path=Path(output_folder / "final_patches.json"),
-    # )
-    # save_json(scores_all, save_path=Path(output_folder / "all_scores.json"))
-
-    # img_names = [
-    #     f.name
-    #     for f in (raw_folder / "labelsTr").iterdir()
-    #     if f.name.endswith(file_ending)
-    # ]
-
-    # for q_n in final_query_patches:
-    #     save_folder = output_folder / f"query_{q_n}"
-    #     if not save_folder.is_dir():
-    #         os.makedirs(save_folder)
-    #     logger.info(f"Saving Queries in Folder: {save_folder}")
-
-    # for img_name in img_names:
-    #     for q_n, patches in final_query_patches.items():
-    #         img_patches = [patch for patch in patches if patch.file == img_name]
-    #         if len(img_patches) == 0:
-    #             continue
-    #         save_folder = output_folder / f"query_{q_n}"
-
-    #         img = sitk.ReadImage(raw_folder / "labelsTr" / img_name)
-    #         label_shape = sitk.GetArrayFromImage(img).shape
-    #         mask = create_patch_mask_for_image(
-    #             img_name, patches, label_shape, identify_patch=False
-    #         )
-    #         mask = sitk.GetImageFromArray(mask)
-    #         mask = copy_geometry_sitk(mask, img)
-    #         sitk.WriteImage(
-    #             mask,
-    #             (save_folder / img_name),
-    #         )
+    analysis.get_representations()
