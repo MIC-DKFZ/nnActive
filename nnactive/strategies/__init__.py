@@ -17,10 +17,15 @@ from nnactive.strategies.randomlabel2 import (
 
 
 def get_strategy(
-    config: ActiveConfig, strategy_name: str, dataset_id: int, **kwargs
+    strategy_name: str,
+    config: ActiveConfig,
+    dataset_id: int,
+    loop_val: int,
+    seed: int,
+    **kwargs,
 ) -> AbstractQueryMethod:
     strategy = strategydict[strategy_name].init_from_dataset_id(
-        config, dataset_id, **kwargs
+        config, dataset_id, loop_val=loop_val, seed=seed, **kwargs
     )
     return strategy
 
@@ -32,22 +37,29 @@ def init_strategy(
     patch_size: list[int],
     seed: int,
     agg_stride: Union[int, list[int]],
-    trials_per_img: int,
     n_patch_per_image: int,
-    file_ending: str = ".nii.gz",
+    loop_val: int | None = -1,
     **kwargs,
 ) -> AbstractQueryMethod:
-    strategy = strategydict[strategy_name](
-        dataset_id,
-        query_size=query_size,
+    config = ActiveConfig(
         patch_size=patch_size,
-        seed=seed,
-        trials_per_img=trials_per_img,
-        file_ending=file_ending,
-        agg_stride=agg_stride,
+        query_size=query_size,
         n_patch_per_image=n_patch_per_image,
-        **kwargs,
+        seed=seed,
+        agg_stride=agg_stride,
     )
+    strategy = get_strategy(strategy_name, config, dataset_id, loop_val, seed, **kwargs)
+    # strategy = strategydict[strategy_name](
+    #     dataset_id,
+    #     query_size=query_size,
+    #     patch_size=patch_size,
+    #     seed=seed,
+    #     trials_per_img=trials_per_img,
+    #     file_ending=file_ending,
+    #     agg_stride=agg_stride,
+    #     n_patch_per_image=n_patch_per_image,
+    #     **kwargs,
+    # )
     logger.debug(f"Initializing query-strategy: {strategy.__class__.__name__}")
     return strategy
 

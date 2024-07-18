@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Union
+from typing import Any, Callable, Dict, Iterable, Union
 
 import numpy as np
 import psutil
@@ -25,7 +25,6 @@ from nnunetv2.inference.sliding_window_prediction import compute_gaussian
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.helpers import empty_cache
 from torch._dynamo import OptimizedModule
-from torch.backends import cudnn
 from tqdm import tqdm
 
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
@@ -34,201 +33,72 @@ from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.masking import does_overlap
 from nnactive.nnunet.utils import get_raw_path
-from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.strategies.base import BasePredictionQuery, BaseQueryPredictor
+from nnactive.strategies.utils import RepresentationHandler
 from nnactive.utils.io import load_label_map
 from nnactive.utils.timer import CudaTimer, Timer
 
 
-class AbstractUncertainQueryMethod(AbstractQueryMethod):
-    def __init__(
-        self,
-        dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
-        agg_stride: Union[int, list[int]],
-        n_patch_per_image: int,
-        file_ending: str = ".nii.gz",
-        num_processes_preprocessing: int = 3,
-        use_gaussian: bool = False,
-        use_mirroring: bool = False,
-        tile_step_size: float = 0.75,
-        additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
-        verbose: bool = False,
-        config: ActiveConfig | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            file_ending,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
-            config=config,
-        )
-
-        self.num_processes_preprocessing = num_processes_preprocessing
-        self.n_patch_per_image = n_patch_per_image
-        self.use_mirroring = use_mirroring
-        self.use_gaussian = use_gaussian
-        self.tile_step_size = tile_step_size
+class AbstractUncertainQueryMethod(BasePredictionQuery):
+    def __post_init__(self):
+        super().__post_init__()
         if (
-            agg_stride == 1
+            self.config.agg_stride == 1
         ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
-            self.aggregation = ConvolveAggScipy(patch_size, stride=agg_stride)
+            self.aggregation = ConvolveAggScipy(
+                self.config.patch_size, stride=self.config.agg_stride
+            )
         else:
-            self.aggregation = ConvolveAggTorch(patch_size, stride=agg_stride)
+            self.aggregation = ConvolveAggTorch(
+                self.config.patch_size, stride=self.config.agg_stride
+            )
 
         logger.info(
-            f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {agg_stride}"
+            f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {self.config.agg_stride}"
         )
-        self.__post_init__()
 
-    def __post_init__(self):
-        pass
-
-    def query_part(
-        self,
-        part_id: int = 0,
-        num_parts: int = 1,
-        device: torch.device = torch.device("cuda:0"),
-    ) -> list[dict]:
-        temp_path = get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
-
-        torch.cuda.set_device(device)
-        # Initialize Predictor
+    def build_query_predictor(self, device: torch.device):
         predictor = nnActivePredictor(
-            tile_step_size=self.tile_step_size,
-            use_mirroring=self.use_mirroring,
-            use_gaussian=self.use_gaussian,
+            tile_step_size=self.config.tile_step_size,
+            use_mirroring=self.config.use_mirroring,
+            use_gaussian=self.config.use_gaussian,
             verbose=self.verbose,
             allow_tqdm=not self.verbose,
             device=device,
         )
-        # Initialize Model for Predictor
-        nnunet_plans_identifier = self.config.model_plans
-        nnunet_trainer_name = self.config.trainer
-        nnunet_config = self.config.model_config
-        model_folder = get_output_folder(
-            self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
-        )
-        use_folds = tuple(range(self.config.train_folds))
-        predictor.initialize_from_trained_model_folder(
-            model_folder, use_folds=use_folds
-        )
 
-        source_folder = str(get_raw_path(self.dataset_id) / "imagesTr")
-        output_folder = "/".join(model_folder.split("/")[:-1])
-
-        data_iterator = predictor.get_data_iterator_from_folders(
-            list_of_lists_or_source_folder=source_folder,
-            output_folder_or_list_of_truncated_output_files=output_folder,
-            num_processes_preprocessing=self.num_processes_preprocessing,
-            part_id=part_id,
-            num_parts=num_parts,
-        )
-        predictor.predict_from_data_iterator(data_iterator, self, temp_path=temp_path)
-        return self.top_patches
-
-    def wrap_query_part(
-        self,
-        part_id: int = 0,
-        num_parts: int = 1,
-        device: torch.device = torch.device("cuda:0"),
-        wandb_group: str = "Test",
-    ) -> list[dict]:
-        self.config.set_nnunet_env()
-        with monitor.active_run(group=wandb_group):
-            top_patches = self.query_part(part_id, num_parts, device)
-        return top_patches
-
-    def query(self, n_gpus: int = 1, verbose: bool = False) -> list[Patch]:
-        if n_gpus == 0:
-            device = torch.device("cuda:0")
-            self.query_part(part_id=0, num_parts=1, device=device)
-        else:
-            devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
-            num_parts = [n_gpus] * n_gpus
-            parts = [i for i in range(n_gpus)]
-            try:
-                with ProcessPoolExecutor(
-                    max_workers=n_gpus, mp_context=mp.get_context("spawn")
-                ) as executor:
-                    for top_patch_part in executor.map(
-                        self.wrap_query_part,
-                        parts,
-                        num_parts,
-                        devices,
-                        [wandb.run.group] * n_gpus,
-                    ):
-                        self.top_patches.extend(top_patch_part)
-
-            except BrokenProcessPool as exc:
-                raise MemoryError(
-                    "One of the worker processes died. "
-                    "This usually happens because you run out of memory. "
-                    "Try running with less processes."
-                ) from exc
-
-        return self.compose_query_of_patches()
-
-    def query_from_probs(
-        self,
-        probs: list[Path] | np.ndarray,
-        image_shape: Iterable[int],
-        label_file: str,
-        device: torch.device = torch.device("cuda:0"),
-    ) -> tuple[torch.Tensor, np.ndarray]:
-        """Computes potential queries for a single input image and adds best queries to the internal list of queries.
-
-        Args:
-            out_probs (torch.Tensor): probability map for image
-            image_shape (Iterable[int]): shape of image
-            label_file (str): name of label file
-        """
-        with (
-            monitor.timer("query_from_probs") if monitor.is_active() else nullcontext()
-        ):
-            uncertainty, agg_uncertainty, kernel_size = self.compute_scores(
-                probs, device
-            )
-            if torch.any(torch.isnan(uncertainty)):
-                # unc_num_nan = torch.sum(torch.isnan(uncertainty))
-                # unc_where_nan = torch.argwhere(torch.isnan(uncertainty))
-                raise ValueError(f" NAN values in uncertainties for image {label_file}")
-
-            logger.info("Initialize selected array...")
-            annotated_patches = [
-                patch
-                for patch in self.annotated_patches
-                if patch.file == label_file + ".nii.gz"
-            ]
-
-            logger.info("Select patches...")
-            selected_patches = self.select_top_n_non_overlapping_patches(
-                patch_size=kernel_size,
-                aggregated=agg_uncertainty,
-                annotated_patches=annotated_patches,
-                label_file=label_file,
-                n=self.n_patch_per_image,
-            )
-            logger.info("Finished patch selection.")
-            self.top_patches += selected_patches
-        return uncertainty, agg_uncertainty
+        return predictor
 
     def compute_scores(
-        self,
-        probs: list[Path] | np.ndarray,
-        device: torch.device = torch.device("cuda:0"),
-    ):
+        self, probs: np.ndarray | list[Path], device: torch.device
+    ) -> tuple[torch.Tesnor, np.ndarray, Iterable[int]]:
         with torch.no_grad():
-            logger.info("Compute uncertaintes...")
+            logger.debug("Compute uncertaintes...")
             uncertainty = self.get_uncertainty(probs, device=device)
-            logger.info("Aggregate uncertainties...")
+            logger.debug("Aggregate uncertainties...")
             agg_uncertainty, kernel_size = self.aggregation.forward(uncertainty)
         return uncertainty, agg_uncertainty, kernel_size
+
+    def strategy(
+        self, query_dict: Dict[str, Any], device: torch.device = torch.device("cuda:0")
+    ) -> list[dict[str, Any]]:
+        probs: np.ndarray | list[Path] = query_dict["probs"]
+        scores, agg_scores, patch_size = self.compute_scores(probs)
+        sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
+            agg_scores
+        )
+        # TODO: Think how to cleverly obtain uncertainty in a way to use it for other stuff...
+        out_list = [
+            {
+                "coords": self.aggregation.backward_index(index),
+                "size": patch_size,
+                "score": score,
+            }
+            for score, index in zip(
+                sorted_uncertainty_scores, sorted_uncertainty_indices
+            )
+        ]
+        return out_list
 
     @abstractmethod
     def get_uncertainty(
@@ -246,90 +116,90 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
             torch.Tensor: outputs [XYZ] on device
         """
 
-    def select_top_n_non_overlapping_patches(
-        self,
-        patch_size: list[int],
-        aggregated: np.ndarray,
-        annotated_patches: list[Patch],
-        label_file: str,
-        n: int,
-    ) -> list[dict]:
-        """Select top-n non overlapping patches in image.
+    # def select_top_n_non_overlapping_patches(
+    #     self,
+    #     patch_size: list[int],
+    #     aggregated: np.ndarray,
+    #     annotated_patches: list[Patch],
+    #     label_file: str,
+    #     n: int,
+    # ) -> list[dict]:
+    #     """Select top-n non overlapping patches in image.
 
-        Args:
-            patch_size (list[int]): size of patch
-            aggregated (np.ndarray): aggregated uncertainty
-            annotated_patches (list[Patch]): list of annotated patches per image
-            label_file (str): name of label_file without ending (.nii.gz)
-            n (int): number of patches to select
+    #     Args:
+    #         patch_size (list[int]): size of patch
+    #         aggregated (np.ndarray): aggregated uncertainty
+    #         annotated_patches (list[Patch]): list of annotated patches per image
+    #         label_file (str): name of label_file without ending (.nii.gz)
+    #         n (int): number of patches to select
 
-        Returns:
-            list[dict]: dict contains all values required to build a Patch
-        """
-        selected_patches = []
-        # sort only once since this can take a significant amount of time
-        logger.info("Sort potential queries")
-        sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
-            aggregated
-        )
-        logger.info("Start finding non-overlapping patches.")
-        # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
+    #     Returns:
+    #         list[dict]: dict contains all values required to build a Patch
+    #     """
+    #     selected_patches = []
+    #     # sort only once since this can take a significant amount of time
+    #     logger.info("Sort potential queries")
+    #     sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
+    #         aggregated
+    #     )
+    #     logger.info("Start finding non-overlapping patches.")
+    #     # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
 
-        iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
-        pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=self.verbose)
-        pbar1 = tqdm(
-            total=len(sorted_uncertainty_scores),
-            position=1,
-            desc="Possible Patch Search",
-            disable=self.verbose,
-        )
+    #     iterator = zip(sorted_uncertainty_scores, sorted_uncertainty_indices)
+    #     pbar0 = tqdm(total=n, position=0, desc="Patch Selection", disable=self.verbose)
+    #     pbar1 = tqdm(
+    #         total=len(sorted_uncertainty_scores),
+    #         position=1,
+    #         desc="Possible Patch Search",
+    #         disable=self.verbose,
+    #     )
 
-        additional_label = None
-        if self.additional_label_path is not None:
-            if self.verbose:
-                logger.debug("Create additional label map.")
-            additional_label = load_label_map(
-                label_file,
-                self.additional_label_path,
-                self.file_ending,
-            )
-            additional_label: np.ndarray = additional_label != 255
+    #     additional_label = None
+    #     if self.additional_label_path is not None:
+    #         if self.verbose:
+    #             logger.debug("Create additional label map.")
+    #         additional_label = load_label_map(
+    #             label_file,
+    #             self.additional_label_path,
+    #             self.file_ending,
+    #         )
+    #         additional_label: np.ndarray = additional_label != 255
 
-        for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
-            pbar1.update()
-            # get coordinates in image space from aggregated indices
-            coords = self.aggregation.backward_index(
-                uncertainty_index, aggregated.shape
-            )
-            patch = Patch(
-                file=label_file + ".nii.gz",
-                coords=coords,
-                size=patch_size,
-            )
+    #     for i, (uncertainty_score, uncertainty_index) in enumerate(iterator):
+    #         pbar1.update()
+    #         # get coordinates in image space from aggregated indices
+    #         coords = self.aggregation.backward_index(
+    #             uncertainty_index, aggregated.shape
+    #         )
+    #         patch = Patch(
+    #             file=label_file + ".nii.gz",
+    #             coords=coords,
+    #             size=patch_size,
+    #         )
 
-            # Check if coordinated overlap with already queried region
-            if self.check_overlap(
-                patch, annotated_patches, additional_label, verbose=self.verbose
-            ):
-                # If it is a non-overlapping region, append this patch to be queried
-                selected_patches.append(
-                    {
-                        "file": label_file + ".nii.gz",
-                        "coords": coords,
-                        "size": patch_size,
-                        "score": uncertainty_score,
-                    }
-                )
-                # Mark region as queried
-                annotated_patches.append(patch)
-                # Stop if we reach the maximum number of patches to be queried
-                pbar0.update()
-            if n is not None and len(selected_patches) >= n:
-                break
-        pbar1.close()
-        pbar0.close()
-        logger.info(f"Finished patch selection for image {label_file}")
-        return selected_patches
+    #         # Check if coordinated overlap with already queried region
+    #         if self.check_overlap(
+    #             patch, annotated_patches, additional_label, verbose=self.verbose
+    #         ):
+    #             # If it is a non-overlapping region, append this patch to be queried
+    #             selected_patches.append(
+    #                 {
+    #                     "file": label_file + ".nii.gz",
+    #                     "coords": coords,
+    #                     "size": patch_size,
+    #                     "score": uncertainty_score,
+    #                 }
+    #             )
+    #             # Mark region as queried
+    #             annotated_patches.append(patch)
+    #             # Stop if we reach the maximum number of patches to be queried
+    #             pbar0.update()
+    #         if n is not None and len(selected_patches) >= n:
+    #             break
+    #     pbar1.close()
+    #     pbar0.close()
+    #     logger.info(f"Finished patch selection for image {label_file}")
+    #     return selected_patches
 
     def get_top_scores(self, aggregated: np.ndarray) -> tuple[list[int], list[float]]:
         flat_aggregated_uncertainties = aggregated.flatten()
@@ -350,7 +220,7 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
         ):
             sorted_top_patches = sorted(
                 self.top_patches, key=lambda d: d["score"], reverse=True
-            )[: self.query_size]
+            )[: self.config.query_size]
             patches = [
                 {
                     "file": patch["file"],
@@ -360,14 +230,14 @@ class AbstractUncertainQueryMethod(AbstractQueryMethod):
                 for patch in sorted_top_patches
             ]
             patches = [Patch(**patch) for patch in patches]
-            if len(patches) < self.query_size:
+            if len(patches) < self.config.query_size:
                 raise RuntimeError(
-                    f"Not enough patches could be queried, {len(patches)} instead of {self.query_size}"
+                    f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
                 )
             return patches
 
 
-class nnActivePredictor(nnUNetPredictor):
+class nnActivePredictor(BaseQueryPredictor):
     def postprocess_logits(
         self, logits: np.ndarray | torch.Tensor, properties: Dict
     ) -> np.ndarray:
@@ -383,10 +253,11 @@ class nnActivePredictor(nnUNetPredictor):
         logger.info(
             f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss * 1e-9}GB"
         )
-        logits_nf = torch.isfinite(logits) == 0
-        if torch.any(logits_nf):
-            raise RuntimeError(f"NAN values in logits")
-        del logits_nf
+        # NAN Checking is now handled by nnU-Net
+        # logits_nf = torch.isfinite(logits) == 0
+        # if torch.any(logits_nf):
+        #     raise RuntimeError(f"NAN values in logits")
+        # del logits_nf
 
         conversion_timer = CudaTimer()
         conversion_timer.start()
@@ -403,8 +274,9 @@ class nnActivePredictor(nnUNetPredictor):
 
         # fastest way to check if nan in np array
         # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
-        if np.isnan(np.sum(out_prob)):
-            raise ValueError(f"NAN values in probablities in image!")
+        # NAN Checking is now handled by nnU-Net
+        # if np.isnan(np.sum(out_prob)):
+        #     raise ValueError(f"NAN values in probablities in image!")
 
         return out_prob
 
@@ -425,14 +297,6 @@ class nnActivePredictor(nnUNetPredictor):
         os.makedirs(save_file.parent, exist_ok=True)
         np.save(save_file, out_probs)
         logger.info(f"Time for saving: {save_timer.stop()/1000}s")
-
-    def delete_out_probs_temp(self, save_path: Path, save_name: str = "probs_fold"):
-        """Delete temp files to not mess up in subsequent query steps"""
-        delete_files = [
-            file for file in save_path.iterdir() if file.name.startswith(save_name)
-        ]
-        for file in delete_files:
-            os.remove(file)
 
     def predict_fold_logits_from_preprocessed_data(
         self,
@@ -486,119 +350,14 @@ class nnActivePredictor(nnUNetPredictor):
                     logits = self.predict_sliding_window_return_logits(data)
                     out_probs = self.postprocess_logits(logits, properties)
                     self.save_out_probs_temp(out_probs, return_probs[fold])
+                    if hasattr(self, "img_representations"):
+                        self.img_representations: dict[str, RepresentationHandler]
+                        for key in self.img_representations:
+                            self.img_representations[key].set_orig_shape(data.shape[1:])
+                            self.img_representations[key].build_representation()
 
             self.perform_everything_on_device = original_perform_everything_on_device
         return return_probs
-
-    def predict_from_data_iterator(
-        self,
-        data_iterator,
-        query_method: AbstractUncertainQueryMethod,
-        temp_path: Path,
-        save_probabilities: bool = False,
-        num_processes_segmentation_export: int = default_num_processes,
-        temp_name: str = "probs_fold",
-    ):
-        """
-        each element returned by data_iterator must be a dict with 'data', 'ofile' and 'data_properites' keys!
-        If 'ofile' is None, the result will be returned instead of written to a file
-        """
-        # set up multiprocessing for spawning
-
-        for preprocessed in monitor.itertimer(
-            data_iterator, name="get_queries_per_image"
-        ):
-            # Reminder: GPU issues can be nicely evaluated using case_00223 on KiTS21_small/KiTS21...
-            # if os.path.basename(preprocessed["ofile"]) not in [
-            #     "case_00223",
-            #     "case_00210",
-            # ]:
-            #     print("Skipping file:", preprocessed["ofile"])
-            #     continue
-            data = preprocessed["data"]
-            if isinstance(data, str):
-                delfile = data
-                data = torch.from_numpy(np.load(data))
-                os.remove(delfile)
-
-            ofile = preprocessed["ofile"]
-            if ofile is not None:
-                filename: str = os.path.basename(ofile)
-                logger.info(f"\nPredicting {filename}:")
-            else:
-                logger.info(f"\nPredicting image of shape {data.shape}:")
-
-            logger.info(
-                f"perform_everything_on_gpu: {self.perform_everything_on_device}"
-            )
-
-            properties = preprocessed["data_properties"]
-
-            if torch.cuda.is_available():
-                cudnn.benchmark = True
-
-            out_probs: list[Path] | np.ndarray = (
-                self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_path, temp_name
-                )
-            )
-
-            logger.info("Start Query")
-            # Benchmark = True can lead to problems during inference with convolutions
-            # illegal memory access
-            if torch.cuda.is_available():
-                cudnn.benchmark = False
-            query_method.query_from_probs(
-                out_probs,
-                properties["shape_before_cropping"],
-                filename,
-                device=self.device,
-            )
-
-            self.delete_out_probs_temp(temp_path, temp_name)
-            # TODO: possibly add some multiprocessing as in nnUNet_predictor
-
-        if isinstance(data_iterator, MultiThreadedAugmenter):
-            data_iterator._finish()
-
-        # clear lru cache
-        compute_gaussian.cache_clear()
-        # clear device cache
-        empty_cache(self.device)
-
-    def get_data_iterator_from_folders(
-        self,
-        list_of_lists_or_source_folder: Union[str, list[list[str]]],
-        output_folder_or_list_of_truncated_output_files: Union[str, None, list[str]],
-        num_processes_preprocessing: int = 3,
-        num_parts: int = 1,
-        part_id: int = 0,
-        save_probabilities: bool = False,
-    ):
-        # sort out input and output filenames
-        (
-            list_of_lists_or_source_folder,
-            output_filename_truncated,
-            seg_from_prev_stage_files,
-        ) = self._manage_input_and_output_lists(
-            list_of_lists_or_source_folder,
-            output_folder_or_list_of_truncated_output_files,
-            None,
-            True,
-            part_id,
-            num_parts,
-            save_probabilities,
-        )
-        if len(list_of_lists_or_source_folder) == 0:
-            return
-
-        data_iterator = self._internal_get_data_iterator_from_lists_of_filenames(
-            list_of_lists_or_source_folder,
-            seg_from_prev_stage_files,
-            output_filename_truncated,
-            num_processes_preprocessing,
-        )
-        return data_iterator
 
 
 def select_top_n_non_overlapping_patches(

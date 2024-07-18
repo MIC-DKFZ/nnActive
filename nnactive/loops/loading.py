@@ -32,7 +32,7 @@ def get_patches_from_loop_files(
 def get_nested_patches_from_loop_files(
     data_path: Path, loop_val: Optional[int] = None
 ) -> list[list[Patch]]:
-    """Returns list of labeled patches of all loop_xxx.json files within loop_val
+    """Returns list of labeled patches of all loop_xxx.json files with xxx<= loop_val
 
     Args:
         data_path (Path): path to datafolder with loop_xxx.json files

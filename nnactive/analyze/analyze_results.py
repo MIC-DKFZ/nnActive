@@ -30,7 +30,7 @@ PALETTE = {
     "random-label2": "tab:cyan",
     "power_bald": "tab:brown",
     "power_pe": "tab:gray",
-    # "other_5": "tab:pink",
+    "softrank_bald": "tab:pink",
     # "other_6": "tab:olive",
 }
 

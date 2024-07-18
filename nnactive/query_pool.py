@@ -28,11 +28,11 @@ def query_pool(
     loop_val = len(get_sorted_loop_files(raw_dataset_path))
     seed = config.seed + loop_val
     strategy = get_strategy(
-        config,
         config.uncertainty,
+        config,
         state.dataset_id,
         seed=seed,
-        # n_patch_per_image=config.n_patch_per_image,
+        loop_val=loop_val,
         verbose=verbose,
     )
     query = strategy.query(n_gpus=runtime_config.n_gpus)

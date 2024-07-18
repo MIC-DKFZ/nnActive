@@ -29,18 +29,16 @@ from nnactive.utils.io import load_label_map
 class RandomLabel(Random):
     def __init__(
         self,
+        config: ActiveConfig,
         dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
+        loop_val: int,
         seed: int,
         trials_per_img: int = 600,
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
         background_cls: int | None = None,
         additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
         verbose: bool = False,
-        config: ActiveConfig | None = None,
         **kwargs,
     ):
         """
@@ -56,17 +54,16 @@ class RandomLabel(Random):
             background_cls (int | None, optional): _description_. Defaults to None.
         """
         super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            seed,
-            trials_per_img,
-            file_ending,
-            raw_labels_path,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
+            dataset_id=dataset_id,
             config=config,
+            loop_val=loop_val,
+            file_ending=file_ending,
+            additional_label_path=additional_label_path,
+            verbose=verbose,
+            seed=seed,
+            # Random
+            trials_per_img=trials_per_img,
+            raw_labels_path=raw_labels_path,
         )
         self.raw_labels_path = raw_labels_path
         if self.raw_labels_path is None:
@@ -119,7 +116,7 @@ class RandomLabel(Random):
                 patches = []
             else:
                 patches = already_annotated_patches
-            for i in range(self.query_size - len(patches)):
+            for i in range(self.config.query_size - len(patches)):
                 if verbose:
                     logger.debug("-" * 8)
                     logger.debug("-" * 8)
@@ -194,12 +191,12 @@ class RandomLabel(Random):
                                 iter_patch_loc,
                                 iter_patch_size,
                             ) = _obtain_random_patch_from_locs(
-                                locs, img_size, self.patch_size, self.rng
+                                locs, img_size, self.config.patch_size, self.rng
                             )
                         if area in ["all"]:
                             iter_patch_loc, iter_patch_size = (
                                 _obtain_random_patch_for_img(
-                                    img_size, self.patch_size, self.rng
+                                    img_size, self.config.patch_size, self.rng
                                 )
                             )
 
@@ -267,50 +264,17 @@ class RandomLabel(Random):
 
 
 class RandomLabelAllClasses(RandomLabel):
-    def __init__(
-        self,
-        dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
-        seed: int,
-        trials_per_img: int = 600,
-        file_ending: str = ".nii.gz",
-        raw_labels_path: Path | None = None,
-        background_cls: int | None = None,
-        additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
-        verbose: bool = False,
-        config: ActiveConfig | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            seed,
-            trials_per_img,
-            file_ending,
-            raw_labels_path,
-            background_cls,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
-            config=config,
-            **kwargs,
-        )
-        random.seed(seed)
-
     def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times
         selected_patches = query_starting_budget_all_classes(
             self.raw_labels_path,
             self.file_ending,
             annotated_patches=self.annotated_patches,
-            patch_size=self.patch_size,
+            patch_size=self.config.patch_size,
             rng=self.rng,
             trials_per_img=self.trials_per_img,
             additional_label_path=self.additional_label_path,
-            additional_overlap=self.additional_overlap,
+            additional_overlap=self.config.additional_overlap,
             verbose=verbose,
         )
         return super().query(
