@@ -349,7 +349,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         predictor.predict_from_data_iterator(data_iterator, self, temp_file_handler)
         return self.top_patches
 
-    def build_query_predictor(self, device: torch.device):
+    def build_query_predictor(self, device: torch.device) -> BaseQueryPredictor:
         predictor = BaseQueryPredictor(
             tile_step_size=self.config.tile_step_size,
             use_mirroring=self.config.use_mirroring,

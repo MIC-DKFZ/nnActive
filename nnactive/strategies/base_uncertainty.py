@@ -57,18 +57,6 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
             f"Aggregation is performed using: {self.aggregation.__class__.__name__} with stride {self.config.agg_stride}"
         )
 
-    def build_query_predictor(self, device: torch.device):
-        predictor = nnActivePredictor(
-            tile_step_size=self.config.tile_step_size,
-            use_mirroring=self.config.use_mirroring,
-            use_gaussian=self.config.use_gaussian,
-            verbose=self.verbose,
-            allow_tqdm=not self.verbose,
-            device=device,
-        )
-
-        return predictor
-
     def compute_scores(
         self, probs: np.ndarray | list[Path], device: torch.device
     ) -> tuple[torch.Tesnor, np.ndarray, Iterable[int]]:
@@ -237,68 +225,6 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
                     f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
                 )
             return patches
-
-
-class nnActivePredictor(BaseQueryPredictor):
-    def postprocess_logits(
-        self, logits: np.ndarray | torch.Tensor, properties: Dict
-    ) -> np.ndarray:
-        """Postprocess logits to return probs in the end
-        Args:
-            logits: logits to postprocess
-            properties: image properties
-
-        Returns:
-            np.ndarray: output probabilities
-
-        """
-        logger.info(
-            f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss * 1e-9}GB"
-        )
-        # NAN Checking is now handled by nnU-Net
-        # logits_nf = torch.isfinite(logits) == 0
-        # if torch.any(logits_nf):
-        #     raise RuntimeError(f"NAN values in logits")
-        # del logits_nf
-
-        conversion_timer = CudaTimer()
-        conversion_timer.start()
-        logger.info(f"Shape before postprocessing: {logits.shape}")
-        out_prob = convert_predicted_logits_to_probs_with_correct_shape(
-            logits.cpu(),
-            self.plans_manager,
-            self.configuration_manager,
-            self.label_manager,
-            properties,
-        )
-        logger.info(f"Shape after postprocessing: {out_prob.shape}")
-        logger.info(f"Time for conversion: {conversion_timer.stop()/1000}s")
-
-        # fastest way to check if nan in np array
-        # according to https://stackoverflow.com/questions/6736590/fast-check-for-nan-in-numpy
-        # NAN Checking is now handled by nnU-Net
-        # if np.isnan(np.sum(out_prob)):
-        #     raise ValueError(f"NAN values in probablities in image!")
-
-        return out_prob
-
-    def save_out_probs_temp(
-        self,
-        out_probs: np.ndarray,
-        save_file: Path,
-    ) -> Path:
-        """Save the predicted probabilities as temporary files on disk to use later in subsequent steps.
-        Saving location: save_file
-
-        Args:
-            out_probs (np.ndarray): Predicted probabilities
-            save_file (Path): Filename for saving with .npy suffix
-        """
-        save_timer = Timer()
-        save_timer.start()
-        os.makedirs(save_file.parent, exist_ok=True)
-        np.save(save_file, out_probs)
-        logger.info(f"Time for saving: {save_timer.stop()/1000}s")
 
 
 def select_top_n_non_overlapping_patches(
