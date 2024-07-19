@@ -18,8 +18,7 @@ from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
-from nnactive.strategies.base import AbstractQueryMethod
-from nnactive.strategies.base_uncertainty import nnActivePredictor
+from nnactive.strategies.base import AbstractQueryMethod, BaseQueryPredictor
 from nnactive.utils.io import load_label_map
 from nnactive.utils.torchutils import estimate_free_cuda_memory, get_tensor_memory_usage
 
@@ -145,7 +144,7 @@ class ExpectedPatchDiceScore:
             logger.info(f"Finished image in {img_end - img_start:.4f}sec")
         dice_dict: dict[tuple, float] = {k: np.nanmean(v) for k, v in dice_dict.items()}
         dice_dict = {k: v for k, v in dice_dict.items() if not np.isnan(v)}
-        # get list containing negative scores ranked in ascending order
+        # get list containing negative scores ranked in descending order
         sorted_dice_dict = {
             k: v
             for k, v in sorted(
@@ -195,7 +194,7 @@ class ExpectedDiceQuery(AbstractQueryMethod):
         self.tile_step_size = tile_step_size
         self.agg_stride = agg_stride
         self.n_patch_per_image = n_patch_per_image
-        self.strategy = ExpectedPatchDiceScore(self.patch_size, self.agg_stride)
+        self.strategy = ExpectedPatchDiceScore(self.config.patch_size, self.agg_stride)
 
     def wrap_query_part(
         self,
@@ -249,7 +248,7 @@ class ExpectedDiceQuery(AbstractQueryMethod):
 
         torch.cuda.set_device(device)
         # Initialize Predictor
-        predictor = nnActivePredictor(
+        predictor = BaseQueryPredictor(
             tile_step_size=self.tile_step_size,
             use_mirroring=self.use_mirroring,
             use_gaussian=self.use_gaussian,
@@ -371,7 +370,7 @@ class ExpectedDiceQuery(AbstractQueryMethod):
         with monitor.timer("compose_query_of_patches"):
             sorted_top_patches = sorted(
                 self.top_patches, key=lambda d: d["score"], reverse=True
-            )[: self.query_size]
+            )[: self.config.query_size]
             patches = [
                 {
                     "file": patch["file"],
