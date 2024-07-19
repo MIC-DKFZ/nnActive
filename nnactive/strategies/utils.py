@@ -64,6 +64,7 @@ class RepresentationHandler:
         assert self.init
         assert len(self.que) == 0
         self.image /= self.n_predictions.to(self.dtype)[None]
+        # TODO: Put this out of the current model
         slicers = obtain_center_padding_slicers(
             old_shape=self.orig_shape, cur_shape=self.input_shape
         )
@@ -89,6 +90,18 @@ class RepresentationHandler:
                 )
             )
         return out_slices
+
+    @classmethod
+    def init_from_representation(cls, image: torch.Tensor, input_shape: Iterable[int]):
+        repr_dim = image.shape[0]
+        scaling_factors = [i_s // r_s for i_s, r_s in zip(input_shape, image.shape[1:])]
+
+        out = cls.__init__(input_shape, repr_dim, scaling_factors)
+        out.init = True
+        out.built = True
+        out.image = image
+        out.device = image.device
+        return out
 
 
 def power_noising(

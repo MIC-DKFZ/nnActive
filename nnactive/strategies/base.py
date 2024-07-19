@@ -140,7 +140,7 @@ class AbstractQueryMethod(ABC):
 
     @classmethod
     def init_from_dataset_id(
-        cls: Type[AbstractQueryMethod],
+        cls,
         config: ActiveConfig,
         dataset_id: int,
         loop_val: int,
@@ -199,7 +199,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         query_dicts: list[dict[str, Any]],
         file_id: str,
         device: torch.device = torch.device("cuda:0"),
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Computes potential queries for a single input image and adds best queries to the internal list of queries.
 
         Args:
@@ -213,7 +213,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         with (
             monitor.timer("query_from_probs") if monitor.is_active() else nullcontext()
         ):
-            value_dicts = self.strategy(query_dicts, device)
+            image_dict, value_dicts = self.strategy(query_dicts, device)
 
             logger.info("Initialize selected array...")
             annotated_patches = [
@@ -231,14 +231,14 @@ class BasePredictionQuery(AbstractQueryMethod):
             )
             logger.info("Finished patch selection.")
             self.top_patches += selected_patches
-        return value_dicts
+        return image_dict, value_dicts
 
     @abstractmethod
     def strategy(
         self,
         query_dict: list[dict[str, Any]],
         device: torch.device = torch.device("cuda:0"),
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         pass
 
     def select_file_patches(
@@ -300,8 +300,8 @@ class BasePredictionQuery(AbstractQueryMethod):
         """Assume that value_dicts are already order that first one has highest score etc."""
         return 0
 
-    def get_file_handler(self, temp_path: Path):
-        return TemporaryFileHandler(temp_path)
+    def get_data_handler(self, temp_path: Path):
+        return InternalDataHandler(temp_path)
 
     def cleanup_prediction():
         """Performed after prediction of each single image and subsequent query_file_from_dict"""
@@ -317,7 +317,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         num_parts: int = 1,
         device: torch.device = torch.device("cuda:0"),
     ) -> list[dict]:
-        temp_file_handler = self.get_file_handler(
+        temp_file_handler = self.get_data_handler(
             get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
         )
 
@@ -336,6 +336,10 @@ class BasePredictionQuery(AbstractQueryMethod):
             model_folder, use_folds=use_folds
         )
 
+        # TODO: check whether model_folder is needed here!
+        model_folder = get_output_folder(
+            self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
+        )
         source_folder = str(get_raw_path(self.dataset_id) / "imagesTr")
         output_folder = "/".join(model_folder.split("/")[:-1])
 
@@ -357,6 +361,17 @@ class BasePredictionQuery(AbstractQueryMethod):
             verbose=self.verbose,
             allow_tqdm=not self.verbose,
             device=device,
+        )
+        # Initialize Model for Predictor
+        nnunet_plans_identifier = self.config.model_plans
+        nnunet_trainer_name = self.config.trainer
+        nnunet_config = self.config.model_config
+        model_folder = get_output_folder(
+            self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
+        )
+        use_folds = tuple(range(self.config.train_folds))
+        predictor.initialize_from_trained_model_folder(
+            model_folder, use_folds=use_folds
         )
 
         return predictor
@@ -417,8 +432,13 @@ class BasePredictionQuery(AbstractQueryMethod):
             return patches
 
 
-class TemporaryFileHandler:
-    def __init__(self, temp_path: Path, save_keys: tuple[str, ...] = ("probs",)):
+class InternalDataHandler:
+    def __init__(
+        self,
+        temp_path: Path,
+        save_keys: tuple[str, ...] = ("probs",),
+        pass_keys: tuple[str, ...] | None = None,
+    ):
         """Class to handle saving of temporary files right after prediction step.
 
         Args:
@@ -426,14 +446,16 @@ class TemporaryFileHandler:
         """
         self.temp_path = temp_path
         self.default_filenames = {key: key + "_fold" for key in save_keys}
+        self.pass_keys = [] if pass_keys is None else list(pass_keys)
 
-    def save_temporary_files(
+    def handle_data(
         self,
         temporary_dict: dict,
         filename: str | None = None,
         fold: int | str | None = None,
     ) -> dict[str, Path]:
-        """Save temporary files in temporary dict and returns handles to obtain them again.
+        """Save temporary files in temporary dict and returns paths to obtain them again.
+        Files in pass_keys are give through.
 
         Args:
             temporary_dict (dict): _description_
@@ -443,7 +465,7 @@ class TemporaryFileHandler:
             filename = ""
         save_timer = Timer()
         save_timer.start()
-        save_files = dict()
+        handled_inputs = dict()
         os.makedirs(self.temp_path, exist_ok=True)
         for key in self.default_filenames:
             save_file = self.temp_path / (
@@ -451,9 +473,11 @@ class TemporaryFileHandler:
             )
 
             np.save(save_file, temporary_dict[key])
-            save_files[key] = save_file
+            handled_inputs[key] = save_file
         logger.debug(f"Time for saving: {save_timer.stop()/1000}s")
-        return save_files
+        for key in self.pass_keys:
+            handled_inputs[key] = temporary_dict[key]
+        return handled_inputs
 
     def build_suffix(self, fold: int | str | None):
         return f"{fold}.npy"
@@ -464,16 +488,16 @@ class TemporaryFileHandler:
 
 
 class BaseQueryPredictor(nnUNetPredictor):
-    def postprocess_logits(
+    def postprocess_logits_to_ouptuts(
         self, logits: np.ndarray | torch.Tensor, properties: Dict
-    ) -> np.ndarray:
+    ) -> dict[str, Any]:
         """Postprocess logits to return probs in the end
         Args:
             logits: logits to postprocess
             properties: image properties
 
         Returns:
-            np.ndarray: output probabilities
+            dict: all values necessary for queries from this logits and forward passes.
 
         """
         logger.trace(
@@ -504,13 +528,13 @@ class BaseQueryPredictor(nnUNetPredictor):
         # if np.isnan(np.sum(out_prob)):
         #     raise ValueError(f"NAN values in probablities in image!")
 
-        return out_prob
+        return {"probs": out_prob}
 
     def predict_fold_logits_from_preprocessed_data(
         self,
         data: torch.TensorType,
         properties: dict,
-        temp_file_handler: TemporaryFileHandler,
+        temp_file_handler: InternalDataHandler,
     ) -> list[dict]:
         """Computes the logits/probs for all folds.
 
@@ -535,10 +559,10 @@ class BaseQueryPredictor(nnUNetPredictor):
                         )
                         logits = self.predict_sliding_window_return_logits(data)
 
-                        out_probs = self.postprocess_logits(logits, properties)
-                        out[fold] = temp_file_handler.save_temporary_files(
-                            {"probs": out_probs}
+                        out_dict = self.postprocess_logits_to_ouptuts(
+                            logits, properties
                         )
+                        out[fold] = temp_file_handler.handle_data(out_dict)
 
                 except RuntimeError:
                     logger.exception(
@@ -558,10 +582,8 @@ class BaseQueryPredictor(nnUNetPredictor):
                     else:
                         self.network._orig_mod.load_state_dict(params)
                     logits = self.predict_sliding_window_return_logits(data)
-                    out_probs = self.postprocess_logits(logits, properties)
-                    out[fold] = temp_file_handler.save_temporary_files(
-                        {"probs": out_probs}
-                    )
+                    out_dict = self.postprocess_logits_to_ouptuts(logits, properties)
+                    out[fold] = temp_file_handler.handle_data(out_dict)
 
             self.perform_everything_on_device = original_perform_everything_on_device
         return out
@@ -570,7 +592,7 @@ class BaseQueryPredictor(nnUNetPredictor):
         self,
         data_iterator,
         query_method: BasePredictionQuery,
-        temp_file_handler: TemporaryFileHandler,
+        temp_file_handler: InternalDataHandler,
         save_probabilities: bool = False,
         num_processes_segmentation_export: int = default_num_processes,
     ):

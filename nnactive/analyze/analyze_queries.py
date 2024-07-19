@@ -63,14 +63,18 @@ class AnalyzeQueries:
     def initialize_querymethods(self, query_methods: list[Type[AbstractQueryMethod]]):
         self.query_methods: dict[str, AbstractQueryMethod] = {
             cls_.__name__: cls_.init_from_dataset_id(
-                self.config, dataset_id=self.dataset_id
+                self.config,
+                dataset_id=self.dataset_id,
+                loop_val=self.loop_val,
+                seed=self.loop_val + self.config.seed + 1,
             )
             for cls_ in query_methods
         }
-        for q_n in self.query_methods:
-            self.query_methods[q_n].annotated_patches = get_patches_from_loop_files(
-                get_raw_path(self.dataset_id), loop_val=self.loop_val
-            )
+        # This is handled now during set up of Query Method
+        # for q_n in self.query_methods:
+        #     self.query_methods[q_n].annotated_patches = get_patches_from_loop_files(
+        #         get_raw_path(self.dataset_id), loop_val=self.loop_val
+        #     )
 
     @property
     def file_ending(self):
@@ -133,11 +137,12 @@ class AnalyzeQueries:
         uncertainty_dict = {}
         for qm_name, qm in self.query_methods.items():
             if isinstance(qm, AbstractUncertainQueryMethod):
-                uncertainty, aggregated = qm.query_from_probs(
-                    probs, label_file=label_file
+
+                img_dict, _ = qm.query_file_from_dict(
+                    {"probs": probs}, file_id=label_file
                 )
-                uncertainty_dict[qm_name] = uncertainty.cpu()
-                del aggregated
+                uncertainty_dict[qm_name] = img_dict["scores"].cpu()
+                del _
                 torch.cuda.empty_cache()
 
             elif isinstance(qm, ExpectedDiceQuery):
@@ -215,7 +220,12 @@ class AnalyzeQueries:
         )
 
     def get_representations(self):
-        qm = DiversityQueryMethod.init_from_dataset_id(self.config, self.dataset_id)
+        qm = DiversityQueryMethod.init_from_dataset_id(
+            self.config,
+            self.dataset_id,
+            self.loop_val,
+            self.config.seed + self.loop_val + 1,
+        )
         qm.query()
 
     def query_from_probs(self):

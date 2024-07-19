@@ -88,7 +88,8 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
                 sorted_uncertainty_scores, sorted_uncertainty_indices
             )
         ]
-        return out_list
+        file_dict = {"scores": scores}
+        return file_dict, out_list
 
     @abstractmethod
     def get_uncertainty(
