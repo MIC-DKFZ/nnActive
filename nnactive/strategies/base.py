@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
+import shutil
 from abc import ABC, abstractmethod
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from contextlib import nullcontext
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Type, Union
 
 import numpy as np
 import psutil
 import torch
+import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -48,6 +52,7 @@ class AbstractQueryMethod(ABC):
         seed: int | None = None,
         **kwargs,
     ):
+        logger.info(f"Initializeing Query Method for loop {loop_val}")
         self.dataset_id = dataset_id
         self.additional_label_path = additional_label_path
         self.file_ending = file_ending
@@ -191,33 +196,37 @@ class BasePredictionQuery(AbstractQueryMethod):
 
     def query_file_from_dict(
         self,
-        query_dict: dict[str, Any],
-        label_file: str,
+        query_dicts: list[dict[str, Any]],
+        file_id: str,
         device: torch.device = torch.device("cuda:0"),
-    ) -> dict[str, Any]:
+    ) -> list[dict[str, Any]]:
         """Computes potential queries for a single input image and adds best queries to the internal list of queries.
 
         Args:
-            out_probs (torch.Tensor): probability map for image
-            label_file (str): name of label file
+            query_dicts (list[dict[str, Any]]): each element in the list stands for one fold.
+            file_id (str): name of label file without suffix
+            device (_type_, optional): _description_. Defaults to torch.device("cuda:0").
+
+        Returns:
+            list[dict[str, Any]]: selection of potential queries for current file
         """
         with (
             monitor.timer("query_from_probs") if monitor.is_active() else nullcontext()
         ):
-            value_dicts = self.strategy(query_dict, device)
+            value_dicts = self.strategy(query_dicts, device)
 
             logger.info("Initialize selected array...")
             annotated_patches = [
                 patch
                 for patch in self.annotated_patches
-                if patch.file == label_file + ".nii.gz"
+                if patch.file == file_id + ".nii.gz"
             ]
 
             logger.info("Select patches...")
             selected_patches: list[dict] = self.select_file_patches(
                 value_dicts,
                 annotated_patches=annotated_patches,
-                label_file=label_file,
+                label_file=file_id,
                 n=self.get_n_patch_per_image(),
             )
             logger.info("Finished patch selection.")
@@ -226,11 +235,12 @@ class BasePredictionQuery(AbstractQueryMethod):
 
     @abstractmethod
     def strategy(
-        self, query_dict: dict[str, Any], device: torch.device = torch.device("cuda:0")
-    ) -> dict[str, Iterable[Any]]:
+        self,
+        query_dict: list[dict[str, Any]],
+        device: torch.device = torch.device("cuda:0"),
+    ) -> list[dict[str, Any]]:
         pass
 
-    @abstractmethod
     def select_file_patches(
         self,
         value_dicts: list[dict[str, Any]],
@@ -258,7 +268,7 @@ class BasePredictionQuery(AbstractQueryMethod):
             disable=self.verbose,
         )
         while len(value_dicts) > 0:
-            index = self.get_next_best_value_dict(value_dicts)
+            index = self.next_best_vd_index(value_dicts)
             value_dict = value_dicts.pop(index)
             value_dict["file"] = label_file + ".nii.gz"
 
@@ -286,28 +296,12 @@ class BasePredictionQuery(AbstractQueryMethod):
         logger.info(f"Finished patch selection for image {label_file}")
         return selected_patches
 
-    def get_next_best_value_dict(self, value_dicts: list[dict]) -> int:
+    def next_best_vd_index(self, value_dicts: list[dict]) -> int:
         """Assume that value_dicts are already order that first one has highest score etc."""
         return 0
 
-    @abstractmethod
-    def save_query_files(
-        self,
-        out_probs: np.ndarray,
-        save_file: Path,
-    ) -> Path:
-        """Save the predicted probabilities as temporary files on disk to use later in subsequent steps.
-        Saving location: save_file
-
-        Args:
-            out_probs (np.ndarray): Predicted probabilities
-            save_file (Path): Filename for saving with .npy suffix
-        """
-        save_timer = Timer()
-        save_timer.start()
-        os.makedirs(save_file.parent, exist_ok=True)
-        np.save(save_file, out_probs)
-        logger.debug(f"Time for saving: {save_timer.stop()/1000}s")
+    def get_file_handler(self, temp_path: Path):
+        return TemporaryFileHandler(temp_path)
 
     def cleanup_prediction():
         """Performed after prediction of each single image and subsequent query_file_from_dict"""
@@ -323,7 +317,9 @@ class BasePredictionQuery(AbstractQueryMethod):
         num_parts: int = 1,
         device: torch.device = torch.device("cuda:0"),
     ) -> list[dict]:
-        temp_path = get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
+        temp_file_handler = self.get_file_handler(
+            get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
+        )
 
         torch.cuda.set_device(device)
         # Initialize Predictor
@@ -350,7 +346,7 @@ class BasePredictionQuery(AbstractQueryMethod):
             part_id=part_id,
             num_parts=num_parts,
         )
-        predictor.predict_from_data_iterator(data_iterator, self, temp_path=temp_path)
+        predictor.predict_from_data_iterator(data_iterator, self, temp_file_handler)
         return self.top_patches
 
     def build_query_predictor(self, device: torch.device):
@@ -364,6 +360,36 @@ class BasePredictionQuery(AbstractQueryMethod):
         )
 
         return predictor
+
+    def query(self, n_gpus: int = 0, verbose: bool = False) -> list[Patch]:
+        if n_gpus == 0:
+            device = torch.device("cuda:0")
+            self.query_part(part_id=0, num_parts=1, device=device)
+        else:
+            devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
+            num_parts = [n_gpus] * n_gpus
+            parts = [i for i in range(n_gpus)]
+            try:
+                with ProcessPoolExecutor(
+                    max_workers=n_gpus, mp_context=mp.get_context("spawn")
+                ) as executor:
+                    for top_patch_part in executor.map(
+                        self.wrap_query_part,
+                        parts,
+                        num_parts,
+                        devices,
+                        [wandb.run.group] * n_gpus,
+                    ):
+                        self.top_patches.extend(top_patch_part)
+
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+
+        return self.compose_query_of_patches()
 
     # TODO: Rewrite this function to allow diveristy methods!
     def compose_query_of_patches(self):
@@ -389,6 +415,52 @@ class BasePredictionQuery(AbstractQueryMethod):
                     f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
                 )
             return patches
+
+
+class TemporaryFileHandler:
+    def __init__(self, temp_path: Path, save_keys: tuple[str, ...] = ("probs",)):
+        """Class to handle saving of temporary files right after prediction step.
+
+        Args:
+            temp_path (Path): path to save files to
+        """
+        self.temp_path = temp_path
+        self.default_filenames = {key: key + "_fold" for key in save_keys}
+
+    def save_temporary_files(
+        self,
+        temporary_dict: dict,
+        filename: str | None = None,
+        fold: int | str | None = None,
+    ) -> dict[str, Path]:
+        """Save temporary files in temporary dict and returns handles to obtain them again.
+
+        Args:
+            temporary_dict (dict): _description_
+            filename (str) : if specified is expected to carry suffix .xyz
+        """
+        if filename is None:
+            filename = ""
+        save_timer = Timer()
+        save_timer.start()
+        save_files = dict()
+        os.makedirs(self.temp_path, exist_ok=True)
+        for key in self.default_filenames:
+            save_file = self.temp_path / (
+                filename + self.default_filenames[key] + self.build_suffix(fold)
+            )
+
+            np.save(save_file, temporary_dict[key])
+            save_files[key] = save_file
+        logger.debug(f"Time for saving: {save_timer.stop()/1000}s")
+        return save_files
+
+    def build_suffix(self, fold: int | str | None):
+        return f"{fold}.npy"
+
+    def clean_up(self):
+        if self.temp_path.is_dir():
+            shutil.rmtree(self.temp_path)
 
 
 class BaseQueryPredictor(nnUNetPredictor):
@@ -434,39 +506,20 @@ class BaseQueryPredictor(nnUNetPredictor):
 
         return out_prob
 
-    def save_out_probs_temp(
-        self,
-        out_probs: np.ndarray,
-        save_file: Path,
-    ) -> Path:
-        """Save the predicted probabilities as temporary files on disk to use later in subsequent steps.
-        Saving location: save_file
-
-        Args:
-            out_probs (np.ndarray): Predicted probabilities
-            save_file (Path): Filename for saving with .npy suffix
-        """
-        save_timer = Timer()
-        save_timer.start()
-        os.makedirs(save_file.parent, exist_ok=True)
-        np.save(save_file, out_probs)
-        logger.debug(f"Time for saving: {save_timer.stop()/1000}s")
-
     def predict_fold_logits_from_preprocessed_data(
         self,
         data: torch.TensorType,
         properties: dict,
-        temp_path: Path,
-        temp_name: str = "probs_fold",
-    ):
+        temp_file_handler: TemporaryFileHandler,
+    ) -> list[dict]:
         """Computes the logits/probs for all folds.
 
         Args:
             data (torch.TensorType): Preprocessed Data
         """
         original_perform_everything_on_device = self.perform_everything_on_device
-        num_folds = len(self.list_of_parameters)
-        return_probs = [temp_path / (temp_name + f"{f}.npy") for f in range(num_folds)]
+        out: list[dict] = [None] * len(self.list_of_parameters)
+
         with torch.no_grad():
             if self.perform_everything_on_device:
                 try:
@@ -481,8 +534,11 @@ class BaseQueryPredictor(nnUNetPredictor):
                             f"RAM used before sliding window prediction:~{psutil.Process().memory_info().rss * 1e-9}GB"
                         )
                         logits = self.predict_sliding_window_return_logits(data)
+
                         out_probs = self.postprocess_logits(logits, properties)
-                        self.save_out_probs_temp(out_probs, return_probs[fold])
+                        out[fold] = temp_file_handler.save_temporary_files(
+                            {"probs": out_probs}
+                        )
 
                 except RuntimeError:
                     logger.exception(
@@ -503,19 +559,20 @@ class BaseQueryPredictor(nnUNetPredictor):
                         self.network._orig_mod.load_state_dict(params)
                     logits = self.predict_sliding_window_return_logits(data)
                     out_probs = self.postprocess_logits(logits, properties)
-                    self.save_out_probs_temp(out_probs, return_probs[fold])
+                    out[fold] = temp_file_handler.save_temporary_files(
+                        {"probs": out_probs}
+                    )
 
             self.perform_everything_on_device = original_perform_everything_on_device
-        return return_probs
+        return out
 
     def predict_from_data_iterator(
         self,
         data_iterator,
         query_method: BasePredictionQuery,
-        temp_path: Path,
+        temp_file_handler: TemporaryFileHandler,
         save_probabilities: bool = False,
         num_processes_segmentation_export: int = default_num_processes,
-        temp_name: str = "probs_fold",
     ):
         """
         This function is executed by query_method inside of query_method.query().
@@ -558,9 +615,9 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dict: dict[str, Any] = (
+            query_dicts: list[dict[str, Any]] = (
                 self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_path, temp_name
+                    data, properties, temp_file_handler=temp_file_handler
                 )
             )
 
@@ -570,12 +627,12 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = False
             query_method.query_file_from_dict(
-                query_dict,
+                query_dicts,
                 filename,
                 device=self.device,
             )
 
-            query_method.cleanup_prediction()
+            temp_file_handler.clean_up()
             # TODO: possibly add some multiprocessing as in nnUNet_predictor
 
         if isinstance(data_iterator, MultiThreadedAugmenter):

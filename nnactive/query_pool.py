@@ -25,23 +25,23 @@ def query_pool(
         state = State.get_id_state(continue_id)
 
     raw_dataset_path = get_raw_path(state.dataset_id)
-    loop_val = len(get_sorted_loop_files(raw_dataset_path))
-    seed = config.seed + loop_val
+    num_loop_files = len(get_sorted_loop_files(raw_dataset_path))
+    seed = config.seed + num_loop_files
     strategy = get_strategy(
         config.uncertainty,
         config,
         state.dataset_id,
         seed=seed,
-        loop_val=loop_val,
+        loop_val=num_loop_files - 1,
         verbose=verbose,
     )
     query = strategy.query(n_gpus=runtime_config.n_gpus)
 
-    top_patches_fn = f"{config.uncertainty}_{loop_val:03d}.json"
+    top_patches_fn = f"{config.uncertainty}_{num_loop_files:03d}.json"
     save_json(strategy.top_patches, raw_dataset_path / top_patches_fn)
 
     loop_json = {"patches": query}
-    save_loop(raw_dataset_path, loop_json, loop_val)
+    save_loop(raw_dataset_path, loop_json, num_loop_files)
 
     #
     if not force:

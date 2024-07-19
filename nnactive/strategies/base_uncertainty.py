@@ -80,17 +80,19 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
         return uncertainty, agg_uncertainty, kernel_size
 
     def strategy(
-        self, query_dict: Dict[str, Any], device: torch.device = torch.device("cuda:0")
+        self,
+        query_dicts: list[Dict[str, Any]],
+        device: torch.device = torch.device("cuda:0"),
     ) -> list[dict[str, Any]]:
-        probs: np.ndarray | list[Path] = query_dict["probs"]
-        scores, agg_scores, patch_size = self.compute_scores(probs)
+        probs: np.ndarray | list[Path] = [qd["probs"] for qd in query_dicts]
+        scores, agg_scores, patch_size = self.compute_scores(probs, device)
         sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
             agg_scores
         )
         # TODO: Think how to cleverly obtain uncertainty in a way to use it for other stuff...
         out_list = [
             {
-                "coords": self.aggregation.backward_index(index),
+                "coords": self.aggregation.backward_index(index, agg_scores.shape),
                 "size": patch_size,
                 "score": score,
             }
@@ -297,67 +299,6 @@ class nnActivePredictor(BaseQueryPredictor):
         os.makedirs(save_file.parent, exist_ok=True)
         np.save(save_file, out_probs)
         logger.info(f"Time for saving: {save_timer.stop()/1000}s")
-
-    def predict_fold_logits_from_preprocessed_data(
-        self,
-        data: torch.TensorType,
-        properties: dict,
-        temp_path: Path,
-        temp_name: str = "probs_fold",
-    ):
-        """Computes the logits/probs for all folds.
-
-        Args:
-            data (torch.TensorType): Preprocessed Data
-        """
-        original_perform_everything_on_device = self.perform_everything_on_device
-        num_folds = len(self.list_of_parameters)
-        return_probs = [temp_path / (temp_name + f"{f}.npy") for f in range(num_folds)]
-        with torch.no_grad():
-            if self.perform_everything_on_device:
-                try:
-                    for fold, params in enumerate(self.list_of_parameters):
-                        # messing with state dict names...
-                        if not isinstance(self.network, OptimizedModule):
-                            self.network.load_state_dict(params)
-                        else:
-                            self.network._orig_mod.load_state_dict(params)
-
-                        logger.info(
-                            f"RAM used before sliding window prediction:~{psutil.Process().memory_info().rss * 1e-9}GB"
-                        )
-                        logits = self.predict_sliding_window_return_logits(data)
-                        out_probs = self.postprocess_logits(logits, properties)
-                        self.save_out_probs_temp(out_probs, return_probs[fold])
-
-                except RuntimeError:
-                    logger.exception(
-                        "Prediction with perform_everything_on_gpu=True failed due to insufficient GPU memory. "
-                        "Falling back to perform_everything_on_gpu=False. Not a big deal, just slower..."
-                    )
-                    # print("Error:")
-                    # traceback.print_exc()
-                    self.perform_everything_on_device = False
-
-            if not self.perform_everything_on_device:
-                # TODO: probably do not predict everything from scratch again but only from fold where gpu prediciton is canceled
-                for fold, params in enumerate(self.list_of_parameters):
-                    # messing with state dict names...
-                    if not isinstance(self.network, OptimizedModule):
-                        self.network.load_state_dict(params)
-                    else:
-                        self.network._orig_mod.load_state_dict(params)
-                    logits = self.predict_sliding_window_return_logits(data)
-                    out_probs = self.postprocess_logits(logits, properties)
-                    self.save_out_probs_temp(out_probs, return_probs[fold])
-                    if hasattr(self, "img_representations"):
-                        self.img_representations: dict[str, RepresentationHandler]
-                        for key in self.img_representations:
-                            self.img_representations[key].set_orig_shape(data.shape[1:])
-                            self.img_representations[key].build_representation()
-
-            self.perform_everything_on_device = original_perform_everything_on_device
-        return return_probs
 
 
 def select_top_n_non_overlapping_patches(
