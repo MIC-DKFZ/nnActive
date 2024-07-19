@@ -7,7 +7,7 @@ from concurrent.futures.process import BrokenProcessPool
 from contextlib import nullcontext
 from itertools import accumulate
 from pathlib import Path
-from typing import Callable, Iterable, Union
+from typing import Any, Callable, Iterable, Union
 
 import numpy as np
 import torch
@@ -22,12 +22,29 @@ from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path
-from nnactive.strategies.base import BasePredictionQuery, BaseQueryPredictor
+from nnactive.strategies.base import (
+    BasePredictionQuery,
+    BaseQueryPredictor,
+    InternalDataHandler,
+)
 from nnactive.strategies.utils import RepresentationHandler
 from nnactive.utils.io import load_label_map
 
 
 class DiversityQueryMethod(BasePredictionQuery):
+
+    def strategy(
+        self, query_dicts: list[dict[str, Any]], device: torch.device = ...
+    ) -> list[dict[str, Any]]:
+        representations = [q_d["repr"] for q_d in query_dicts]
+        representations = np.concatenate(representations, axis=0)
+        import IPython
+
+        IPython.embed()
+        # return super().strategy(query_dicts, device)
+
+    def get_data_handler(self, temp_path: Path):
+        return InternalDataHandler(temp_path, pass_keys=["repr"])
 
     def compose_query_of_patches(self):
         with (
@@ -53,6 +70,30 @@ class DiversityQueryMethod(BasePredictionQuery):
                 )
             return patches
 
+    def build_query_predictor(self, device: torch.device) -> BaseQueryPredictor:
+        predictor = DiversityPredictor(
+            tile_step_size=self.config.tile_step_size,
+            use_mirroring=self.config.use_mirroring,
+            use_gaussian=self.config.use_gaussian,
+            verbose=self.verbose,
+            allow_tqdm=not self.verbose,
+            device=device,
+        )
+        # Initialize Model for Predictor
+        nnunet_plans_identifier = self.config.model_plans
+        nnunet_trainer_name = self.config.trainer
+        nnunet_config = self.config.model_config
+        model_folder = get_output_folder(
+            self.dataset_id, nnunet_trainer_name, nnunet_plans_identifier, nnunet_config
+        )
+        use_folds = tuple(range(self.config.train_folds))
+        predictor.initialize_from_trained_model_folder(
+            model_folder, use_folds=use_folds
+        )
+        predictor.setup_representations()
+
+        return predictor
+
 
 class DiversityPredictor(BaseQueryPredictor):
     def setup_representations(self):
@@ -73,14 +114,41 @@ class DiversityPredictor(BaseQueryPredictor):
             }
             for i in range(len(self.network.encoder.stages))
         }
-        self.
+        self.represenation_key = list(self.stages.keys())[-2]
+
+        for key in [k for k in self.stages.keys() if k != self.represenation_key]:
+            self.stages.pop(key)
 
         for name, submodule in self.network.named_modules():
             if name in self.stages:
                 submodule.register_forward_hook(self.hook_creator(name))
 
-        print(self.forward_representations.keys())
         self.img_representations: dict[str, RepresentationHandler] = {}
+
+    def postprocess_logits_to_ouptuts(
+        self, logits: np.ndarray | torch.Tensor, properties: torch.Dict
+    ) -> dict[str, Any]:
+        out_dict = super().postprocess_logits_to_ouptuts(logits, properties)
+        representation = self.img_representations[self.represenation_key]
+        representation.build_representation()
+        if any(
+            [
+                p_i != p_b
+                for p_i, p_b in zip(
+                    properties["bbox_used_for_cropping"],
+                    properties["shape_before_cropping"],
+                )
+            ]
+        ):
+            raise NotImplemented(
+                "Cropping currently is not supported with representations."
+            )
+        repr: np.ndarray = representation.image.numpy()
+        repr = repr.transpose(
+            [0] + [i + 1 for i in self.plans_manager.transpose_backward]
+        )
+        out_dict["repr"] = repr
+        return out_dict
 
     def _internal_predict_sliding_window_return_logits(
         self,
@@ -88,6 +156,7 @@ class DiversityPredictor(BaseQueryPredictor):
         slicers: Iterable[tuple[slice, ...]],
         do_on_device: bool = True,
     ):
+        # representations need to be build here as data is reshaped and padded several times.
         # get clean forward representations again for current image / fold
         self.forward_representations = {}
         for key in self.stages:
@@ -110,12 +179,16 @@ class DiversityPredictor(BaseQueryPredictor):
                     "Length of representations greater than lenght of slices."
                 )
 
+        import IPython
+
+        IPython.embed()
         # free up space
         self.forward_representations = {}
 
         return out
 
     def _internal_maybe_mirror_and_predict(self, x: torch.Tensor) -> torch.Tensor:
+        # TODO: For saving images after every prediction we need to write them out here!
         mirror_axes = self.allowed_mirroring_axes if self.use_mirroring else None
         prediction = self.network(x)
 
