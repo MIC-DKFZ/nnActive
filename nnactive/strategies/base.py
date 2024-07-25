@@ -311,6 +311,18 @@ class BasePredictionQuery(AbstractQueryMethod):
         """Performed after query"""
         pass
 
+    def wrap_query_part(
+        self,
+        part_id: int = 0,
+        num_parts: int = 1,
+        device: torch.device = torch.device("cuda:0"),
+        wandb_group: str = "Test",
+    ) -> list[dict]:
+        self.config.set_nnunet_env()
+        with monitor.active_run(group=wandb_group):
+            top_patches = self.query_part(part_id, num_parts, device)
+        return top_patches
+
     def query_part(
         self,
         part_id: int = 0,

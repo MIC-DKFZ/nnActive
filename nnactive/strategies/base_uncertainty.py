@@ -59,7 +59,7 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
 
     def compute_scores(
         self, probs: np.ndarray | list[Path], device: torch.device
-    ) -> tuple[torch.Tesnor, np.ndarray, Iterable[int]]:
+    ) -> tuple[torch.Tensor, np.ndarray, Iterable[int]]:
         with torch.no_grad():
             logger.debug("Compute uncertaintes...")
             uncertainty = self.get_uncertainty(probs, device=device)
@@ -72,7 +72,7 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
         query_dicts: list[Dict[str, Any]],
         device: torch.device = torch.device("cuda:0"),
     ) -> list[dict[str, Any]]:
-        probs: np.ndarray | list[Path] = [qd["probs"] for qd in query_dicts]
+        probs: list[np.ndarray] | list[Path] = [qd["probs"] for qd in query_dicts]
         scores, agg_scores, patch_size = self.compute_scores(probs, device)
         sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(
             agg_scores

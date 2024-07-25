@@ -22,17 +22,18 @@ def query_pool(
     if continue_id is None:
         state = State.latest(config)
     else:
-        state = State.get_id_state(continue_id)
+        state = State.get_id_state(continue_id, verify=not force)
 
     raw_dataset_path = get_raw_path(state.dataset_id)
+    loop_val = state.loop
     num_loop_files = len(get_sorted_loop_files(raw_dataset_path))
-    seed = config.seed + num_loop_files
+    seed = config.seed + loop_val + 1
     strategy = get_strategy(
         config.uncertainty,
         config,
         state.dataset_id,
         seed=seed,
-        loop_val=num_loop_files - 1,
+        loop_val=loop_val,
         verbose=verbose,
     )
     query = strategy.query(n_gpus=runtime_config.n_gpus)
