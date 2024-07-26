@@ -491,7 +491,7 @@ class InternalDataHandler:
             handled_inputs[key] = temporary_dict[key]
         return handled_inputs
 
-    def build_suffix(self, fold: int | str | None):
+    def build_suffix(self, fold: int | str | None) -> str:
         return f"{fold}.npy"
 
     def clean_up(self):
@@ -500,6 +500,9 @@ class InternalDataHandler:
 
 
 class BaseQueryPredictor(nnUNetPredictor):
+    def prepare_predictions(self):
+        pass
+
     def postprocess_logits_to_ouptuts(
         self, logits: np.ndarray | torch.Tensor, properties: Dict
     ) -> dict[str, Any]:
@@ -574,7 +577,7 @@ class BaseQueryPredictor(nnUNetPredictor):
                         out_dict = self.postprocess_logits_to_ouptuts(
                             logits, properties
                         )
-                        out[fold] = temp_file_handler.handle_data(out_dict)
+                        out[fold] = temp_file_handler.handle_data(out_dict, fold=fold)
 
                 except RuntimeError:
                     logger.exception(
@@ -614,6 +617,7 @@ class BaseQueryPredictor(nnUNetPredictor):
         If 'ofile' is None, the result will be returned instead of written to a file
         """
         # set up multiprocessing for spawning
+        self.prepare_predictions()
 
         for preprocessed in (
             monitor.itertimer(data_iterator, name="get_queries_per_image")

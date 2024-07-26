@@ -38,3 +38,9 @@ class Patch:
                 return Patch(**parsed)
             case _:
                 raise NotImplementedError
+
+    def get_slice(self):
+        """Get the slice of the patch."""
+        return tuple(
+            slice(coord, coord + size) for coord, size in zip(self.coords, self.size)
+        )

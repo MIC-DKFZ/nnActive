@@ -18,10 +18,10 @@ from nnactive.nnunet.utils import get_raw_path, get_results_path
 from nnactive.results.state import State
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
-from nnactive.strategies.base_diversity import DiversityQueryMethod
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_pred import PredictiveEntropy
+from nnactive.strategies.kmeans_bald import KMeansBALD
 from nnactive.strategies.random import Random
 from nnactive.strategies.randomlabel import RandomLabel
 from nnactive.utils.io import get_clean_dataclass_dict, load_json, save_json
@@ -220,7 +220,7 @@ class AnalyzeQueries:
         )
 
     def get_representations(self):
-        qm = DiversityQueryMethod.init_from_dataset_id(
+        qm = KMeansBALD.init_from_dataset_id(
             self.config,
             self.dataset_id,
             self.loop_val,

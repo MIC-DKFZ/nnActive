@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Generator, Iterable, Union
@@ -51,10 +53,26 @@ class RepresentationHandler:
     def set_orig_shape(self, orig_shape: Iterable[int]):
         self.orig_shape = orig_shape
 
-    def add_to_que(self, tensor: torch.Tensor):
-        self.que.append(tensor)
+    def update_que(self, tensor: torch.Tensor):
+        if len(tensor.shape) == len(self.input_shape) + 1:
+            self.que.append(tensor)
+        elif len(tensor.shape) == len(self.input_shape) + 2:
+            for s_t in tensor:
+                self.update_que(s_t)
+        else:
+            raise NotImplementedError(
+                f"The size of input {tensor.shape} is not supported for this representation with input_shape {self.input_shape}"
+            )
 
     def update_representation(self, slices: tuple[slice, ...], que_index: int = 0):
+        """Update the internal representation and counters in image slice space in internal representation with que representation at index.
+
+        Args:
+            slices (tuple[slice, ...]): slices with image space correspondence for que_representation
+            que_index (int, optional): index of internal que to get que_representation. Defaults to 0.
+        """
+        if not self.init:
+            self.init_representation()
         repr_slice = self.image_slice_to_representation_slice(slices)
         data = self.que.pop(que_index)
         self.n_predictions[repr_slice[1:]] += 1
@@ -65,13 +83,18 @@ class RepresentationHandler:
         assert len(self.que) == 0
         self.image /= self.n_predictions.to(self.dtype)[None]
         # TODO: Put this out of the current model
-        slicers = obtain_center_padding_slicers(
-            old_shape=self.orig_shape, cur_shape=self.input_shape
-        )
-        slicers = self.image_slice_to_representation_slice(slicers)
-        self.image = self.image[(slice(None), *slicers)]
+        if self.orig_shape is not None:
+            slicers = obtain_center_padding_slicers(
+                old_shape=self.orig_shape, cur_shape=self.input_shape
+            )
+            slicers = self.image_slice_to_representation_slice(slicers)
+            self.image = self.image[(slice(None), *slicers)]
         del self.n_predictions
         self.built = True
+
+    def map_to_representation(self, slices: tuple[slice, ...]):
+        repr_slice = self.image_slice_to_representation_slice(slices)
+        return self.image[repr_slice]
 
     def image_slice_to_representation_slice(
         self, slices: tuple[slice, ...]
@@ -92,11 +115,13 @@ class RepresentationHandler:
         return out_slices
 
     @classmethod
-    def init_from_representation(cls, image: torch.Tensor, input_shape: Iterable[int]):
+    def init_from_representation(
+        cls, image: torch.Tensor, input_shape: Iterable[int]
+    ) -> RepresentationHandler:
         repr_dim = image.shape[0]
         scaling_factors = [i_s // r_s for i_s, r_s in zip(input_shape, image.shape[1:])]
 
-        out = cls.__init__(input_shape, repr_dim, scaling_factors)
+        out = cls(input_shape, repr_dim, scaling_factors)
         out.init = True
         out.built = True
         out.image = image

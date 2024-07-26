@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import nnunetv2.paths
+import torch
 
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.loops.loading import get_loop_patches, get_sorted_loop_files, save_loop
@@ -39,6 +40,16 @@ def query_pool(
     query = strategy.query(n_gpus=runtime_config.n_gpus)
 
     top_patches_fn = f"{config.uncertainty}_{num_loop_files:03d}.json"
+    if strategy.top_patches[0].get("repr") is not None:
+        repr = torch.empty(
+            (len(strategy.top_patches), len(strategy.top_patches[0]["repr"]))
+        )
+        for i, patch in enumerate(strategy.top_patches):
+            repr[i] = patch.pop("repr")
+        torch.save(
+            repr, raw_dataset_path / f"repr_{top_patches_fn}".replace(".json", ".pt")
+        )
+
     save_json(strategy.top_patches, raw_dataset_path / top_patches_fn)
 
     loop_json = {"patches": query}

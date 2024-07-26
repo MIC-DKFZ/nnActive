@@ -48,7 +48,7 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
         self,
         query_dicts: list[Dict[str, Any]],
         device: torch.device = torch.device("cuda:0"),
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[torch.Tensor, list[dict[str, Any]]]:
         probs: list[np.ndarray] | list[Path] = [qd["probs"] for qd in query_dicts]
         scores, agg_scores, patch_size = self.compute_scores(probs, device)
         sorted_uncertainty_indices, sorted_uncertainty_scores = self.get_top_scores(

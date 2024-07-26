@@ -31,17 +31,34 @@ from nnactive.strategies.utils import RepresentationHandler
 from nnactive.utils.io import load_label_map
 
 
-class DiversityQueryMethod(BasePredictionQuery):
+class BaseDiversityQueryMethod(BasePredictionQuery):
 
     def strategy(
         self, query_dicts: list[dict[str, Any]], device: torch.device = ...
     ) -> list[dict[str, Any]]:
-        representations = [q_d["repr"] for q_d in query_dicts]
-        representations = np.concatenate(representations, axis=0)
-        import IPython
+        pass
+        # probs = [q_d["probs"] for q_d in query_dicts]
+        # input_shape = [np.load(prob[0]).shape[1:] for prob in probs]
+        # representation = [q_d["repr"] for q_d in query_dicts]
+        # representation = torch.from_numpy(np.concatenate(representation, axis=0))
+        # # return super().strategy(query_dicts, device)
+        # representation = RepresentationHandler.init_from_representation(
+        #     representation, input_shape=input_shape
+        # )
+        # # for now we run a grid over the representations
+        # # so the scaling factor is equal to the step size.
 
-        IPython.embed()
-        # return super().strategy(query_dicts, device)
+        # out_list = [
+        #     {
+        #         "coords": [0, 0, 0],
+        #         "size": self.config.patch_size,
+        #         "score": i,
+        #         "repr": np.arange(i),
+        #     }
+        #     for i in range(10)
+        # ]
+        # # coords =
+        # # potential_patches = []
 
     def get_data_handler(self, temp_path: Path):
         return InternalDataHandler(temp_path, pass_keys=["repr"])
@@ -70,7 +87,7 @@ class DiversityQueryMethod(BasePredictionQuery):
                 )
             return patches
 
-    def build_query_predictor(self, device: torch.device) -> BaseQueryPredictor:
+    def build_query_predictor(self, device: torch.device) -> DiversityPredictor:
         predictor = DiversityPredictor(
             tile_step_size=self.config.tile_step_size,
             use_mirroring=self.config.use_mirroring,
@@ -90,14 +107,18 @@ class DiversityQueryMethod(BasePredictionQuery):
         predictor.initialize_from_trained_model_folder(
             model_folder, use_folds=use_folds
         )
-        predictor.setup_representations()
 
         return predictor
 
 
 class DiversityPredictor(BaseQueryPredictor):
-    def setup_representations(self):
-        self.network: unet.PlainConvUNet = self.network
+
+    def prepare_predictions(self):
+        compile_module = False
+        if isinstance(self.network, torch._dynamo.OptimizedModule):
+            self.network: unet.PlainConvUNet = self.network._orig_mod
+            compile_module = True
+        self.network: unet.PlainConvUNet
         self.forward_representations: dict[str, list[torch.Tensor]] = {}
         downsamplig_stages = np.cumprod(
             self.network.encoder.strides, axis=0, dtype=int
@@ -114,27 +135,51 @@ class DiversityPredictor(BaseQueryPredictor):
             }
             for i in range(len(self.network.encoder.stages))
         }
-        self.represenation_key = list(self.stages.keys())[-2]
+        self.representation_key = list(self.stages.keys())[-2]
 
-        for key in [k for k in self.stages.keys() if k != self.represenation_key]:
+        for key in [k for k in self.stages.keys() if k != self.representation_key]:
             self.stages.pop(key)
 
         for name, submodule in self.network.named_modules():
             if name in self.stages:
+                logger.debug(f"Setting Forward Hook on {name}")
                 submodule.register_forward_hook(self.hook_creator(name))
 
         self.img_representations: dict[str, RepresentationHandler] = {}
+
+        # torch.compile leads to issues with forward hooks
+        # 0/0] torch._dynamo.output_graph: [WARNING] nn.Module forward/_pre hooks are only partially supported, and were detected in your model. In particular, if you do not change/remove hooks after calling .compile(), you can disregard this warning, and otherwise you may need to set torch._dynamo.config.skip_nnmodule_hook_guards=False to ensure recompiling after changing hooks.
+        # See https://pytorch.org/docs/master/compile/nn-module.html for more information and limitations.
+        #
+        #
+        # x = torch.randn(1, 1, 64, 64, 64)
+        # self.network(x)
+        # logger.info(
+        #     f"len of forward representations: {len(self.forward_representations)}"
+        # )
+        # self.forward_representations = {}
+
+        if compile_module:
+            # compile does not work as intended forward hooks are ignored. no matter what
+            # torch._dynamo.config.skip_nnmodule_hook_guards = False
+            # self.network = torch.compile(self.network)  # self.network.compile()
+            # self.network.compile()
+            pass
+        # self.network(x)
+        # logger.info(
+        #     f"len of forward representations: {len(self.forward_representations)}"
+        # )
+        # self.forward_representations = {}
 
     def postprocess_logits_to_ouptuts(
         self, logits: np.ndarray | torch.Tensor, properties: torch.Dict
     ) -> dict[str, Any]:
         out_dict = super().postprocess_logits_to_ouptuts(logits, properties)
-        representation = self.img_representations[self.represenation_key]
-        representation.build_representation()
+        representation = self.img_representations[self.representation_key]
         if any(
             [
-                p_i != p_b
-                for p_i, p_b in zip(
+                end - start != p_b
+                for (start, end), p_b in zip(
                     properties["bbox_used_for_cropping"],
                     properties["shape_before_cropping"],
                 )
@@ -168,20 +213,18 @@ class DiversityPredictor(BaseQueryPredictor):
         out = super()._internal_predict_sliding_window_return_logits(
             data, slicers, do_on_device
         )
-
         for key in self.forward_representations:
-            self.img_representations[key].init_representation()
+            for fw_rep in self.forward_representations[key]:
+                self.img_representations[key].update_que(fw_rep)
             if len(self.img_representations[key].que) == len(slicers):
                 for sl in slicers:
                     self.img_representations[key].update_representation(sl, 0)
             else:
                 raise NotImplementedError(
-                    "Length of representations greater than lenght of slices."
+                    f"Length of representations {len(self.img_representations[key].que)} greater than length of slices {len(slicers)}."
                 )
+            self.img_representations[key].build_representation()
 
-        import IPython
-
-        IPython.embed()
         # free up space
         self.forward_representations = {}
 
@@ -218,6 +261,7 @@ class DiversityPredictor(BaseQueryPredictor):
         def hook_fn(m: torch.nn.Module, input: torch.Tensor, output: torch.Tensor):
             if self.forward_representations.get(name) is None:
                 self.forward_representations[name] = []
+            logger.debug(f"Hook {name}")
             self.forward_representations[name].append(output.to("cpu"))
 
         return hook_fn

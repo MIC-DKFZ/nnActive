@@ -8,6 +8,7 @@ from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PowerPredictiveEntropy, PredictiveEntropy
+from nnactive.strategies.kmeans_bald import KMeansBALD
 from nnactive.strategies.random import Random, RandomAllClasses
 from nnactive.strategies.randomlabel import RandomLabel, RandomLabelAllClasses
 from nnactive.strategies.randomlabel2 import (
@@ -68,6 +69,7 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "mutual_information": BALD,
     "power_bald": PowerBALD,
     "softrank_bald": SoftRankBALD,
+    "kmeans_bald": KMeansBALD,
     "pred_entropy": PredictiveEntropy,
     "power_pe": PowerPredictiveEntropy,
     "exp_entropy": ExpectedEntropy,
