@@ -13,6 +13,7 @@ from nnactive.strategies.utils import RepresentationHandler
 
 
 class KMeansBALD(BaseDiversityQueryMethod, BALD):
+    """First select most uncertain patches for each image, then select diverse final selection of patches using kmeans++ centers."""
 
     def get_n_patch_per_image(self):
         # increase n_patch_per_image to allow more diverse patches
@@ -80,9 +81,17 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
 
 
 def kmeanspp(
-    X: torch.Tensor, n_clusters: int, rng: np.random.Generator = np.random.default_rng()
+    X: torch.Tensor,
+    n_clusters: int,
+    rng: np.random.Generator = np.random.default_rng(),
+    strategy="maxselect",
 ) -> torch.Tensor:
-    """kmeans++ algorithm to initialize kmeans"""
+    if strategy == "maxselect":
+        select = MaxSelect()
+    elif strategy == "stochastic":
+        select = StochasticSelect()
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
     X = X.to(torch.float32)
     X /= X.std(dim=0)[None, :] + 1e-6  # normalize
     n_samples, n_features = X.shape
@@ -90,25 +99,46 @@ def kmeanspp(
     centers = torch.empty((n_clusters, n_features), dtype=X.dtype, device=X.device)
     center_inds = [None] * n_clusters
     # Randomly choose the first center
-    center_id = rng.integers(n_samples)
+    center_id = select.select_starting_center(X, rng)
     centers[0] = X[center_id]
     center_inds[0] = center_id
     # Compute the squared distance of each sample to the nearest center
     nearest_dist_sq = torch.linalg.norm(X - centers[0], dim=1) ** 2
-    # Compute the probability of each sample to be chosen as the next center
-    prob = (nearest_dist_sq / nearest_dist_sq.sum()).cpu().numpy()
-    if prob.sum() != 1:
-        prob /= prob.sum()
+
     for i in range(1, n_clusters):
         # Choose the next center
-        center_id = rng.choice(n_samples, p=prob)
+        center_id = select.select_next_center(nearest_dist_sq, rng)
         centers[i] = X[center_id]
         center_inds[i] = center_id
         # Update the squared distance of each sample to the nearest center
         dist_sq = torch.linalg.norm(X - centers[i], dim=1) ** 2
         nearest_dist_sq = torch.minimum(nearest_dist_sq, dist_sq)
-        # Update the probability of each sample to be chosen as the next center
-        prob = (nearest_dist_sq / nearest_dist_sq.sum()).cpu().numpy()
+    return centers, center_inds
+
+
+class StochasticSelect:
+    def select_starting_center(
+        self, X: torch.Tensor, rng: np.random.Generator = np.random.default_rng()
+    ) -> int:
+        n_samples = X.shape[0]
+        return rng.integers(n_samples)
+
+    def select_next_center(
+        self, dist_sq: torch.Tensor, rng: np.random.Generator = np.random.default_rng()
+    ) -> int:
+        prob = (dist_sq / dist_sq.sum()).cpu().numpy()
         if prob.sum() != 1:
             prob /= prob.sum()
-    return centers, center_inds
+        return rng.choice(len(prob), p=prob)
+
+
+class MaxSelect:
+    def select_starting_center(
+        self, X: torch.Tensor, rng: np.random.Generator = np.random.default_rng()
+    ) -> int:
+        return int(torch.argmax(torch.linalg.norm(X, dim=1)))
+
+    def select_next_center(
+        self, dist_sq: torch.Tensor, rng: np.random.Generator = np.random.default_rng()
+    ) -> int:
+        return int(torch.argmax(dist_sq))
