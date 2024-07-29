@@ -142,6 +142,131 @@ class MultiExperimentAnalysis:
                 axs.axhline(**y_full)
         return fig, axs
 
+    def plot_experiment_overview(
+        self, df: pd.DataFrame, selected_classes: list[int] | None = None
+    ):
+        n_rows, n_cols = 3, 9
+        plot_size = 4
+        fig, axs = plt.subplots(
+            nrows=n_rows, ncols=n_cols, figsize=(n_cols * plot_size, n_rows * plot_size)
+        )
+        if selected_classes is None:
+            selected_classes = [
+                int(i.split(" ")[1]) for i in df.columns if i.startswith("Class")
+            ][:3]
+            while len(selected_classes) < 3:
+                selected_classes.append(None)
+
+        # currently we are not plotting values describing relations in dataset like:
+        # "num_unique_files", "percentage_of_voxel_percentage_foreground"
+
+        cols = [[] for _ in range(n_cols)]
+        col_num = 0
+        # fill first 4 columns
+        col0_x = [
+            "#Patches",
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+        ]
+        for x_n in col0_x:
+            cols[col_num].append({"x_name": x_n, "y_name": "Mean Dice"})
+
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                y_names = [f"Class {cls_index} Dice"] * n_rows
+                x_names = [
+                    "#Patches",
+                    f"percentage_of_voxels_per_cls_{cls_index}",
+                    "avg_percentage_of_voxels_fg_cls",
+                ]
+
+            cols[col_num].extend(
+                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
+            )
+
+        # fill last 4 columns
+        x_names = [
+            "percentage_of_num_voxels",
+            "percentage_of_num_voxels",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+            "patches_foreground",
+        ]
+        col_num += 1
+        for x_n, y_n in zip(x_names, y_names):
+            cols[col_num].append({"x_name": x_n, "y_name": y_n})
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                x_names = [
+                    "percentage_of_num_voxels",
+                    None,
+                    "#Patches",
+                ]
+                y_names = [
+                    f"percentage_of_voxels_per_cls_{cls_index}",
+                    None,
+                    f"patches_per_cls_{cls_index}",
+                ]
+            cols[col_num].extend(
+                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
+            )
+
+        x_names = [
+            "Loop",
+            "#Patches",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxel_percentage_foreground",
+            "percentage_of_num_unique_files",
+            "num_unique_files",
+        ]
+        col_num += 1
+        for x_n, y_n in zip(x_names, y_names):
+            cols[col_num].append({"x_name": x_n, "y_name": y_n})
+
+        for i, j in product(range(n_rows), range(n_cols)):
+            x_name, y_name = cols[j][i]["x_name"], cols[j][i]["y_name"]
+            if x_name is None or y_name is None:
+                axs[i, j].set_axis_off()
+                continue
+            axs[i, j] = plot_dataframe(
+                axs[i, j],
+                df,
+                x_name,
+                y_name,
+                hue_key=self.query_key,
+                palette=PALETTE,
+                legend=None,
+            )
+        handles, labels = axs[0][0].get_legend_handles_labels()
+        fig.legend(
+            handles,
+            labels,
+            # loc="lower center",
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.02),
+            ncol=8,
+        )
+        fig.tight_layout()
+        for i, j in product(range(n_rows), range(n_cols)):
+            legend = axs[i, j].get_legend()
+            if legend is not None:
+                legend.remove()
+
+        return fig, axs
+
     def dataset_analyze_performance(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
     ):
@@ -320,6 +445,24 @@ class MultiExperimentAnalysis:
             if not save_dir.is_dir():
                 os.makedirs(save_dir)
             dataset = key[dataset_ind]
+
+            selected_classes = None
+            if dataset == "Dataset216_AMOS2022_task1":
+                selected_classes = [1, 13, 15]
+
+            # currently issues with BraTS due to labels
+            if dataset != "Dataset137_BraTS2021":
+                fig, axs = self.plot_experiment_overview(
+                    df_g, selected_classes=selected_classes
+                )
+                fig.suptitle(
+                    dataset,
+                    y=1.05,
+                )
+                filename = "overview.png"
+                plt.savefig(save_dir.parent / filename, bbox_inches="tight")
+                plt.close("all")
+
             x_name_dict = {x_n: {} for x_n in x_names}
             for x_name, y_name in product(x_name_dict, y_names):
                 # create plots for each value to be plotted
@@ -329,6 +472,7 @@ class MultiExperimentAnalysis:
                     y_name,
                     x_name,
                     dataset,
+                    hline_printers=y_full_dict[y_name],
                     **x_name_dict[x_name],
                 )
 
@@ -341,7 +485,7 @@ class MultiExperimentAnalysis:
                 if not save_dir_final.is_dir():
                     os.makedirs(save_dir_final)
 
-                plt.savefig(save_dir_final / f"{file_name}.png")
+                plt.savefig(save_dir_final / f"{file_name}.png", bbox_inches="tight")
                 plt.close("all")
 
     def analyze_multi_datasets(
