@@ -27,9 +27,10 @@ def plot_dataframe(
     x_name: str,
     y_name: str,
     hue_key: str,
-    plot_title: str,
-    palette: dict = None,
+    plot_title: str | None = None,
+    palette: dict | None = None,
     x_ticks: Iterable | None = None,
+    legend: str | None = "best",
 ):
     axs = sns.lineplot(
         data=df,
@@ -43,8 +44,10 @@ def plot_dataframe(
     )
     axs.set_ylabel(y_name)
     axs.set_xlabel(x_name)
-    axs.legend(loc="best")
-    axs.set_title(plot_title)
+    if legend is not None:
+        axs.legend(loc=legend)
+    if plot_title is not None:
+        axs.set_title(plot_title)
     if x_ticks is not None:
         axs.set_xticks(x_ticks)
     return axs
