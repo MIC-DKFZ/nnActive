@@ -1,34 +1,21 @@
 from __future__ import annotations
 
 import itertools
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
-from contextlib import nullcontext
-from itertools import accumulate
 from pathlib import Path
-from typing import Any, Callable, Iterable, Union
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import torch
-import wandb
 from dynamic_network_architectures.architectures import unet
 from loguru import logger
 from nnunetv2.utilities.file_path_utilities import get_output_folder
-from tqdm import tqdm
 
-from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
-from nnactive.config.struct import ActiveConfig
-from nnactive.data import Patch
-from nnactive.logger import monitor
-from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import (
     BasePredictionQuery,
     BaseQueryPredictor,
     InternalDataHandler,
 )
 from nnactive.strategies.utils import RepresentationHandler
-from nnactive.utils.io import load_label_map
 
 
 class BaseDiversityQueryMethod(BasePredictionQuery):
@@ -63,30 +50,6 @@ class BaseDiversityQueryMethod(BasePredictionQuery):
     def get_data_handler(self, temp_path: Path):
         return InternalDataHandler(temp_path, pass_keys=["repr"])
 
-    def compose_query_of_patches(self):
-        with (
-            monitor.timer("compose_query_of_patches")
-            if monitor.is_active()
-            else nullcontext()
-        ):
-            sorted_top_patches = sorted(
-                self.top_patches, key=lambda d: d["score"], reverse=True
-            )[: self.config.query_size]
-            patches = [
-                {
-                    "file": patch["file"],
-                    "coords": patch["coords"],
-                    "size": patch["size"],
-                }
-                for patch in sorted_top_patches
-            ]
-            patches = [Patch(**patch) for patch in patches]
-            if len(patches) < self.config.query_size:
-                raise RuntimeError(
-                    f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
-                )
-            return patches
-
     def build_query_predictor(self, device: torch.device) -> DiversityPredictor:
         predictor = DiversityPredictor(
             tile_step_size=self.config.tile_step_size,
@@ -114,6 +77,11 @@ class BaseDiversityQueryMethod(BasePredictionQuery):
 class DiversityPredictor(BaseQueryPredictor):
 
     def prepare_predictions(self):
+        """Method used to set up hooks for extraction of parameters.
+
+        TODO: Allow for automated selection of representation depth based on Field of View.
+        TODO: Implement code for obtaining final representation for BADGE.
+        """
         compile_module = False
         if isinstance(self.network, torch._dynamo.OptimizedModule):
             self.network: unet.PlainConvUNet = self.network._orig_mod
@@ -152,12 +120,6 @@ class DiversityPredictor(BaseQueryPredictor):
         # See https://pytorch.org/docs/master/compile/nn-module.html for more information and limitations.
         #
         #
-        # x = torch.randn(1, 1, 64, 64, 64)
-        # self.network(x)
-        # logger.info(
-        #     f"len of forward representations: {len(self.forward_representations)}"
-        # )
-        # self.forward_representations = {}
 
         if compile_module:
             # compile does not work as intended forward hooks are ignored. no matter what
@@ -165,15 +127,15 @@ class DiversityPredictor(BaseQueryPredictor):
             # self.network = torch.compile(self.network)  # self.network.compile()
             # self.network.compile()
             pass
-        # self.network(x)
-        # logger.info(
-        #     f"len of forward representations: {len(self.forward_representations)}"
-        # )
-        # self.forward_representations = {}
 
     def postprocess_logits_to_ouptuts(
         self, logits: np.ndarray | torch.Tensor, properties: torch.Dict
     ) -> dict[str, Any]:
+        """Changes from standard function: return dictionary.
+        It contains "repr" and "probs" keys.
+
+        TODO: possibibly allow changing shapes before and after cropping.
+        """
         out_dict = super().postprocess_logits_to_ouptuts(logits, properties)
         representation = self.img_representations[self.representation_key]
         if any(
@@ -201,6 +163,11 @@ class DiversityPredictor(BaseQueryPredictor):
         slicers: Iterable[tuple[slice, ...]],
         do_on_device: bool = True,
     ):
+        """Predict data using sliding window and also writes representations into:
+        self.img_representations and self.forward_representations.
+
+        TODO: for larger images this possibly needs to be catched for each forward pass separately!
+        """
         # representations need to be build here as data is reshaped and padded several times.
         # get clean forward representations again for current image / fold
         self.forward_representations = {}
@@ -267,6 +234,7 @@ class DiversityPredictor(BaseQueryPredictor):
         return hook_fn
 
     def setup_badge(self):
+        """Currently this is only in prototyping stage."""
         self.network: unet.PlainConvUNet = self.network
         self.forward_representations: dict[str, list[torch.Tensor]] = {}
         # get encoder parameters

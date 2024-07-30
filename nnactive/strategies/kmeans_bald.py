@@ -13,7 +13,9 @@ from nnactive.strategies.utils import RepresentationHandler
 
 
 class KMeansBALD(BaseDiversityQueryMethod, BALD):
-    """First select most uncertain patches for each image, then select diverse final selection of patches using kmeans++ centers."""
+    """First select most uncertain patches for each image (2xstandard),
+    then select diverse final selection of patches using kmeans++ centers of normalized representations.
+    """
 
     def get_n_patch_per_image(self):
         # increase n_patch_per_image to allow more diverse patches
@@ -29,6 +31,7 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
         representation = RepresentationHandler.init_from_representation(
             representation, input_shape=input_shape
         )
+        # build slicers for potential patches
         slicers = [
             tuple(
                 slice(coord, coord + size)
@@ -36,12 +39,14 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
             )
             for p_patch in potential_patches
         ]
+        # obtain representations for potential patches
         representations = [
             representation.map_to_representation(slicer).mean(
                 dim=list(range(1, len(input_shape) + 1))
             )
             for slicer in slicers
         ]
+        # assign representations to potential patches
         for potential_patch, representation in zip(potential_patches, representations):
             potential_patch["repr"] = representation
         return img_unc, potential_patches
@@ -62,7 +67,7 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
 
     def _compose_query_of_patches(
         self, device: torch.DeviceObjType = torch.device("cuda:0")
-    ):
+    ) -> dict[str, Any]:
         X = torch.stack([patch["repr"] for patch in self.top_patches], dim=0)
         _, center_inds = kmeanspp(X.to(device), self.config.query_size, self.rng)
         del _
@@ -74,6 +79,8 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
             }
             for ind in center_inds
         ]
+        for i in range(len(self.top_patches)):
+            self.top_patches[i]["selected"] = False
         for ind in center_inds:
             self.top_patches[ind]["selected"] = True
 
@@ -84,7 +91,7 @@ def kmeanspp(
     X: torch.Tensor,
     n_clusters: int,
     rng: np.random.Generator = np.random.default_rng(),
-    strategy="maxselect",
+    strategy: str = "maxselect",
 ) -> torch.Tensor:
     if strategy == "maxselect":
         select = MaxSelect()

@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, Dict, Iterable, Type, Union
+from typing import Any, Dict, Iterable, Union
 
 import numpy as np
 import psutil
@@ -418,30 +418,44 @@ class BasePredictionQuery(AbstractQueryMethod):
 
         return self.compose_query_of_patches()
 
-    # TODO: Rewrite this function to allow diveristy methods!
-    def compose_query_of_patches(self):
+    def compose_query_of_patches(self) -> list[Patch]:
+        """Function calling internal _compose_query_of_patches and returns list of Patches.
+        Times execution time if monitor is active.
+
+        Returns:
+            list[Patch]: list of Patches
+        """
         with (
             monitor.timer("compose_query_of_patches")
             if monitor.is_active()
             else nullcontext()
         ):
-            sorted_top_patches = sorted(
-                self.top_patches, key=lambda d: d["score"], reverse=True
-            )[: self.config.query_size]
-            patches = [
-                {
-                    "file": patch["file"],
-                    "coords": patch["coords"],
-                    "size": patch["size"],
-                }
-                for patch in sorted_top_patches
-            ]
+            patches = self._compose_query_of_patches()
             patches = [Patch(**patch) for patch in patches]
             if len(patches) < self.config.query_size:
                 raise RuntimeError(
                     f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
                 )
             return patches
+
+    def _compose_query_of_patches(self) -> dict[str, Any]:
+        """Returns the patches that should be queried.
+
+        Returns:
+            dict[str, Any]: list of Patch objects.
+        """
+        sorted_top_patches = sorted(
+            self.top_patches, key=lambda d: d["score"], reverse=True
+        )[: self.config.query_size]
+        patches = [
+            {
+                "file": patch["file"],
+                "coords": patch["coords"],
+                "size": patch["size"],
+            }
+            for patch in sorted_top_patches
+        ]
+        return patches
 
 
 class InternalDataHandler:

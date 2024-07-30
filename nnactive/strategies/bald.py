@@ -1,12 +1,9 @@
-from contextlib import nullcontext
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
 
-from nnactive.config.struct import ActiveConfig
-from nnactive.data import Patch
-from nnactive.logger import monitor
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
 from nnactive.strategies.uncertainties import prob_mutual_information
 from nnactive.strategies.utils import power_noising
@@ -71,34 +68,24 @@ class SoftRankBALD(BALD):
     #     ).tolist()
     #     return sorted_uncertainty_indices, sorted_uncertainty_scores
 
-    def compose_query_of_patches(self):
-        with (
-            monitor.timer("compose_query_of_patches")
-            if monitor.is_active()
-            else nullcontext()
-        ):
-            pre_sorted_top_patches = sorted(
-                self.top_patches, key=lambda d: d["score"], reverse=True
-            )
-            soft_scores = -np.log(
-                np.arange(len(self.top_patches)) + 1
-            ) + self.rng.gumbel(0, 1, size=len(self.top_patches))
-            soft_rankings = np.argsort(soft_scores)[::-1]
-            sorted_top_patches: list[dict] = []
-            for soft_rank in soft_rankings[: self.config.query_size]:
-                sorted_top_patches.append(pre_sorted_top_patches[soft_rank])
+    def _compose_query_of_patches(self) -> dict[str, Any]:
+        pre_sorted_top_patches = sorted(
+            self.top_patches, key=lambda d: d["score"], reverse=True
+        )
+        soft_scores = -np.log(np.arange(len(self.top_patches)) + 1) + self.rng.gumbel(
+            0, 1, size=len(self.top_patches)
+        )
+        soft_rankings = np.argsort(soft_scores)[::-1]
+        sorted_top_patches: list[dict] = []
+        for soft_rank in soft_rankings[: self.config.query_size]:
+            sorted_top_patches.append(pre_sorted_top_patches[soft_rank])
 
-            patches = [
-                {
-                    "file": patch["file"],
-                    "coords": patch["coords"],
-                    "size": patch["size"],
-                }
-                for patch in sorted_top_patches
-            ]
-            patches = [Patch(**patch) for patch in patches]
-            if len(patches) < self.config.query_size:
-                raise RuntimeError(
-                    f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
-                )
-            return patches
+        patches = [
+            {
+                "file": patch["file"],
+                "coords": patch["coords"],
+                "size": patch["size"],
+            }
+            for patch in sorted_top_patches
+        ]
+        return patches

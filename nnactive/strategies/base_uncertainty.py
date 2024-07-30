@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable
 
@@ -11,7 +10,6 @@ from loguru import logger
 
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.data import Patch
-from nnactive.logger import monitor
 from nnactive.masking import does_overlap
 from nnactive.strategies.base import BasePredictionQuery
 
@@ -95,30 +93,6 @@ class AbstractUncertainQueryMethod(BasePredictionQuery):
         sorted_uncertainty_indices: list[int] = sorted_uncertainty_indices.tolist()
 
         return sorted_uncertainty_indices, sorted_uncertainty_scores
-
-    def compose_query_of_patches(self):
-        with (
-            monitor.timer("compose_query_of_patches")
-            if monitor.is_active()
-            else nullcontext()
-        ):
-            sorted_top_patches = sorted(
-                self.top_patches, key=lambda d: d["score"], reverse=True
-            )[: self.config.query_size]
-            patches = [
-                {
-                    "file": patch["file"],
-                    "coords": patch["coords"],
-                    "size": patch["size"],
-                }
-                for patch in sorted_top_patches
-            ]
-            patches = [Patch(**patch) for patch in patches]
-            if len(patches) < self.config.query_size:
-                raise RuntimeError(
-                    f"Not enough patches could be queried, {len(patches)} instead of {self.config.query_size}"
-                )
-            return patches
 
 
 def select_top_n_non_overlapping_patches(
