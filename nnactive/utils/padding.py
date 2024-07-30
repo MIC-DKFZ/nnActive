@@ -17,16 +17,15 @@ def obtain_center_padding_slicers(
     Returns:
         tuple[slice, ...]: (slice(40, 160), slice(5, 45), slice(5, 45))
     """
-    for i in range(old_shape):
-        assert old_shape[i] <= cur_shape[i]
+    for o_s, c_s in zip(old_shape, cur_shape):
+        assert o_s <= c_s
     assert len(old_shape) == len(cur_shape)
 
+    cur_shape = np.array(cur_shape)
+    old_shape = np.array(old_shape)
     difference = cur_shape - old_shape
     pad_below = difference // 2
     pad_above = difference // 2 + difference % 2
-    pad_list = [list(i) for i in zip(pad_below, pad_above)]
-
-    pad_list = np.array(pad_list)
-    pad_list[:, 1] = np.array(cur_shape.shape) - pad_list[:, 1]
+    pad_list = np.stack([pad_below, cur_shape - pad_above], axis=1)
     slicer = tuple(slice(*i) for i in pad_list)
     return slicer

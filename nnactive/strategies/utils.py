@@ -26,6 +26,17 @@ class RepresentationHandler:
         orig_shape: Iterable[int] | None = None,
         device=torch.device("cpu"),
     ):
+        """Internal Representation Handler for Patch Selection.
+
+        TODO: Add saving and loading of representations for large images on demand.
+
+        Args:
+            input_shape (Iterable[int]): Shape of image that representation is built on.
+            repr_dim (int | None, optional): dimensionality of representation. Defaults to None.
+            scaling_factor (Iterable[int] | None, optional): Factor how many pixels belong to one representation pixel. Defaults to None.
+            orig_shape (Iterable[int] | None, optional): Shape of image before padding is applied. Defaults to None.
+            device (Device, optional): Device on which internal representation is saved. Defaults to torch.device("cpu").
+        """
         self.que: list[torch.Tensor] = []
         self.image: torch.Tensor = None
         self.n_predictions: torch.Tensor = None
@@ -39,6 +50,7 @@ class RepresentationHandler:
         self.orig_shape = orig_shape
 
     def init_representation(self):
+        """Initialize the internal representation and counter."""
         representation_size = [
             i // s for i, s in zip(self.input_shape, self.scaling_factor)
         ]
@@ -53,7 +65,25 @@ class RepresentationHandler:
     def set_orig_shape(self, orig_shape: Iterable[int]):
         self.orig_shape = orig_shape
 
+    def crop_repr_to_orig_shape(self):
+        """Crop internal representation to original shape."""
+        if self.orig_shape is None:
+            raise ValueError("Original Shape is not defined.")
+        else:
+            slicer = obtain_center_padding_slicers(
+                old_shape=self.orig_shape, cur_shape=self.input_shape
+            )
+            slicer = self.image_slice_to_representation_slice(slicer)
+            self.image = self.image[slicer]
+            if self.n_predictions is not None:
+                self.n_predictions = self.n_predictions[slicer]
+
     def update_que(self, tensor: torch.Tensor):
+        """Add tensor to internal que.
+
+        Args:
+            tensor (torch.Tensor): expected shape is (repr_dim, *input_shape) or (N, repr_dim, *input_shape)
+        """
         if len(tensor.shape) == len(self.input_shape) + 1:
             self.que.append(tensor)
         elif len(tensor.shape) == len(self.input_shape) + 2:
@@ -79,26 +109,22 @@ class RepresentationHandler:
         self.image[repr_slice] += data
 
     def build_representation(self):
+        """Build the internal representation from the que."""
         assert self.init
         assert len(self.que) == 0
         self.image /= self.n_predictions.to(self.dtype)[None]
-        # TODO: Put this out of the current model
-        if self.orig_shape is not None:
-            slicers = obtain_center_padding_slicers(
-                old_shape=self.orig_shape, cur_shape=self.input_shape
-            )
-            slicers = self.image_slice_to_representation_slice(slicers)
-            self.image = self.image[(slice(None), *slicers)]
-        del self.n_predictions
+        self.n_predictions = None
         self.built = True
 
-    def map_to_representation(self, slices: tuple[slice, ...]):
+    def map_to_representation(self, slices: tuple[slice, ...]) -> torch.Tensor:
+        """Map image slice to representation slice."""
         repr_slice = self.image_slice_to_representation_slice(slices)
         return self.image[repr_slice]
 
     def image_slice_to_representation_slice(
         self, slices: tuple[slice, ...]
     ) -> tuple[slice, ...]:
+        """Map image slice to representation slice. If slice is smaller than scaling factor, it is set to 1."""
         out_slices = [slice(None)]
         if len(slices) == len(self.input_shape):
             start_ind = 0
@@ -106,10 +132,14 @@ class RepresentationHandler:
             start_ind = 1
 
         for i in range(start_ind, len(slices)):
+            start = slices[i].start // self.scaling_factor[i - start_ind]
+            end = slices[i].stop // self.scaling_factor[i - start_ind]
+            if end - start == 0:
+                end += 1
             out_slices.append(
                 slice(
-                    slices[i].start // self.scaling_factor[i - start_ind],
-                    slices[i].stop // self.scaling_factor[i - start_ind],
+                    start,
+                    end,
                 )
             )
         return out_slices
@@ -238,7 +268,7 @@ def query_starting_budget_all_classes(
                 (
                     iter_patch_loc,
                     iter_patch_size,
-                ) = _obtain_random_patch_from_locs(locs, img_size, patch_size, rng)
+                ) = generate_random_patch_from_locs(locs, img_size, patch_size, rng)
                 patch = Patch(
                     file=sample + file_ending,
                     coords=iter_patch_loc,
@@ -293,7 +323,7 @@ def query_starting_budget_all_classes(
     return patches
 
 
-def _obtain_random_patch_for_img(
+def obtain_random_patch_for_img(
     img_size: list, patch_size: list, rng: Generator = np.random.default_rng()
 ) -> tuple[list[int], list[int]]:
     """Generates a complete random patch fitting inside the image
@@ -323,7 +353,7 @@ def _obtain_random_patch_for_img(
     return (patch_loc, patch_real_size)
 
 
-def _get_infinte_iter(finite_list: Iterable):
+def get_infinte_iter(finite_list: Iterable):
     while True:
         for elt in finite_list:
             yield elt
@@ -366,7 +396,7 @@ def get_locs_from_segmentation(
         raise NotImplementedError
 
 
-def _obtain_random_patch_from_locs(
+def generate_random_patch_from_locs(
     locs: Union[tuple, list],
     img_size: list,
     patch_size: list,
