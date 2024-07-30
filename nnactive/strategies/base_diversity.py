@@ -79,7 +79,7 @@ class DiversityPredictor(BaseQueryPredictor):
     def prepare_predictions(self):
         """Method used to set up hooks for extraction of parameters.
 
-        TODO: Allow for automated selection of representation depth based on Field of View.
+        TODO: Allow for automated selection of representation depth based on Field of View and Patch Size.
         TODO: Implement code for obtaining final representation for BADGE.
         """
         compile_module = False
@@ -150,6 +150,10 @@ class DiversityPredictor(BaseQueryPredictor):
             raise NotImplemented(
                 "Cropping currently is not supported with representations."
             )
+        # TODO: check whether shape_before_cropping has correct axes!
+
+        representation.set_orig_shape(properties["shape_before_cropping"])
+        representation.crop_repr_to_orig_shape()
         repr: np.ndarray = representation.image.numpy()
         repr = repr.transpose(
             [0] + [i + 1 for i in self.plans_manager.transpose_backward]
@@ -165,6 +169,8 @@ class DiversityPredictor(BaseQueryPredictor):
     ):
         """Predict data using sliding window and also writes representations into:
         self.img_representations and self.forward_representations.
+
+        Important: data is padded here!
 
         TODO: for larger images this possibly needs to be catched for each forward pass separately!
         """

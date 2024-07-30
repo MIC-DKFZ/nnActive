@@ -10,8 +10,8 @@ from nnactive.data import Patch
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.utils import (
-    _get_infinte_iter,
-    _obtain_random_patch_for_img,
+    get_infinte_iter,
+    obtain_random_patch_for_img,
     query_starting_budget_all_classes,
 )
 from nnactive.utils.io import load_label_map
@@ -63,7 +63,7 @@ class Random(AbstractQueryMethod):
         Returns:
             List[Patch]: patches for annotation
         """
-        img_generator = _get_infinte_iter(self.img_names)
+        img_generator = get_infinte_iter(self.img_names)
         if already_annotated_patches is None:
             patches = []
         else:
@@ -99,7 +99,7 @@ class Random(AbstractQueryMethod):
                 num_tries = 0
                 while True:
                     # propose a random patch
-                    iter_patch_loc, iter_patch_size = _obtain_random_patch_for_img(
+                    iter_patch_loc, iter_patch_size = obtain_random_patch_for_img(
                         img_size, self.config.patch_size, self.rng
                     )
 
@@ -133,7 +133,7 @@ class Random(AbstractQueryMethod):
                             count += 1
 
                         self.img_names.pop(count)
-                        img_generator = _get_infinte_iter(self.img_names)
+                        img_generator = get_infinte_iter(self.img_names)
                         break
                     num_tries += 1
                 if labeled:

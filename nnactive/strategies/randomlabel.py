@@ -17,10 +17,10 @@ from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import set_raw_paths
 from nnactive.strategies.random import Random
 from nnactive.strategies.utils import (
-    _get_infinte_iter,
-    _obtain_random_patch_for_img,
-    _obtain_random_patch_from_locs,
+    generate_random_patch_from_locs,
+    get_infinte_iter,
     get_locs_from_segmentation,
+    obtain_random_patch_for_img,
     query_starting_budget_all_classes,
 )
 from nnactive.utils.io import load_label_map
@@ -110,7 +110,7 @@ class RandomLabel(Random):
         # issues can arise if this is not done.
         if n_gpus == 0:
             logger.info(self.img_names)
-            img_generator = _get_infinte_iter(self.img_names)
+            img_generator = get_infinte_iter(self.img_names)
             labeled_patches = self.annotated_patches
             if already_annotated_patches is None:
                 patches = []
@@ -190,12 +190,12 @@ class RandomLabel(Random):
                             (
                                 iter_patch_loc,
                                 iter_patch_size,
-                            ) = _obtain_random_patch_from_locs(
+                            ) = generate_random_patch_from_locs(
                                 locs, img_size, self.config.patch_size, self.rng
                             )
                         if area in ["all"]:
                             iter_patch_loc, iter_patch_size = (
-                                _obtain_random_patch_for_img(
+                                obtain_random_patch_for_img(
                                     img_size, self.config.patch_size, self.rng
                                 )
                             )
