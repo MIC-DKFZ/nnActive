@@ -31,7 +31,7 @@ PALETTE = {
     "power_bald": "tab:brown",
     "power_pe": "tab:gray",
     "softrank_bald": "tab:pink",
-    # "other_6": "tab:olive",
+    "kmeans_bald": "tab:olive",
 }
 
 
