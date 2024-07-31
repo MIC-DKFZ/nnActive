@@ -12,7 +12,6 @@ from typing import Iterable
 import nnunetv2.paths
 import numpy as np
 import torch
-import wandb
 from batchgenerators.utilities.file_and_folder_operations import (
     join,
     maybe_mkdir_p,
@@ -26,6 +25,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
+import wandb
 from nnactive import paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
@@ -133,7 +133,7 @@ def step_train(
         unpack_segmentation=True,
         overwrite_existing=False,
         num_processes=npp,
-        verify_npy=False,
+        verify=False,
     )
 
     if runtime_config.n_gpus == 0:
