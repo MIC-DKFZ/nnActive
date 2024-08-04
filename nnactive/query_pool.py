@@ -40,7 +40,10 @@ def query_pool(
     query = strategy.query(n_gpus=runtime_config.n_gpus)
 
     top_patches_fn = f"{config.uncertainty}_{num_loop_files:03d}.json"
-    if strategy.top_patches[0].get("repr") is not None:
+    if (
+        len(strategy.top_patches) > 0
+        and strategy.top_patches[0].get("repr") is not None
+    ):
         repr = torch.empty(
             (len(strategy.top_patches), len(strategy.top_patches[0]["repr"]))
         )
