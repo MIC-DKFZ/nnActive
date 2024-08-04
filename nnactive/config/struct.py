@@ -137,6 +137,9 @@ class RuntimeConfig:
     num_processes: int = 4
     n_gpus: int = 0
 
+    def to_dict(self) -> dict[str, Any]:
+        return get_clean_dataclass_dict(self)
+
 
 @dataclass
 class Final:
