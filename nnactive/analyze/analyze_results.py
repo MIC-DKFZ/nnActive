@@ -177,9 +177,13 @@ class MultiExperimentAnalysis:
                 y_names = [None] * n_rows
             else:
                 y_names = [f"Class {cls_index} Dice"] * n_rows
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
                 x_names = [
                     "#Patches",
-                    f"percentage_of_voxels_per_cls_{cls_index[0]}",
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
                     "avg_percentage_of_voxels_fg_cls",
                 ]
 
@@ -212,10 +216,14 @@ class MultiExperimentAnalysis:
                     None,
                     "#Patches",
                 ]
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
                 y_names = [
-                    f"percentage_of_voxels_per_cls_{cls_index[0]}",
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
                     None,
-                    f"patches_per_cls_{cls_index[0]}",
+                    f"patches_per_cls_{perctentage_index}",
                 ]
             cols[col_num].extend(
                 [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
