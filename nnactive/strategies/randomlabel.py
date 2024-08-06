@@ -175,7 +175,7 @@ class RandomLabel(Random):
                             area,
                             state=self.rng,
                             background_cls=self.background_cls,
-                        ).tolist()
+                        )
                         if verbose:
                             logger.debug("Obtaining Locations was succesful.")
                         if len(locs) == 0:

@@ -261,7 +261,7 @@ def query_starting_budget_all_classes(
                 for patch in current_patch_list
                 if patch.file == sample + file_ending
             ]
-            locs = np.argwhere(label_map == label_dict_dataset_json[label]).tolist()
+            locs = np.argwhere(label_map == label_dict_dataset_json[label])
 
             # try drawing patches for sample until one fits or max_tries
             while not labeled:
@@ -397,7 +397,7 @@ def get_locs_from_segmentation(
 
 
 def generate_random_patch_from_locs(
-    locs: Union[tuple, list],
+    locs: tuple | list | np.ndarray,
     img_size: list,
     patch_size: list,
     rng: Generator = np.random.default_rng(),
