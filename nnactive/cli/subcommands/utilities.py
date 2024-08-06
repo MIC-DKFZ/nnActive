@@ -1,8 +1,10 @@
+import os
 import os.path
 import shutil
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import SimpleITK as sitk
 from loguru import logger
 
@@ -148,6 +150,54 @@ def util_verify_data(
                     raise RuntimeError(
                         f"For file {file.name} in labelsTr the labels from addTr were not added."
                     )
+
+
+@register_subcommand("util_get_times")
+def util_get_times(base_path: str | None = None, filter_times=True):
+    def get_file_dicts(base_path: str):
+        # Find all files with name "benchmark_times.json"
+        base_path: Path = Path(base_path)
+        file_paths = base_path.rglob("benchmark_times.json")
+
+        file_dicts = []
+        for file in file_paths:
+            file = Path(file)
+            # Load the JSON file
+            data = load_json(file)
+
+            # Extract the time from the JSON file
+            file_dict = {}
+            file_dict["Experiment"] = file.parent.name
+            file_dict["Trainer"] = data["config"]["trainer"]
+            file_dict["n_gpus"] = data["runtime_config"]["n_gpus"]
+            file_dict.update(data["times"])
+            file_dicts.append(file_dict)
+        #
+        # Create a DataFrame from the list of dictionaries
+        return file_dicts
+
+    if base_path is None:
+        base_path = Path(os.getenv("nnActive_data"))
+        base_paths = os.listdir(base_path)
+        base_paths = [
+            (base_path / sub_path / "nnActive_results") for sub_path in base_paths
+        ]
+
+    else:
+        base_paths = [base_path]
+
+    df_dicts = []
+    for base_path in base_paths:
+        file_dicts = get_file_dicts(base_path)
+        df_dicts.extend(file_dicts)
+    df = pd.DataFrame(df_dicts)
+    # filter rows
+    if len(df) == 0:
+        print("No benchmark_times.json files found.")
+    else:
+        if filter_times:
+            df = df.loc[df["Loop Time"].isnull() == False]
+        print(df.to_csv())
 
 
 @register_subcommand("util_list_experiments")
