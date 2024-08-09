@@ -8,6 +8,7 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnactive.config.struct import ActiveConfig
 from nnactive.nnunet.utils import get_patch_size
 from nnactive.paths import get_nnActive_data, set_raw_paths
+from nnactive.results.state import State
 
 __experiments = {}
 
@@ -63,6 +64,20 @@ def list_prepared_experiments(base_id: int):
         file.name for file in results_path.iterdir() if file.name.startswith("Dataset")
     ]
     out_list.sort()
+    return out_list
+
+
+def list_finished_experiments(base_id: int):
+    with set_raw_paths():
+        dataset_name = convert_id_to_dataset_name(base_id)
+    results_path: Path = get_nnActive_data() / dataset_name / "nnActive_results"
+    out_list = [
+        file.name
+        for file in results_path.iterdir()
+        if file.name.startswith("Dataset")
+        and file.is_dir()
+        and State.experiment_finished(file)
+    ]
     return out_list
 
 

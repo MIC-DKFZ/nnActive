@@ -14,8 +14,6 @@ from nnactive.paths import get_nnActive_results
 from nnactive.results.utils import get_results_folder
 from nnactive.utils.io import save_dataclass_to_json
 
-FILENAME = "state.json"
-
 
 @dataclass
 class State:
@@ -49,23 +47,24 @@ class State:
 
     def save_state(self):
         try:
-            fn = get_results_folder(self.dataset_id) / FILENAME
+            fn = get_results_folder(self.dataset_id) / State.filename()
         except FileNotFoundError:
             save_path: Path = (
                 get_nnActive_results() / f"Dataset{self.dataset_id:03d}_{self.name}"
             )
             logger.info(f"Creating Path: {save_path}")
             save_path.mkdir(parents=True)
-            fn = save_path / FILENAME
+            fn = save_path / State.filename()
         save_dataclass_to_json(self, fn)
 
-    def verify(self):
-        # if we are in loop X, we want to have loop_XXX.json
-        loop_val = len(get_sorted_loop_files(get_raw_path(self.dataset_id))) - 1
-        if self.query:
-            assert loop_val == self.loop + 1
-        else:
-            assert loop_val == self.loop
+    def verify(self, check_loop_files: bool = True):
+        if check_loop_files:
+            # if we are in loop X, we want to have loop_XXX.json
+            loop_val = len(get_sorted_loop_files(get_raw_path(self.dataset_id))) - 1
+            if self.query:
+                assert loop_val == self.loop + 1
+            else:
+                assert loop_val == self.loop
 
         if self.training:
             assert self.preprocess  # preprocessing before training is required
@@ -93,7 +92,7 @@ class State:
 
     @classmethod
     def get_id_state(cls, id: int, verify: bool = True) -> State:
-        fn = get_results_folder(id) / "state.json"
+        fn = get_results_folder(id) / State.filename()
         state = State.from_json(fn)
         if verify:
             state.verify()
@@ -125,5 +124,25 @@ class State:
         return State(name=config.name(), dataset_id=max(state_files) + 1)
 
     @staticmethod
+    def experiment_finished(path: Path) -> bool:
+        """Returns True if the experiment is finished.
+
+        Args:
+            path (Path): Path to nnActive_results/DatasetXXX_name
+        """
+        state = State.from_json(path / State.filename())
+        config = ActiveConfig.from_json(path / ActiveConfig.filename())
+        if state.loop >= config.query_steps - 1:
+            verified = False
+            try:
+                state.verify(check_loop_files=False)
+                verified = True
+            except AssertionError as e:
+                pass
+            if verified:
+                return True
+        return False
+
+    @staticmethod
     def filename():
-        return FILENAME
+        return "state.json"
