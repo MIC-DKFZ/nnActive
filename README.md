@@ -24,8 +24,8 @@ export nnUNet_results=Path_to_nnUnet_results # base datasets (ID)
 
 #### Usage:
 ```bash
-nnactive setup --experiment <tab>
-nnactive run_al_loops --experiment <tab>
+nnactive setup_experiment --experiment <tab>
+nnactive run_experiment --experiment <tab>
 ```
 #### Set up on ZSH:
 write completion file
