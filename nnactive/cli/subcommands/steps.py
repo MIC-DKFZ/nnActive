@@ -45,6 +45,8 @@ from nnactive.query_pool import query_pool
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
+from nnactive.utils.io import save_json
+from nnactive.utils.timer import Timer
 
 nnActive_results = get_nnActive_results()
 
@@ -489,6 +491,7 @@ def step_query(
         force (bool, optional): Set this to force using this command without taking the state.json of the dataset into account. Defaults to False.
     """
     config.set_nnunet_env()
+    timer = Timer()
 
     print(f"{continue_id=}")
     if continue_id is None:
@@ -499,9 +502,19 @@ def step_query(
         state = State.get_id_state(continue_id, verify=not force)
 
     with monitor.active_run(config=config.to_dict()):
+        timer.start()
         query_pool(
             config, runtime_config, state.dataset_id, force=force, verbose=verbose
         )
+        timer.stop()
+
+    b_times = {}
+    b_times["times"] = {"Query Time": timer.average()}
+    b_times["config"] = config.to_dict()
+    b_times["runtime_config"] = runtime_config.to_dict()
+    save_json(
+        b_times, get_results_folder(state.dataset_id) / "benchmark_time_query.json"
+    )
 
 
 @register_subcommand("step_update")
