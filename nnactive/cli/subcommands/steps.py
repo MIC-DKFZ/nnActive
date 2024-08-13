@@ -501,6 +501,13 @@ def step_query(
     else:
         state = State.get_id_state(continue_id, verify=not force)
 
+    # If the query step is already done, re-running it has to be forced.
+    if state.query and not force:
+        raise RuntimeError(
+            f"Query step already performed for loop {state.loop + 1}. Use --force=True "
+            "to re-run the query step."
+        )
+
     with monitor.active_run(config=config.to_dict()):
         timer.start()
         query_pool(
