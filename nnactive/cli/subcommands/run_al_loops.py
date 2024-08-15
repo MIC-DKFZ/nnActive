@@ -58,72 +58,88 @@ def main(
             if torch.__version__ >= "2.0":
                 os.environ["nnUNet_compile"] = "True"
 
-        for al_iteration in range(config.query_steps):
-            timer_dict["Loop Time"].start()
-            time_loop = False
-            if al_iteration < state.loop:
-                continue
-            if al_iteration > state.loop:
-                raise ValueError("A loop has not been executed!")
-            if state.preprocess is False:
-                time_loop = True
-                monitor.log("task", "preprocess", epoch=al_iteration)
-                timer_dict["Preprocess Timer"].start()
-                # Preprocess only images that are annotated
-                do_all = al_iteration == 0
-                preprocess(
-                    config,
-                    runtime_config,
-                    continue_id=continue_id,
-                    verbose=verbose,
-                    do_all=do_all,
-                )
-                preprocess_time = timer_dict["Preprocess Timer"].stop()
-                state = State.get_id_state(dataset_id)
+        if state.in_progress:
+            raise RuntimeError(
+                f"Training already in progress for experiment {config.name()}. Check "
+                "the current trainings or set up a new nnActive experiment."
+            )
+        state.in_progress = True
+        state.save_state()
+        try:
+            for al_iteration in range(config.query_steps):
+                timer_dict["Loop Time"].start()
+                time_loop = False
+                if al_iteration < state.loop:
+                    continue
+                if al_iteration > state.loop:
+                    raise ValueError("A loop has not been executed!")
+                if state.preprocess is False:
+                    time_loop = True
+                    monitor.log("task", "preprocess", epoch=al_iteration)
+                    timer_dict["Preprocess Timer"].start()
+                    # Preprocess only images that are annotated
+                    do_all = al_iteration == 0
+                    preprocess(
+                        config,
+                        runtime_config,
+                        continue_id=continue_id,
+                        verbose=verbose,
+                        do_all=do_all,
+                    )
+                    preprocess_time = timer_dict["Preprocess Timer"].stop()
+                    state = State.get_id_state(dataset_id)
 
-            if state.training is False:
-                # verbose not necessary here.
-                monitor.log("task", "training", epoch=al_iteration)
-                timer_dict["Train Time"].start()
-                step_train(config, runtime_config, continue_id=continue_id)
-                train_time = timer_dict["Train Time"].stop()
-                state = State.get_id_state(dataset_id)
-            if state.get_performance is False:
-                monitor.log("task", "get_performance", epoch=al_iteration)
-                timer_dict["Val Time"].start()
-                step_performance(
-                    config,
-                    runtime_config,
-                    continue_id=continue_id,
-                    verbose=verbose,
-                )
-                performance_time = timer_dict["Val Time"].stop()
-                state = State.get_id_state(dataset_id)
-            if al_iteration < config.query_steps - 1:
-                if state.pred_tr is False and state.query is False:
-                    monitor.log("task", "query_pool", epoch=al_iteration)
-                    timer_dict["Query Time"].start()
-                    query_pool(
+                if state.training is False:
+                    # verbose not necessary here.
+                    monitor.log("task", "training", epoch=al_iteration)
+                    timer_dict["Train Time"].start()
+                    step_train(config, runtime_config, continue_id=continue_id)
+                    train_time = timer_dict["Train Time"].stop()
+                    state = State.get_id_state(dataset_id)
+                if state.get_performance is False:
+                    monitor.log("task", "get_performance", epoch=al_iteration)
+                    timer_dict["Val Time"].start()
+                    step_performance(
                         config,
                         runtime_config,
                         continue_id=continue_id,
                         verbose=verbose,
                     )
-                    query_time = timer_dict["Query Time"].stop()
+                    performance_time = timer_dict["Val Time"].stop()
                     state = State.get_id_state(dataset_id)
-                if state.update_data is False:
-                    monitor.log("task", "update_step", epoch=al_iteration)
-                    timer_dict["Data-Update Time"].start()
-                    step_update(config, continue_id=continue_id, annotated=True)
-                    update_time = timer_dict["Data-Update Time"].stop()
-                    state = State.get_id_state(dataset_id)
+                if al_iteration < config.query_steps - 1:
+                    if state.pred_tr is False and state.query is False:
+                        monitor.log("task", "query_pool", epoch=al_iteration)
+                        timer_dict["Query Time"].start()
+                        query_pool(
+                            config,
+                            runtime_config,
+                            continue_id=continue_id,
+                            verbose=verbose,
+                        )
+                        query_time = timer_dict["Query Time"].stop()
+                        state = State.get_id_state(dataset_id)
+                    if state.update_data is False:
+                        monitor.log("task", "update_step", epoch=al_iteration)
+                        timer_dict["Data-Update Time"].start()
+                        step_update(config, continue_id=continue_id, annotated=True)
+                        update_time = timer_dict["Data-Update Time"].stop()
+                        state = State.get_id_state(dataset_id)
 
-                # time loop only if all tasks are completed
-                if time_loop:
-                    loop_time = timer_dict["Loop Time"].stop()
-                    monitor.write_metric(loop_time, "Loop Time", epoch=al_iteration)
-            if benchmark:
-                break
+                    # time loop only if all tasks are completed
+                    if time_loop:
+                        loop_time = timer_dict["Loop Time"].stop()
+                        monitor.write_metric(loop_time, "Loop Time", epoch=al_iteration)
+                if benchmark:
+                    break
+
+        except Exception as err:
+            state.in_progress = False
+            state.save_state()
+            raise RuntimeError("An error occured in 'run_experiment'.") from err
+
+        state.in_progress = False
+        state.save_state()
 
         loop_time = timer_dict["Runtime"].stop()
         monitor.write_metric(loop_time, "Runtime")

@@ -138,39 +138,56 @@ def step_train(
         verify=False,
     )
 
-    if runtime_config.n_gpus == 0:
-        wrap_training(
-            dataset_id=state.dataset_id,
-            config=config,
-            folds=list(range(num_folds)),
-            device=torch.device("cuda:0"),
-            wandbgroup=None,
+    if state.in_progress:
+        raise RuntimeError(
+            f"Training already in progress for experiment {config.name()}. Check the "
+            "current trainings or set up a new nnActive experiment."
         )
-    else:
-        devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
-        folds = [
-            [fold for fold in range(num_folds) if fold % runtime_config.n_gpus == d]
-            for d in range(runtime_config.n_gpus)
-        ]
-        try:
-            with ProcessPoolExecutor(
-                max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")
-            ) as executor:
-                for _ in executor.map(
-                    wrap_training,
-                    [state.dataset_id] * num_folds,
-                    [config] * num_folds,
-                    folds,
-                    devices,
-                    [wandb.run.group] * num_folds,
-                ):
-                    pass
-        except BrokenProcessPool as exc:
-            raise MemoryError(
-                "One of the worker processes died. "
-                "This usually happens because you run out of memory. "
-                "Try running with less processes."
-            ) from exc
+    state.in_progress = True
+    state.save_state()
+    try:
+        if runtime_config.n_gpus == 0:
+            wrap_training(
+                dataset_id=state.dataset_id,
+                config=config,
+                folds=list(range(num_folds)),
+                device=torch.device("cuda:0"),
+                wandbgroup=None,
+            )
+        else:
+            devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
+            folds = [
+                [fold for fold in range(num_folds) if fold % runtime_config.n_gpus == d]
+                for d in range(runtime_config.n_gpus)
+            ]
+            try:
+                with ProcessPoolExecutor(
+                    max_workers=runtime_config.n_gpus,
+                    mp_context=mp.get_context("spawn"),
+                ) as executor:
+                    for _ in executor.map(
+                        wrap_training,
+                        [state.dataset_id] * num_folds,
+                        [config] * num_folds,
+                        folds,
+                        devices,
+                        [wandb.run.group] * num_folds,
+                    ):
+                        pass
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
+
+    except Exception as err:
+        state.in_progress = False
+        state.save_state()
+        raise RuntimeError("An error occured in 'step_train'") from err
+
+    state.in_progress = False
+    state.save_state()
 
     if not force:
         state.training = True
