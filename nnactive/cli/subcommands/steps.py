@@ -100,6 +100,7 @@ def step_train(
     runtime_config: RuntimeConfig = RuntimeConfig(),
     continue_id: int | None = None,
     force: bool = False,
+    raise_on_in_progress: bool = True,
 ):
     config.set_nnunet_env()
 
@@ -138,7 +139,7 @@ def step_train(
         verify=False,
     )
 
-    if state.in_progress:
+    if raise_on_in_progress and state.in_progress:
         raise RuntimeError(
             f"Training already in progress for experiment {config.name()}. Check the "
             "current trainings or set up a new nnActive experiment."
@@ -187,11 +188,9 @@ def step_train(
         raise RuntimeError("An error occured in 'step_train'") from err
 
     state.in_progress = False
-    state.save_state()
-
     if not force:
         state.training = True
-        state.save_state()
+    state.save_state()
 
 
 def get_mean_foreground_cv(summary_cross_val_dict, n_folds):

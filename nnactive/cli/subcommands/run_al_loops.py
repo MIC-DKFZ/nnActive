@@ -44,6 +44,13 @@ def main(
         state = State.get_id_state(continue_id)
 
     dataset_id = state.dataset_id
+    # Update config file if needed
+    existing_config = ActiveConfig.get_from_id(dataset_id)
+    if config != existing_config:
+        logger.info(
+            f"Overwriting {ActiveConfig.filename()} with updated configuration."
+        )
+        config.save_id(dataset_id)
 
     # TODO: update nnUNet env vars based on config
 
@@ -93,7 +100,12 @@ def main(
                     # verbose not necessary here.
                     monitor.log("task", "training", epoch=al_iteration)
                     timer_dict["Train Time"].start()
-                    step_train(config, runtime_config, continue_id=continue_id)
+                    step_train(
+                        config,
+                        runtime_config,
+                        continue_id=continue_id,
+                        raise_on_in_progress=False,
+                    )
                     train_time = timer_dict["Train Time"].stop()
                     state = State.get_id_state(dataset_id)
                 if state.get_performance is False:
