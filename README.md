@@ -4,7 +4,8 @@ Scripts for nnActive development
 
 Install with
 ```bash
-pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+# use Pytorch 2.4.0 and CUDA 12.4
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip install -e '.[dev]'
 ```
 
