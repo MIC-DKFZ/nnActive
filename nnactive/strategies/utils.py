@@ -324,14 +324,14 @@ def query_starting_budget_all_classes(
 
 
 def obtain_random_patch_for_img(
-    img_size: list, patch_size: list, rng: Generator = np.random.default_rng()
+    img_size: list, patch_size: list, rng: Generator
 ) -> tuple[list[int], list[int]]:
     """Generates a complete random patch fitting inside the image
 
     Args:
         img_size (list): size of image
         patch_size (list): size of patch
-        rng (Generator, optional): generator for seeding. Defaults to np.random.default_rng().
+        rng (Generator): generator for seeding
 
     Returns:
         tuple[list[int], list[int]]: (location, patch_size)
