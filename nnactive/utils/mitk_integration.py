@@ -14,25 +14,11 @@ from nnactive.cli.registry import register_subcommand
 from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_sorted_loop_files, save_loop
+from nnactive.masking import does_overlap
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import get_nnActive_results
 from nnactive.utils import create_mitk_geometry_patch
 from nnactive.utils.patches import create_patch_mask_for_image
-
-
-def does_overlap(patch_seg: np.ndarray, indices: List[slice]):
-    """
-    Check if a patch with given indices does overlap with other patches stored in a segmentation map.
-    Args:
-        patch_seg (np.ndarray): segmentation map with the already selected patches
-        indices (List[slice]): indices of the patch that should be checked for overlapping
-
-    Returns:
-        bool: whether the patch with the given indices overlaps with other patches
-    """
-    if patch_seg[tuple(indices)].max() > 0:
-        return True
-    return False
 
 
 def get_correct_patch_size(data_path: Path):
@@ -170,7 +156,8 @@ def save_segmentation(
 def get_file_patch_list(
     original_image_path: Path,
     cropped_path: Path,
-    data_path: Path,
+    patch_size_required: list[int],
+    file_patches: List[Patch],
     debug: bool = False,
 ):
     """
@@ -178,7 +165,6 @@ def get_file_patch_list(
     Args:
         original_image_path (Path): path of the whole input image
         cropped_path (Path): path of the manually selected, cropped images (patches)
-        data_path (Path): raw dataset path
         debug (bool): If true, stores the patches as a segmentation map
 
     Returns:
@@ -211,16 +197,15 @@ def get_file_patch_list(
     for patch_path in sorted(glob.glob(f"{str(cropped_path)}/{image_id}*")):
         patch = sitk.ReadImage(patch_path)
         # Check if the selected patch has the correct size and crop to correct size if this is not the case
-        patch_required_size = get_correct_patch_size(data_path)
-        if patch.GetSize() != patch_required_size:
+        if patch.GetSize() != patch_size_required:
             logger.info(
-                f"Patch did not have correct size {patch_required_size}, but {patch.GetSize()}. "
+                f"Patch did not have correct size {patch_size_required}, but {patch.GetSize()}. "
                 f"Cropping the patch using the same origin but the correct size..."
             )
             patch = crop_to_correct_size(
                 patch=patch,
                 original_image=original_image,
-                correct_patch_size=patch_required_size,
+                correct_patch_size=patch_size_required,
             )
         # the origin of the selected patch is specified in world coordinates and needs to be transformed to indices
         patch_location = list(
@@ -237,18 +222,18 @@ def get_file_patch_list(
             slices.append(slice(start_index, start_index + size))
 
         # check if patch overlaps with previous patches
-        # TODO: allow possibility for overlap here for manual annotation
-        if not does_overlap(patch_seg, slices):
-            patch_seg[tuple(slices)] = 1
+        ipatch = Patch(
+            file=image_id + file_ending, coords=patch_location, size=patch_size
+        )
+        if not does_overlap(ipatch, file_patches):
+            file_patches.append(ipatch)
         else:
             logger.error(
                 f"Error for file {image_id + file_ending}. Patch does already overlap with a previous patch."
                 f"Please annotate this case again."
             )
             save_preliminary = True
-        patches_image_list.append(
-            Patch(file=image_id + file_ending, coords=patch_location, size=patch_size)
-        )
+        patches_image_list.append(ipatch)
         patches_sitk_list.append(patch)
         patches_names_list.append(Path(patch_path).stem.split(".")[0])
     # If patches overlap for this image, save the .mitkgeometry files to correct the patches afterward
