@@ -9,6 +9,7 @@ from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_nested_patches_from_loop_files
 from nnactive.utils.io import load_json
 from nnactive.utils.patches import create_patch_mask_for_image
+from nnactive.utils.pyutils import stitch_images
 
 
 def visualize_query_trajectory(raw_folder: Path, output_folder: Path):
@@ -147,11 +148,19 @@ def plot_query_trajectory(
                 fig.tight_layout()
                 fig.subplots_adjust(top=0.9)
                 fig.suptitle(f"Patch {p_id} Loop {i} File {file_id}", y=0.72)
-                filename = f"loop-{i}__id-{p_id}__img-{file_id}.png"
+                filename = f"loop-{i:02d}__id-{p_id:02d}__img-{file_id}.png"
                 plt.savefig(
                     save_folder / f"loop_{i:03d}" / filename, bbox_inches="tight"
                 )
                 plt.close("all")
+
+    for i in range(len(loop_patches)):
+        stitch_images(
+            save_folder / f"loop_{i:03d}",
+            save_folder / f"overview-loop_{i:03d}.png",
+            columns=5,
+            image_padding=0,
+        )
 
 
 if __name__ == "__main__":

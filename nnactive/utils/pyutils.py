@@ -3,7 +3,52 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Hashable, List
 
+from PIL import Image
 from pydantic import dataclasses
+
+
+def stitch_images(
+    image_dir: Path,
+    output_file: Path | str,
+    columns: int = 3,
+    image_padding: int = 0,
+    background_color: tuple[int, int, int] = (255, 255, 255),
+):
+    # Get all image files from the folder
+    image_files = [
+        f.name
+        for f in image_dir.iterdir()
+        if f.is_file() and f.name.lower().endswith(("png", "jpg", "jpeg", "bmp", "gif"))
+    ]
+    image_files.sort()
+    print(image_files)
+
+    # Open all images and find the maximum width and height
+    images = [Image.open(image_dir / f) for f in image_files]
+    widths, heights = zip(*(img.size for img in images))
+
+    max_width = max(widths)
+    max_height = max(heights)
+
+    # Calculate the number of rows needed
+    rows = (len(images) + columns - 1) // columns
+
+    # Create a new image with a background color
+    grid_width = columns * max_width + (columns - 1) * image_padding
+    grid_height = rows * max_height + (rows - 1) * image_padding
+    grid_image = Image.new("RGB", (grid_width, grid_height), color=background_color)
+
+    # Paste images into the grid
+    for index, image in enumerate(images):
+        row = index // columns
+        col = index % columns
+        x_offset = col * (max_width + image_padding)
+        y_offset = row * (max_height + image_padding)
+        grid_image.paste(image, (x_offset, y_offset))
+
+    # Save the stitched image
+    grid_image.save(output_file)
+    print(f"Successfully saved grid image to {output_file}")
 
 
 def get_subitems(folder: Path, level: int) -> List[Path]:
