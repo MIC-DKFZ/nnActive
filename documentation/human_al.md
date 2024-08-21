@@ -13,5 +13,5 @@ nnactive manual_query --raw_folder {DATAPATH} --loop {loop} --identify_patches T
 
 Create a folder with cropped predictions:
 ```bash
-nnactive manual_crop_pred --raw_folder nnUNet_raw_new/Dataset602_ALEGRA-HollowAirway --loop {loop}
+nnactive manual_crop_pred --raw_folder {DATAPATH} --loop {loop}
 ```
