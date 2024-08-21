@@ -208,7 +208,7 @@ def util_get_times(base_path: str | None = None, filter_times=True):
 @register_subcommand("util_list_experiments")
 def util_list_experiments():
     """List all configured experiments each experiment in one row."""
-    for experiment in list_experiments():
+    for experiment in sorted(list_experiments()):
         print(experiment)
 
 
@@ -232,7 +232,7 @@ def util_list_unfinished_experiments(base_id: int):
 @register_subcommand("util_list_prepared_experiments")
 def util_list_prepared_experiments(base_id: int):
     """List all prepared experiments with dataset rowwise for a specific base_id."""
-    for experiment in list_prepared_experiments(base_id):
+    for experiment in sorted(list_prepared_experiments(base_id)):
         print(experiment)
 
 

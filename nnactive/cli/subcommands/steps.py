@@ -30,6 +30,7 @@ from nnactive import paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.logger import monitor
+from nnactive.loops.cross_validation import get_mean_cv, get_mean_foreground_cv
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.predict import predict_entry_point
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
@@ -173,57 +174,6 @@ def step_train(
     if not force:
         state.training = True
         state.save_state()
-
-
-def get_mean_foreground_cv(summary_cross_val_dict, n_folds):
-    """
-    Get the mean over the foreground means across folds.
-    Each fold has entry "foreground_mean" representing the mean over all foreground classes across images.
-    Args:
-        summary_cross_val_dict: Dictionary with the individual metrics per fold
-        n_folds: number of folds
-
-    Returns:
-        Dict: mean dict containing the mean foreground metrics across fold
-    """
-    all_foreground_mean = []
-    for fold in range(n_folds):
-        all_foreground_mean.append(
-            summary_cross_val_dict[f"fold_{fold}"]["foreground_mean"]
-        )
-    # Iterate over each metric (e.g. Dice, FN, FP, ...) and take the mean
-    mean_dict = {}
-    for key in all_foreground_mean[0].keys():
-        mean_dict[key] = np.array([d[key] for d in all_foreground_mean]).mean()
-    return mean_dict
-
-
-def get_mean_cv(summary_cross_val_dict, n_folds):
-    """
-    Get the mean of the individual classes across folds.
-    Each fold has entry "mean" representing the mean over the individual classes across images.
-    Structure "mean": {'1': Dice: .., FN ..., ... '2': Dice:..., ...}
-    Args:
-        summary_cross_val_dict: Dictionary with the individual metrics per fold
-        n_folds: number of folds
-
-    Returns:
-        Dict: per class dict containing the mean metrics per class across folds
-    """
-    mean_dicts_list = []
-    for fold in range(n_folds):
-        mean_dicts_list.append(summary_cross_val_dict[f"fold_{fold}"]["mean"])
-    class_dicts = {}
-
-    # First iterate over class indices
-    for class_idx in mean_dicts_list[0].keys():
-        class_dicts[class_idx] = {}
-        # Iterate over each metric (e.g. Dice, FN, FP, ...) and take the mean for each class
-        for key in mean_dicts_list[0][class_idx].keys():
-            class_dicts[class_idx][key] = np.array(
-                [d[class_idx][key] for d in mean_dicts_list]
-            ).mean()
-    return class_dicts
 
 
 def wrap_prediction(

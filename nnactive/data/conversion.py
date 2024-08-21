@@ -32,97 +32,99 @@ def convert_dataset_to_partannotated(
     strategy: str = "random",
     seed: int = 12345,
     additional_overlap: float = 0.6,
-    force: bool = False,
 ):
+    """Converts base dataset to partly annotated dataset for AL. Raises a RuntimeError if
+    the target dataset folder already exists.
     """
-    force: only use for development!
-    """
-    already_exists = False
-    if not already_exists or force:
-        # load base_dataset_json
-        with set_raw_paths():
-            base_dataset: str = convert_id_to_dataset_name(base_id)
-            base_dataset_json: dict = read_dataset_json(base_dataset)
-            base_dir = Path(paths.nnUNet_raw) / base_dataset
+    logger.info("Converting base dataset to partly annotated dataset...")
 
-        # rewrite target_dataset_json and save
-        target_dataset_json = deepcopy(base_dataset_json)
-        target_dataset_json["name"] = "{}{}".format(
-            target_dataset_json["name"], name_suffix
-        )
-        target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
-        target_dataset_json["annotated_id"] = base_id
-        target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
-        target_dir = nnActive_data / base_dataset / "nnUNet_raw" / target_dataset
-        target_dir.mkdir(exist_ok=True, parents=True)
-        # Save target dataset.json
-        with open(target_dir / "dataset.json", "w") as file:
-            json.dump(target_dataset_json, file, indent=4)
-        assert (
-            read_dataset_json(base_dataset) == base_dataset_json
-        )  # basedataset/dataset.json is not supposed to change!
+    # load base_dataset_json
+    with set_raw_paths():
+        base_dataset: str = convert_id_to_dataset_name(base_id)
+        base_dataset_json: dict = read_dataset_json(base_dataset)
+        base_dir = Path(paths.nnUNet_raw) / base_dataset
 
-        # Copy all data except for labelsTr to target_dir and dataset.json
-        copy_folders = [
-            "imagesTr",
-            "imagesTs",
-            "labelsTs",
-            "imagesVal",
-            "labelsVal",
-            "addTr",
-        ]
-        for copy_folder in copy_folders:
-            if copy_folder in os.listdir(base_dir):
-                (target_dir / copy_folder).symlink_to(
-                    base_dir / copy_folder, target_is_directory=True
-                )
-            else:
-                logger.info(
-                    f"Skip Path for copying into target:\n{base_dir / copy_folder}"
-                )
+    # rewrite target_dataset_json and save
+    target_dataset_json = deepcopy(base_dataset_json)
+    target_dataset_json["name"] = "{}{}".format(
+        target_dataset_json["name"], name_suffix
+    )
+    target_dataset_json = add_ignore_label_to_dataset_json(target_dataset_json)
+    target_dataset_json["annotated_id"] = base_id
+    target_dataset: str = f"Dataset{target_id:03d}_" + target_dataset_json["name"]
+    target_dir = nnActive_data / base_dataset / "nnUNet_raw" / target_dataset
+    try:
+        target_dir.mkdir(parents=True)
+    except FileExistsError as err:
+        raise RuntimeError(
+            f"The folder for experiment '{target_dir}' already exists. {target_id = }"
+        ) from err
+    # Save target dataset.json
+    with open(target_dir / "dataset.json", "w") as file:
+        json.dump(target_dataset_json, file, indent=4)
+    assert (
+        read_dataset_json(base_dataset) == base_dataset_json
+    )  # basedataset/dataset.json is not supposed to change!
 
-        # Create labelstTr for target dataset
-        base_labelsTr_dir = base_dir / "labelsTr"
-        target_labelsTr_dir = target_dir / "labelsTr"
+    # Copy all data except for labelsTr to target_dir and dataset.json
+    copy_folders = [
+        "imagesTr",
+        "imagesTs",
+        "labelsTs",
+        "imagesVal",
+        "labelsVal",
+        "addTr",
+    ]
+    for copy_folder in copy_folders:
+        if copy_folder in os.listdir(base_dir):
+            (target_dir / copy_folder).symlink_to(
+                base_dir / copy_folder, target_is_directory=True
+            )
+        else:
+            logger.info(f"Skip Path for copying into target:\n{base_dir / copy_folder}")
 
-        ignore_label = target_dataset_json["labels"]["ignore"]
-        background_cls = base_dataset_json["labels"].get("background")
-        file_ending = base_dataset_json["file_ending"]
+    # Create labelstTr for target dataset
+    base_labelsTr_dir = base_dir / "labelsTr"
+    target_labelsTr_dir = target_dir / "labelsTr"
 
-        additional_label_path = None
-        if target_dataset_json.get("use_mask_for_norm") is True:
-            additional_label_path: Path = target_dir / "addTr"
+    ignore_label = target_dataset_json["labels"]["ignore"]
+    background_cls = base_dataset_json["labels"].get("background")
+    file_ending = base_dataset_json["file_ending"]
 
-        # create patches list for dataset creation
-        patches = get_patches_for_partannotation(
-            full_images,
-            num_patches,
-            patch_size,
-            file_ending,
-            base_labelsTr_dir,
-            target_labelsTr_dir,
-            agg_stride=1,  # random queries do not use this variable
-            patch_func_kwargs=patch_kwargs,
-            strategy_name=strategy,
-            seed=seed,
-            background_cls=background_cls,
-            dataset_id=target_id,
-            additional_label_path=additional_label_path,
-            additional_overlap=additional_overlap,
-        )
+    additional_label_path = None
+    if target_dataset_json.get("use_mask_for_norm") is True:
+        additional_label_path: Path = target_dir / "addTr"
 
-        # Create labels from patches
-        create_labels_from_patches(
-            patches,
-            ignore_label,
-            file_ending,
-            base_labelsTr_dir,
-            target_labelsTr_dir,
-            additional_label_path=additional_label_path,
-        )
+    # create patches list for dataset creation
+    patches = get_patches_for_partannotation(
+        full_images,
+        num_patches,
+        patch_size,
+        file_ending,
+        base_labelsTr_dir,
+        target_labelsTr_dir,
+        agg_stride=1,  # random queries do not use this variable
+        patch_func_kwargs=patch_kwargs,
+        strategy_name=strategy,
+        seed=seed,
+        background_cls=background_cls,
+        dataset_id=target_id,
+        additional_label_path=additional_label_path,
+        additional_overlap=additional_overlap,
+    )
 
-        loop_json = {"patches": patches}
-        save_loop(target_dir, loop_json, 0)
+    # Create labels from patches
+    create_labels_from_patches(
+        patches,
+        ignore_label,
+        file_ending,
+        base_labelsTr_dir,
+        target_labelsTr_dir,
+        additional_label_path=additional_label_path,
+    )
+
+    loop_json = {"patches": patches}
+    save_loop(target_dir, loop_json, 0)
 
 
 def get_patches_for_partannotation(
@@ -189,8 +191,7 @@ def get_patches_for_partannotation(
         additional_overlap=additional_overlap,
         n_patch_per_image=1,  # this value does not affect Random Queries
     )
-    logger.info("Finished Initialization")
-    logger.info(strategy)
+    logger.info(f"Finished Initialization with strategy {strategy}")
     patches_partial = strategy.query(verbose=get_verbose(True))
     logger.info(f"#{strategy_name} based patches: {patches_partial}")
     patches = patches_partial + patches
