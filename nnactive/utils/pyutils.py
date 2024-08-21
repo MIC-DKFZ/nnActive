@@ -21,7 +21,6 @@ def stitch_images(
         if f.is_file() and f.name.lower().endswith(("png", "jpg", "jpeg", "bmp", "gif"))
     ]
     image_files.sort()
-    print(image_files)
 
     # Open all images and find the maximum width and height
     images = [Image.open(image_dir / f) for f in image_files]
