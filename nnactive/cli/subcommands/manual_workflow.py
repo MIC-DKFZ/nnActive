@@ -28,6 +28,8 @@ from nnactive.utils.patches import create_patch_mask_for_image
 def manual_crop_pred(
     raw_folder: str,
     loop: int | None = None,
+    labels_folder: str | None = None,
+    output_folder: str | None = None,
 ) -> None:
     """Crop predictions to region requested in loop_xxx.json file.
     Predictions are expected to be in 'predTr_{loop-1}'
@@ -35,8 +37,9 @@ def manual_crop_pred(
 
     Args:
         raw_folder (str): Path to folder with raw (containing predTr_{loop-1} and loop_{loop}.json)
-        continue_id (int | None, optional): Ignore. Defaults to None.
         loop (int | None, optional): Set loop file. Defaults to None.
+        labels_folder (str | None): Ovewrite default raw_folder/predTr_{loop-1}. Defaults to None.
+        output_folder (str | None): Ovewrite default raw_folder/predTr_crop_{loop-1}. Defaults to None.
     """
     raw_folder = Path(raw_folder)
 
@@ -48,17 +51,28 @@ def manual_crop_pred(
         loop = get_current_loop(raw_folder)
 
     patches = get_loop_patches(raw_folder, loop_val=loop)
-    labels_dir = raw_folder / f"predTr_{loop-1:02d}"
+    labels_folder = (
+        raw_folder / f"predTr_{loop-1:02d}"
+        if labels_folder is None
+        else Path(labels_folder)
+    )
 
     logger.info(
         f"Creation of cropped predictions for loop {loop} with {len(patches)} Patches"
     )
 
-    img_names = [file for file in os.listdir(labels_dir) if file.endswith(file_ending)]
-    logger.info(f"Found images {len(img_names)} in {labels_dir}")
-    save_path = raw_folder / f"predTr_crop_{loop-1:02d}"
-    logger.info(f"Saving images to: {save_path}")
-    os.makedirs(save_path, exist_ok=True)
+    img_names = [
+        file for file in os.listdir(labels_folder) if file.endswith(file_ending)
+    ]
+    logger.info(f"Found images {len(img_names)} in {labels_folder}")
+
+    output_folder = (
+        raw_folder / f"predTr_crop_{loop-1:02d}"
+        if output_folder is None
+        else Path(output_folder)
+    )
+    logger.info(f"Saving images to: {output_folder}")
+    os.makedirs(output_folder, exist_ok=True)
     for img_name in img_names:
         img_patches = [patch for patch in patches if patch.file == img_name]
         if len(img_patches) == 0:
@@ -66,7 +80,7 @@ def manual_crop_pred(
         logger.info("-" * 8)
         logger.info(f"Start Image: {img_name}")
         logger.info("Load label...")
-        seg = load_label_map(img_name.replace(file_ending, ""), labels_dir, file_ending)
+        seg = load_label_map(img_name, labels_folder, "")
 
         logger.info("Select region...")
         seg_crop = np.zeros_like(seg)
@@ -77,12 +91,12 @@ def manual_crop_pred(
                 slices.append(slice(start_index, start_index + size))
             seg_crop[tuple(slices)] = seg[tuple(slices)]
         logger.info("Save image...")
-        img = sitk.ReadImage(labels_dir / img_name)
+        img = sitk.ReadImage(labels_folder / img_name)
         seg_save = sitk.GetImageFromArray(seg_crop)
         seg_save = copy_geometry_sitk(seg_save, img)
         sitk.WriteImage(
             seg_save,
-            (save_path / img_name),
+            (output_folder / img_name),
         )
 
 
