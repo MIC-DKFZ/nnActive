@@ -13,7 +13,6 @@ from typing import Any, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
-import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -28,6 +27,7 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
+import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -477,8 +477,8 @@ class InternalDataHandler:
     def handle_data(
         self,
         temporary_dict: dict,
+        fold: int | str,
         filename: str | None = None,
-        fold: int | str | None = None,
     ) -> dict[str, Path]:
         """Save temporary files in temporary dict and returns paths to obtain them again.
         Files in pass_keys are give through.
@@ -505,7 +505,7 @@ class InternalDataHandler:
             handled_inputs[key] = temporary_dict[key]
         return handled_inputs
 
-    def build_suffix(self, fold: int | str | None) -> str:
+    def build_suffix(self, fold: int | str) -> str:
         return f"{fold}.npy"
 
     def clean_up(self):
@@ -612,7 +612,7 @@ class BaseQueryPredictor(nnUNetPredictor):
                         self.network._orig_mod.load_state_dict(params)
                     logits = self.predict_sliding_window_return_logits(data)
                     out_dict = self.postprocess_logits_to_ouptuts(logits, properties)
-                    out[fold] = temp_file_handler.handle_data(out_dict)
+                    out[fold] = temp_file_handler.handle_data(out_dict, fold=fold)
 
             self.perform_everything_on_device = original_perform_everything_on_device
         return out
@@ -667,10 +667,10 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dicts: list[dict[str, Any]] = (
-                self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_file_handler=temp_file_handler
-                )
+            query_dicts: list[
+                dict[str, Any]
+            ] = self.predict_fold_logits_from_preprocessed_data(
+                data, properties, temp_file_handler=temp_file_handler
             )
 
             logger.info("Start Query")
