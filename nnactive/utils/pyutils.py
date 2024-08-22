@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Hashable, List
 
+import numpy as np
 from PIL import Image
 from pydantic import dataclasses
 
@@ -48,6 +49,71 @@ def stitch_images(
     # Save the stitched image
     grid_image.save(output_file)
     print(f"Successfully saved grid image to {output_file}")
+
+
+def rescale_pad_to_square(image: np.ndarray) -> np.ndarray:
+    """Rescale image to a square by repeating the image in the
+    dimension with the smallest size. (so not necessarily perfect square)
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Rescaled and padded image
+    """
+    image = rescale_to_rel_square(image)
+    image = pad_to_square(image)
+    return image
+
+
+def rescale_to_rel_square(image: np.ndarray) -> np.ndarray:
+    """Rescale image to a square by repeating the image in the
+    dimension with the smallest size. (so not necessarily perfect square)
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Rescaled image
+    """
+    height, width = image.shape
+    ratio = height / width
+    if ratio > 1:
+        image = np.repeat(image, ratio // 1, axis=1)
+    if ratio < 1:
+        image = np.repeat(image, (1 / ratio) // 1, axis=0)
+    return image
+
+
+def pad_to_square(image: np.ndarray) -> np.ndarray:
+    """Pad image to a square by adding zeros to the smaller dimension.
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Padded image with shape (max(height, width), max(height, width))
+    """
+    height, width = image.shape
+    max_dim = max(height, width)
+
+    # Calculate padding for image
+    pad_height = (max_dim - height) // 2
+    pad_width = (max_dim - width) // 2
+    pad_height_odd = (max_dim - height) % 2
+    pad_width_odd = (max_dim - width) % 2
+
+    # Pad image
+    padded_image = np.pad(
+        image,
+        (
+            (pad_height, pad_height + pad_height_odd),
+            (pad_width, pad_width + pad_width_odd),
+        ),
+        mode="constant",
+        constant_values=0,
+    )
+    return padded_image
 
 
 def get_subitems(folder: Path, level: int) -> List[Path]:
