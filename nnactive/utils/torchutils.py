@@ -147,60 +147,6 @@ def move_tensor_check_vram(
     return tensor.to(device)
 
 
-@contextmanager
-def vram_guard(
-    tensor: torch.Tensor, device: torch.device, factor_required_vram: float = 1.0
-):
-    """
-    Context manager to handle VRAM usage checks and fallback to CPU when necessary.
-
-    Args:
-        tensor (torch.Tensor): The tensor to check for VRAM capacity.
-        device (torch.device): The target device, typically a CUDA device.
-        factor_required_vram (float, optional): Required VRAM in units of memory usage of
-            tensor.
-
-    Yields:
-        torch.Tensor: Tensor on the appropriate device (CUDA if VRAM is sufficient, else CPU).
-    """
-    try:
-        # GPU case
-        if device.type == "cuda":
-            logger.debug("Checking available CUDA memory...")
-            # if get_tensor_memory_usage(tensor) * 2 * 1.1 < estimate_free_cuda_memory(device):
-            if get_tensor_memory_usage(
-                tensor
-            ) * factor_required_vram < estimate_free_cuda_memory(device):
-                logger.debug(
-                    f"Sufficient VRAM on {device}. Proceeding with computation."
-                )
-                use_device = device
-            else:
-                logger.debug(f"Insufficient VRAM on {device}, falling back to CPU.")
-                use_device = torch.device("cpu")
-        else:
-            # CPU case
-            use_device = device
-
-        # Move tensor to the selected device
-        tensor_on_device = tensor.to(use_device)
-        yield tensor_on_device
-
-    except RuntimeError as e:
-        # In case of a CUDA out-of-memory (OOM) error, fallback to CPU
-        logger.error(f"RuntimeError during computation: {e}. Falling back to CPU.")
-        if device.type == "cuda":
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-        yield tensor.to(torch.device("cpu"))
-
-    finally:
-        # Ensure we clean up any VRAM-related issues
-        if device.type == "cuda":
-            logger.debug("VRAM check completed, cleaning up...")
-            torch.cuda.empty_cache()
-
-
 if __name__ == "__main__":
     from skimage.morphology import ball
 
