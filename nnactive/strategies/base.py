@@ -562,6 +562,9 @@ class InternalDataHandler:
             logger.info(info_msg + " - Keeping data in RAM.")
         return self._data_exceeds_max_ram
 
+    def reset_ram_stats(self) -> None:
+        self._data_exceeds_max_ram = None
+
     def build_suffix(self, fold: int | str | None) -> str:
         return f"{fold}.npy"
 
@@ -622,11 +625,6 @@ class BaseQueryPredictor(nnUNetPredictor):
         properties: dict,
         temp_file_handler: InternalDataHandler,
     ) -> list[dict]:
-        # TODO:
-        #   - (optionally save predictions: argmax on probs -> apply label mapping )
-        #   - (convert_probabilities_to_segmentation -> mean probs to inefficient for now)
-        #   - optionally save all probs (not temp):
-        #   - np.array -> torch.Tensors
         """Computes the logits/probs for all folds.
 
         Args:
@@ -753,6 +751,7 @@ class BaseQueryPredictor(nnUNetPredictor):
             ] = self.predict_fold_logits_from_preprocessed_data(
                 data, properties, temp_file_handler=temp_file_handler
             )
+            temp_file_handler.reset_ram_stats()
 
             logger.info("Start Query")
             # Benchmark = True can lead to problems during inference with convolutions

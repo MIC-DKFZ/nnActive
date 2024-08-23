@@ -134,7 +134,7 @@ class ActiveConfig:
 class RuntimeConfig:
     num_processes: int = 4
     n_gpus: int = 0
-    max_ram_pred_query: int | float = 40
+    max_ram_pred_query: int | float = 25
     save_probs: bool = False
     # TODO optionally, save predictions (requires efficient computation of mean probs
     #      across folds)
