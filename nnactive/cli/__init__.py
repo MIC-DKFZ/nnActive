@@ -1,6 +1,7 @@
 import shtab
 from jsonargparse import ActionConfigFile, ArgumentParser, Namespace
 
+# from nnactive.cli import subcommands
 from nnactive.cli.registry import add_subcommands, run_subcommand
 
 from .subcommands import (
@@ -8,6 +9,7 @@ from .subcommands import (
     human_al_workflow,
     init_data,
     init_resampling,
+    manual_workflow,
     run_al_loops,
     setup,
     utilities,

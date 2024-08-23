@@ -9,9 +9,9 @@ from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw, nnUNet_results
 from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_name
 from tqdm import tqdm
 
-from nnactive.cli.subcommands.init_data import extract_fingerprint_dataset
 from nnactive.cli.subcommands.init_resampling import resample_nnunet_dataset
 from nnactive.data.conversion import convert_dataset_to_partannotated
+from nnactive.data.utils import extract_dataset_fingerprint
 from nnactive.utils.io import load_json
 
 NNUNET_RAW = Path(nnUNet_raw) if nnUNet_raw is not None else None
@@ -91,7 +91,7 @@ def main():
     subprocess.run(fingerprint_call.format(resample_id), shell=True, check=True)
     subprocess.run(plan_call.format(resample_id), shell=True, check=True)
     resample_nnunet_dataset(resample_id, 6)
-    extract_fingerprint_dataset(
+    extract_dataset_fingerprint(
         resample_id,
         num_processes=12,
         check_dataset_integrity=True,

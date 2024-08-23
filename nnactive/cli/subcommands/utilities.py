@@ -22,6 +22,7 @@ from nnactive.loops.loading import (
     get_sorted_loop_files,
 )
 from nnactive.nnunet.utils import get_raw_path
+from nnactive.production import produce_empty_masks
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.utils.io import load_json
@@ -207,7 +208,7 @@ def util_get_times(base_path: str | None = None, filter_times=True):
 @register_subcommand("util_list_experiments")
 def util_list_experiments():
     """List all configured experiments each experiment in one row."""
-    for experiment in list_experiments():
+    for experiment in sorted(list_experiments()):
         print(experiment)
 
 
@@ -231,5 +232,34 @@ def util_list_unfinished_experiments(base_id: int):
 @register_subcommand("util_list_prepared_experiments")
 def util_list_prepared_experiments(base_id: int):
     """List all prepared experiments with dataset rowwise for a specific base_id."""
-    for experiment in list_prepared_experiments(base_id):
+    for experiment in sorted(list_prepared_experiments(base_id)):
         print(experiment)
+
+
+@register_subcommand("util_produce_empty_masks")
+def util_produce_empty_masks(
+    images_folder: Path,
+    output_folder: Path,
+    fill_value: int,
+    file_ending: str = ".nii.gz",
+    additional_label_folder: Path | None = None,
+    modality_iden: str = "_0000",
+):
+    """Create empty labels for all images in images_folder.
+
+    Args:
+        images_folder (Path): Folder with images
+        output_folder (Path): Folder for labels
+        fill_value (int): Label for ignore regions
+        file_ending (str): File ending. Defaults to ".nii.gz".
+        additional_label_folder (Path, optional): Folder with additional labels. Defaults to None.
+        modality_iden (str): _0000 modality string after img_identifier. Defaults to "_0000".
+    """
+    produce_empty_masks(
+        images_folder,
+        output_folder,
+        fill_value,
+        file_ending,
+        additional_label_folder,
+        modality_iden,
+    )

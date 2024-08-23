@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -19,32 +20,11 @@ from nnactive.strategies.utils import RepresentationHandler
 
 
 class BaseDiversityQueryMethod(BasePredictionQuery):
+    @abstractmethod
     def strategy(
         self, query_dicts: list[dict[str, Any]], device: torch.device = ...
     ) -> list[dict[str, Any]]:
         pass
-        # probs = [q_d["probs"] for q_d in query_dicts]
-        # input_shape = [np.load(prob[0]).shape[1:] for prob in probs]
-        # representation = [q_d["repr"] for q_d in query_dicts]
-        # representation = torch.from_numpy(np.concatenate(representation, axis=0))
-        # # return super().strategy(query_dicts, device)
-        # representation = RepresentationHandler.init_from_representation(
-        #     representation, input_shape=input_shape
-        # )
-        # # for now we run a grid over the representations
-        # # so the scaling factor is equal to the step size.
-
-        # out_list = [
-        #     {
-        #         "coords": [0, 0, 0],
-        #         "size": self.config.patch_size,
-        #         "score": i,
-        #         "repr": np.arange(i),
-        #     }
-        #     for i in range(10)
-        # ]
-        # # coords =
-        # # potential_patches = []
 
     def get_data_handler(self, temp_path: Path, num_folds: int, max_ram: float):
         return InternalDataHandler(

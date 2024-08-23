@@ -52,6 +52,7 @@ def create_empty_mask(
     ignore_label: int,
     save_filename: Path,
     additional_label_file: Path | None = None,
+    change_to_uint: bool = False,
 ):
     """Create an empty label mask for a sitk readable image with ignore label.
 
@@ -63,7 +64,10 @@ def create_empty_mask(
     """
     img_itk = sitk.ReadImage(image_filename)
     img_npy = sitk.GetArrayFromImage(img_itk)
-    img_npy.fill(ignore_label)
+    if change_to_uint:
+        img_npy = np.ones_like(img_npy, dtype=np.uint8) * ignore_label
+    else:
+        img_npy.fill(ignore_label)
     if additional_label_file is not None:
         new_label = sitk.ReadImage(additional_label_file)
         new_label = sitk.GetArrayFromImage(new_label)

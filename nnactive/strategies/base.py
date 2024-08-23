@@ -498,7 +498,7 @@ class InternalDataHandler:
         fold: int | str,
         filename: str | None = None,
         ram_usage: float | int | None = None,
-    ) -> dict[str, Path | torch.Tensor | np.ndarray]:
+    ) -> dict[str, Path] | torch.Tensor | np.ndarray:
         """Save temporary files in temporary dict and returns paths to obtain them again.
         Files in pass_keys are give through.
 

@@ -3,7 +3,117 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Hashable, List
 
+import numpy as np
+from PIL import Image
 from pydantic import dataclasses
+
+
+def stitch_images(
+    image_dir: Path,
+    output_file: Path | str,
+    columns: int = 3,
+    image_padding: int = 0,
+    background_color: tuple[int, int, int] = (255, 255, 255),
+):
+    # Get all image files from the folder
+    image_files = [
+        f.name
+        for f in image_dir.iterdir()
+        if f.is_file() and f.name.lower().endswith(("png", "jpg", "jpeg", "bmp", "gif"))
+    ]
+    image_files.sort()
+
+    # Open all images and find the maximum width and height
+    images = [Image.open(image_dir / f) for f in image_files]
+    widths, heights = zip(*(img.size for img in images))
+
+    max_width = max(widths)
+    max_height = max(heights)
+
+    # Calculate the number of rows needed
+    rows = (len(images) + columns - 1) // columns
+
+    # Create a new image with a background color
+    grid_width = columns * max_width + (columns - 1) * image_padding
+    grid_height = rows * max_height + (rows - 1) * image_padding
+    grid_image = Image.new("RGB", (grid_width, grid_height), color=background_color)
+
+    # Paste images into the grid
+    for index, image in enumerate(images):
+        row = index // columns
+        col = index % columns
+        x_offset = col * (max_width + image_padding)
+        y_offset = row * (max_height + image_padding)
+        grid_image.paste(image, (x_offset, y_offset))
+
+    # Save the stitched image
+    grid_image.save(output_file)
+    print(f"Successfully saved grid image to {output_file}")
+
+
+def rescale_pad_to_square(image: np.ndarray) -> np.ndarray:
+    """Rescale image to a square by repeating the image in the
+    dimension with the smallest size. (so not necessarily perfect square)
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Rescaled and padded image
+    """
+    image = rescale_to_rel_square(image)
+    image = pad_to_square(image)
+    return image
+
+
+def rescale_to_rel_square(image: np.ndarray) -> np.ndarray:
+    """Rescale image to a square by repeating the image in the
+    dimension with the smallest size. (so not necessarily perfect square)
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Rescaled image
+    """
+    height, width = image.shape
+    ratio = height / width
+    if ratio > 1:
+        image = np.repeat(image, ratio // 1, axis=1)
+    if ratio < 1:
+        image = np.repeat(image, (1 / ratio) // 1, axis=0)
+    return image
+
+
+def pad_to_square(image: np.ndarray) -> np.ndarray:
+    """Pad image to a square by adding zeros to the smaller dimension.
+
+    Args:
+        image (np.ndarray): 2D Image with shape(height, width)
+
+    Returns:
+        np.ndarray: Padded image with shape (max(height, width), max(height, width))
+    """
+    height, width = image.shape
+    max_dim = max(height, width)
+
+    # Calculate padding for image
+    pad_height = (max_dim - height) // 2
+    pad_width = (max_dim - width) // 2
+    pad_height_odd = (max_dim - height) % 2
+    pad_width_odd = (max_dim - width) % 2
+
+    # Pad image
+    padded_image = np.pad(
+        image,
+        (
+            (pad_height, pad_height + pad_height_odd),
+            (pad_width, pad_width + pad_width_odd),
+        ),
+        mode="constant",
+        constant_values=0,
+    )
+    return padded_image
 
 
 def get_subitems(folder: Path, level: int) -> List[Path]:
