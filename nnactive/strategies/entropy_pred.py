@@ -5,7 +5,7 @@ import torch
 
 from nnactive.data import Patch
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
-from nnactive.strategies.uncertainties import prob_pred_entropy
+from nnactive.strategies.uncertainties import Probs
 from nnactive.strategies.utils import power_noising
 
 
@@ -13,7 +13,9 @@ class PredictiveEntropy(AbstractUncertainQueryMethod):
     def get_uncertainty(
         self, probs: list[Path] | torch.Tensor, device: torch.device
     ) -> torch.Tensor:
-        return prob_pred_entropy(probs, device)
+        if not isinstance(probs, Probs):
+            probs = Probs.create(probs)
+        return probs.pred_entropy(probs, device)
 
 
 class PowerPredictiveEntropy(PredictiveEntropy):

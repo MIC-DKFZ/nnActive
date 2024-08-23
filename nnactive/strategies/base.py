@@ -13,7 +13,6 @@ from typing import Any, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
-import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -28,6 +27,7 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
+import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -36,6 +36,7 @@ from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.masking import does_overlap, percentage_overlap, percentage_overlap_array
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.utils.io import load_label_map
+from nnactive.utils.logging import log_memory_usage
 from nnactive.utils.patches import get_slices_for_file_from_patch
 from nnactive.utils.timer import CudaTimer, Timer
 
@@ -52,7 +53,7 @@ class AbstractQueryMethod(ABC):
         seed: int | None = None,
         **kwargs,
     ):
-        logger.info(f"Initializeing Query Method for loop {loop_val}")
+        logger.info(f"Initializing Query Method for loop {loop_val}")
         self.dataset_id = dataset_id
         self.additional_label_path = additional_label_path
         self.file_ending = file_ending
@@ -177,6 +178,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         num_processes_preprocessing: int = 3,
         additional_label_path: Path | None = None,
         verbose: bool = False,
+        max_ram_pred_query: float | int = 40,
         **kwargs,
     ):
         super().__init__(
@@ -190,6 +192,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         )
 
         self.num_processes_preprocessing = num_processes_preprocessing
+        self.max_ram_pred_query = max_ram_pred_query
 
     def get_n_patch_per_image(self):
         return self.config.n_patch_per_image
@@ -300,8 +303,10 @@ class BasePredictionQuery(AbstractQueryMethod):
         """Assume that value_dicts are already order that first one has highest score etc."""
         return 0
 
-    def get_data_handler(self, temp_path: Path):
-        return InternalDataHandler(temp_path)
+    def get_data_handler(self, temp_path: Path, num_folds: int, max_ram: float | int):
+        return InternalDataHandler(
+            temp_path=temp_path, num_folds=num_folds, max_ram=max_ram
+        )
 
     def cleanup_prediction():
         """Performed after prediction of each single image and subsequent query_file_from_dict"""
@@ -330,7 +335,9 @@ class BasePredictionQuery(AbstractQueryMethod):
         device: torch.device = torch.device("cuda:0"),
     ) -> list[dict]:
         temp_file_handler = self.get_data_handler(
-            get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}"
+            temp_path=get_raw_path(self.dataset_id) / f"temp_probs_part{part_id}",
+            num_folds=self.config.train_folds,
+            max_ram=self.max_ram_pred_query,
         )
 
         torch.cuda.set_device(device)
@@ -462,31 +469,53 @@ class InternalDataHandler:
     def __init__(
         self,
         temp_path: Path,
+        num_folds: int,
+        max_ram: float = 40.0,
         save_keys: tuple[str, ...] = ("probs",),
         pass_keys: tuple[str, ...] | None = None,
     ):
         """Class to handle saving of temporary files right after prediction step.
 
         Args:
-            temp_path (Path): path to save files to
+            temp_path (Path): path to save files to.
+            num_folds (int): Number of folds.
+            max_ram (float, optional): Maximum allowed RAM usage for handled files in GB.
+                When exceeding max_ram, temp files are used. Defaults to 40GB.
+            save_keys (tuple[str, ...], optional): Defaults to ("probs",).
+            pass_keys (tuple[str, ...] | None, optional): Additional keys to pass.
+                Defaults to None.
         """
         self.temp_path = temp_path
+        self.num_folds = num_folds
+        self.max_ram = max_ram
+        self._data_exceeds_max_ram = None
         self.default_filenames = {key: key + "_fold" for key in save_keys}
         self.pass_keys = [] if pass_keys is None else list(pass_keys)
 
     def handle_data(
         self,
         temporary_dict: dict,
+        fold: int | str,
         filename: str | None = None,
-        fold: int | str | None = None,
-    ) -> dict[str, Path]:
+        ram_usage: float | int | None = None,
+    ) -> dict[str, Path | torch.Tensor | np.ndarray]:
         """Save temporary files in temporary dict and returns paths to obtain them again.
         Files in pass_keys are give through.
 
         Args:
-            temporary_dict (dict): _description_
-            filename (str) : if specified is expected to carry suffix .xyz
+            temporary_dict (dict): data to handle with identifier as keys
+            filename (str | None, optional): Defaults to None.
+            fold (int | str): Fold index required for unique naming of temp files.
+            ram_usage (float | int | None, optional): Estimated RAM usage per fold.
+                If None, it is derived from the temporary_dict size. Defaults to None.
+
+        Returns:
+            dict[str, Path | torch.Tensor | np.ndarray]: Handled data. If temp files are
+                used, the corresponding paths are returned.
         """
+        if not self.data_exceeds_max_ram(temporary_dict, ram_usage):
+            return temporary_dict
+
         if filename is None:
             filename = ""
         save_timer = Timer()
@@ -497,13 +526,41 @@ class InternalDataHandler:
             save_file = self.temp_path / (
                 filename + self.default_filenames[key] + self.build_suffix(fold)
             )
-
             np.save(save_file, temporary_dict[key])
             handled_inputs[key] = save_file
         logger.debug(f"Time for saving: {save_timer.stop()/1000}s")
         for key in self.pass_keys:
             handled_inputs[key] = temporary_dict[key]
         return handled_inputs
+
+    def data_exceeds_max_ram(self, data_dict, ram_usage=None):
+        """Whether data for all folds exceeds the specified maximum RAM. Calculated once."""
+        if self._data_exceeds_max_ram is not None:
+            return self._data_exceeds_max_ram
+
+        if ram_usage is None:
+            ram_usage = 0
+            for k, v in data_dict.items():
+                if isinstance(v, np.ndarray):
+                    ram_usage += v.nbytes
+                elif isinstance(v, torch.Tensor):
+                    ram_usage += v.element_size() * v.numel()
+                else:
+                    raise ValueError(
+                        f"Unsupported object type {type(v)} for '{k}' data."
+                    )
+            ram_usage /= 1024**3
+
+        self._data_exceeds_max_ram = ram_usage * self.num_folds > self.max_ram
+        info_msg = (
+            f"RAM estimate for {self.num_folds} folds: {ram_usage * self.num_folds:.2f}"
+            f"GB; Max RAM: {self.max_ram:.2f}GB"
+        )
+        if self._data_exceeds_max_ram:
+            logger.info(info_msg + " - Storing data in temporary files.")
+        else:
+            logger.info(info_msg + " - Keeping data in RAM.")
+        return self._data_exceeds_max_ram
 
     def build_suffix(self, fold: int | str | None) -> str:
         return f"{fold}.npy"
@@ -530,7 +587,7 @@ class BaseQueryPredictor(nnUNetPredictor):
 
         """
         logger.trace(
-            f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss * 1e-9}GB"
+            f"RAM used before conversion of logits to probs:~{psutil.Process().memory_info().rss / (1024**3)}GB"
         )
         # NAN Checking is now handled by nnU-Net
         # logits_nf = torch.isfinite(logits) == 0
@@ -557,7 +614,7 @@ class BaseQueryPredictor(nnUNetPredictor):
         # if np.isnan(np.sum(out_prob)):
         #     raise ValueError(f"NAN values in probablities in image!")
 
-        return {"probs": out_prob}
+        return {"probs": torch.from_numpy(out_prob)}
 
     def predict_fold_logits_from_preprocessed_data(
         self,
@@ -565,6 +622,11 @@ class BaseQueryPredictor(nnUNetPredictor):
         properties: dict,
         temp_file_handler: InternalDataHandler,
     ) -> list[dict]:
+        # TODO:
+        #   - (optionally save predictions: argmax on probs -> apply label mapping )
+        #   - (convert_probabilities_to_segmentation -> mean probs to inefficient for now)
+        #   - optionally save all probs (not temp):
+        #   - np.array -> torch.Tensors
         """Computes the logits/probs for all folds.
 
         Args:
@@ -583,24 +645,37 @@ class BaseQueryPredictor(nnUNetPredictor):
                         else:
                             self.network._orig_mod.load_state_dict(params)
 
-                        logger.info(
-                            f"RAM used before sliding window prediction:~{psutil.Process().memory_info().rss * 1e-9}GB"
-                        )
+                        if fold == 0:
+                            used_ram_before = psutil.Process().memory_info().rss
+
+                        log_memory_usage("Before sliding window prediction")
                         logits = self.predict_sliding_window_return_logits(data)
 
                         out_dict = self.postprocess_logits_to_ouptuts(
                             logits, properties
                         )
-                        out[fold] = temp_file_handler.handle_data(out_dict, fold=fold)
+
+                        if fold == 0:
+                            # Get empirical RAM estimate per fold in GB
+                            ram_empirical = (
+                                psutil.Process().memory_info().rss - used_ram_before
+                            ) / (1024**3)
+                            logger.debug(
+                                f"Empirical RAM estimate per fold: {ram_empirical:.2f} GB"
+                            )
+
+                        # NOTE Set ram_usage to None to infer it from the tensor sizes
+                        out[fold] = temp_file_handler.handle_data(
+                            out_dict, fold=fold, ram_usage=ram_empirical
+                        )
 
                 except RuntimeError:
                     logger.exception(
                         "Prediction with perform_everything_on_gpu=True failed due to insufficient GPU memory. "
                         "Falling back to perform_everything_on_gpu=False. Not a big deal, just slower..."
                     )
-                    # print("Error:")
-                    # traceback.print_exc()
                     self.perform_everything_on_device = False
+                    torch.cuda.empty_cache()
 
             if not self.perform_everything_on_device:
                 # TODO: probably do not predict everything from scratch again but only from fold where gpu prediciton is canceled
@@ -610,9 +685,19 @@ class BaseQueryPredictor(nnUNetPredictor):
                         self.network.load_state_dict(params)
                     else:
                         self.network._orig_mod.load_state_dict(params)
+                    if fold == 0:
+                        used_ram_before = psutil.Process().memory_info().rss
                     logits = self.predict_sliding_window_return_logits(data)
                     out_dict = self.postprocess_logits_to_ouptuts(logits, properties)
-                    out[fold] = temp_file_handler.handle_data(out_dict)
+                    if fold == 0:
+                        # Get empirical RAM estimate per fold in GB
+                        ram_empirical = (
+                            psutil.Process().memory_info().rss - used_ram_before
+                        ) / (1024**3)
+                        logger.debug(
+                            f"Empirical RAM estimate per fold: {ram_empirical:.2f} GB"
+                        )
+                    out[fold] = temp_file_handler.handle_data(out_dict, fold=fold)
 
             self.perform_everything_on_device = original_perform_everything_on_device
         return out
@@ -658,19 +743,15 @@ class BaseQueryPredictor(nnUNetPredictor):
             else:
                 logger.info(f"\nPredicting image of shape {data.shape}:")
 
-            logger.info(
-                f"perform_everything_on_gpu: {self.perform_everything_on_device}"
-            )
-
             properties = preprocessed["data_properties"]
 
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dicts: list[dict[str, Any]] = (
-                self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_file_handler=temp_file_handler
-                )
+            query_dicts: list[
+                dict[str, Any]
+            ] = self.predict_fold_logits_from_preprocessed_data(
+                data, properties, temp_file_handler=temp_file_handler
             )
 
             logger.info("Start Query")
