@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
-from nnactive.strategies.uncertainties import prob_mutual_information
+from nnactive.strategies.uncertainties import Probs
 from nnactive.strategies.utils import power_noising
 
 
@@ -13,7 +13,9 @@ class BALD(AbstractUncertainQueryMethod):
     def get_uncertainty(
         self, probs: list[Path] | torch.Tensor, device: torch.device
     ) -> torch.Tensor:
-        return prob_mutual_information(probs, device)
+        if not isinstance(probs, Probs):
+            probs = Probs.create(probs)
+        return probs.mutual_information(probs, device)
 
 
 class PowerBALD(BALD):

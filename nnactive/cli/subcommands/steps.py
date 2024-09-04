@@ -46,6 +46,8 @@ from nnactive.query_pool import query_pool
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder
 from nnactive.update_data import update_data
+from nnactive.utils.io import save_json
+from nnactive.utils.timer import Timer
 
 nnActive_results = get_nnActive_results()
 
@@ -99,6 +101,7 @@ def step_train(
     runtime_config: RuntimeConfig = RuntimeConfig(),
     continue_id: int | None = None,
     force: bool = False,
+    raise_on_in_progress: bool = True,
 ):
     config.set_nnunet_env()
 
@@ -137,43 +140,58 @@ def step_train(
         verify=False,
     )
 
-    if runtime_config.n_gpus == 0:
-        wrap_training(
-            dataset_id=state.dataset_id,
-            config=config,
-            folds=list(range(num_folds)),
-            device=torch.device("cuda:0"),
-            wandbgroup=None,
+    if raise_on_in_progress and state.in_progress:
+        raise RuntimeError(
+            f"Training already in progress for experiment {config.name()}. Check the "
+            "current trainings or set up a new nnActive experiment."
         )
-    else:
-        devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
-        folds = [
-            [fold for fold in range(num_folds) if fold % runtime_config.n_gpus == d]
-            for d in range(runtime_config.n_gpus)
-        ]
-        try:
-            with ProcessPoolExecutor(
-                max_workers=runtime_config.n_gpus, mp_context=mp.get_context("spawn")
-            ) as executor:
-                for _ in executor.map(
-                    wrap_training,
-                    [state.dataset_id] * num_folds,
-                    [config] * num_folds,
-                    folds,
-                    devices,
-                    [wandb.run.group] * num_folds,
-                ):
-                    pass
-        except BrokenProcessPool as exc:
-            raise MemoryError(
-                "One of the worker processes died. "
-                "This usually happens because you run out of memory. "
-                "Try running with less processes."
-            ) from exc
+    state.in_progress = True
+    state.save_state()
+    try:
+        if runtime_config.n_gpus == 0:
+            wrap_training(
+                dataset_id=state.dataset_id,
+                config=config,
+                folds=list(range(num_folds)),
+                device=torch.device("cuda:0"),
+                wandbgroup=None,
+            )
+        else:
+            devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
+            folds = [
+                [fold for fold in range(num_folds) if fold % runtime_config.n_gpus == d]
+                for d in range(runtime_config.n_gpus)
+            ]
+            try:
+                with ProcessPoolExecutor(
+                    max_workers=runtime_config.n_gpus,
+                    mp_context=mp.get_context("spawn"),
+                ) as executor:
+                    for _ in executor.map(
+                        wrap_training,
+                        [state.dataset_id] * num_folds,
+                        [config] * num_folds,
+                        folds,
+                        devices,
+                        [wandb.run.group] * num_folds,
+                    ):
+                        pass
+            except BrokenProcessPool as exc:
+                raise MemoryError(
+                    "One of the worker processes died. "
+                    "This usually happens because you run out of memory. "
+                    "Try running with less processes."
+                ) from exc
 
+    except Exception as err:
+        state.in_progress = False
+        state.save_state()
+        raise RuntimeError("An error occured in 'step_train'") from err
+
+    state.in_progress = False
     if not force:
         state.training = True
-        state.save_state()
+    state.save_state()
 
 
 def wrap_prediction(
@@ -439,6 +457,7 @@ def step_query(
         force (bool, optional): Set this to force using this command without taking the state.json of the dataset into account. Defaults to False.
     """
     config.set_nnunet_env()
+    timer = Timer()
 
     print(f"{continue_id=}")
     if continue_id is None:
@@ -448,10 +467,27 @@ def step_query(
     else:
         state = State.get_id_state(continue_id, verify=not force)
 
+    # If the query step is already done, re-running it has to be forced.
+    if state.query and not force:
+        raise RuntimeError(
+            f"Query step already performed for loop {state.loop + 1}. Use --force=True "
+            "to re-run the query step."
+        )
+
     with monitor.active_run(config=config.to_dict()):
+        timer.start()
         query_pool(
             config, runtime_config, state.dataset_id, force=force, verbose=verbose
         )
+        timer.stop()
+
+    b_times = {}
+    b_times["times"] = {"Query Time": timer.average()}
+    b_times["config"] = config.to_dict()
+    b_times["runtime_config"] = runtime_config.to_dict()
+    save_json(
+        b_times, get_results_folder(state.dataset_id) / "benchmark_time_query.json"
+    )
 
 
 @register_subcommand("step_update")

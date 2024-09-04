@@ -20,15 +20,19 @@ from nnactive.strategies.utils import RepresentationHandler
 
 
 class BaseDiversityQueryMethod(BasePredictionQuery):
-
     @abstractmethod
     def strategy(
         self, query_dicts: list[dict[str, Any]], device: torch.device = ...
     ) -> list[dict[str, Any]]:
         pass
 
-    def get_data_handler(self, temp_path: Path):
-        return InternalDataHandler(temp_path, pass_keys=["repr"])
+    def get_data_handler(self, temp_path: Path, num_folds: int, max_ram: float):
+        return InternalDataHandler(
+            temp_path=temp_path,
+            num_folds=num_folds,
+            max_ram=max_ram,
+            pass_keys=["repr"],
+        )
 
     def build_query_predictor(self, device: torch.device) -> DiversityPredictor:
         predictor = DiversityPredictor(
@@ -55,7 +59,6 @@ class BaseDiversityQueryMethod(BasePredictionQuery):
 
 
 class DiversityPredictor(BaseQueryPredictor):
-
     def prepare_predictions(self):
         """Method used to set up hooks for extraction of parameters.
 
@@ -72,9 +75,9 @@ class DiversityPredictor(BaseQueryPredictor):
             self.network.encoder.strides, axis=0, dtype=int
         ).tolist()
 
-        features_stages: list[int] = (
-            self.configuration_manager.network_arch_init_kwargs["features_per_stage"]
-        )
+        features_stages: list[
+            int
+        ] = self.configuration_manager.network_arch_init_kwargs["features_per_stage"]
         # get encoder parameters
         self.stages = {
             f"encoder.stages.{i}": {
@@ -210,7 +213,6 @@ class DiversityPredictor(BaseQueryPredictor):
     def hook_creator(
         self, name: str
     ) -> Callable[[torch.nn.Module, torch.Tensor, torch.Tensor], None]:
-
         def hook_fn(m: torch.nn.Module, input: torch.Tensor, output: torch.Tensor):
             if self.forward_representations.get(name) is None:
                 self.forward_representations[name] = []

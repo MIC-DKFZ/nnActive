@@ -73,6 +73,16 @@ class MultiExperimentAnalysis:
                 for exp_path in experiment_paths
                 if Final.from_json(exp_path / Final.filename()).final
             ]
+
+        # Filter out debug and prototype runs
+        experiment_paths = [
+            e
+            for e in experiment_paths
+            if not "DEBUG" in str(e)
+            and not "PROTOTYPE" in str(e)
+            and not "small" in str(e)
+        ]
+
         return experiment_paths
 
     @cached_property
@@ -395,7 +405,6 @@ class MultiExperimentAnalysis:
             dataset = key[dataset_ind]
             x_name_dict = {"Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)}}
             for y_name, x_name in product(y_names, x_name_dict):
-
                 fig, axs = self.plot_single_experiment(
                     df_g,
                     y_name,

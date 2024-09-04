@@ -26,6 +26,7 @@ class State:
     pred_tr: bool = False
     query: bool = False
     update_data: bool = False
+    in_progress: bool = False
 
     def new_loop(self):
         self.loop += 1
@@ -35,6 +36,7 @@ class State:
         self.pred_tr = False
         self.query = False
         self.update_data = False
+        self.in_progress = False
 
     def reset(self):
         self.loop = 0
@@ -44,6 +46,7 @@ class State:
         self.pred_tr = False
         self.query = False
         self.update_data = False
+        self.in_progress = False
 
     def save_state(self):
         try:
