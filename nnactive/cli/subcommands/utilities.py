@@ -8,6 +8,7 @@ import pandas as pd
 import SimpleITK as sitk
 from loguru import logger
 
+import nnactive.paths as paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.steps import preprocess, step_update
 from nnactive.config.struct import ActiveConfig
@@ -21,7 +22,7 @@ from nnactive.loops.loading import (
     get_patches_from_loop_files,
     get_sorted_loop_files,
 )
-from nnactive.nnunet.utils import get_raw_path
+from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, get_results_path
 from nnactive.production import produce_empty_masks
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
@@ -159,6 +160,8 @@ def util_verify_data(
 
 @register_subcommand("util_get_times")
 def util_get_times(base_path: str | None = None, filter_times=True):
+    """Get the times from the benchmark_times.json files in the base_path."""
+
     def get_file_dicts(base_path: str):
         # Find all files with name "benchmark_times.json"
         base_path: Path = Path(base_path)
@@ -263,3 +266,33 @@ def util_produce_empty_masks(
         additional_label_folder,
         modality_iden,
     )
+
+
+@register_subcommand("util_get_experiment_dirs")
+def util_get_experiment_dirs(
+    config: ActiveConfig,
+    continue_id: int | None = None,
+):
+    """Get the experiment directories for the current config.
+
+    Args:
+        config (ActiveConfig): ActiveConfig object
+        continue_id (int, optional): Continue with this id in nnActive Structure. Defaults to None.
+    """
+    from pprint import pprint
+
+    config.set_nnunet_env()
+    # TODO: take state which is already prepared instead of next_free_state
+    state = State.latest(config)
+    continue_id = state.dataset_id
+    print("\n")
+    print("Experiment Directories:")
+    print("-" * 5)
+    out_dict = {}
+    out_dict["nnActive_raw"] = str(paths.nnActive_raw / "nnUNet_raw" / config.dataset)
+    out_dict["nnActive_results"] = str(get_nnactive_results_folder(continue_id))
+    out_dict["nnUNet_raw"] = str(get_raw_path(continue_id))
+    out_dict["nnUNet_preprocessed"] = str(get_preprocessed_path(continue_id))
+    out_dict["nnUNet_results"] = str(get_results_path(continue_id))
+    for key, val in out_dict.items():
+        print(f"{key}: '{val}'")
