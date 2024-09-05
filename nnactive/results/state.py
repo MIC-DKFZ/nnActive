@@ -105,26 +105,24 @@ class State:
     def latest(cls, config: ActiveConfig) -> State:
         state_files = sorted(
             list(
-                (config.group_dir() / "nnActive_results").glob(
-                    f"Dataset*{config.name()}/state.json"
-                )
+                (config.group_results_dir()).glob(f"Dataset*{config.name()}/state.json")
             )
         )
         assert state_files, f"No state files found for {config.name()}"
-        return State.from_json(state_files[-1])
+        return cls.from_json(state_files[-1])
 
     @classmethod
     def next_free_state(cls, config: ActiveConfig) -> State:
         state_files = list(
             map(
                 lambda path: int(path.name[7:10]),
-                list((config.group_dir() / "nnActive_results").glob("Dataset*")),
+                list((config.group_results_dir()).glob("Dataset*")),
             )
         )
         if not state_files:
-            return State(name=config.name(), dataset_id=0)
+            return cls(name=config.name(), dataset_id=0)
 
-        return State(name=config.name(), dataset_id=max(state_files) + 1)
+        return cls(name=config.name(), dataset_id=max(state_files) + 1)
 
     @staticmethod
     def experiment_finished(path: Path) -> bool:

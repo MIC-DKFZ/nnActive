@@ -151,6 +151,7 @@ $nnActive_data
 ...
 
 $nnActive_results
+├── Dataset004_Hippocampus # base_dataset folder
 │   ├── nnActive_results
 │   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
 │   │   │   └── config.json

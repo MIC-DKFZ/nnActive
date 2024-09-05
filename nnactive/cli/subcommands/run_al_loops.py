@@ -43,14 +43,14 @@ def main(
     else:
         state = State.get_id_state(continue_id)
 
-    dataset_id = state.dataset_id
+    continue_id = state.dataset_id
     # Update config file if needed
-    existing_config = ActiveConfig.get_from_id(dataset_id)
+    existing_config = ActiveConfig.get_from_id(continue_id)
     if config != existing_config:
         logger.info(
             f"Overwriting {ActiveConfig.filename()} with updated configuration."
         )
-        config.save_id(dataset_id)
+        config.save_id(continue_id)
 
     # TODO: update nnUNet env vars based on config
 
@@ -94,7 +94,7 @@ def main(
                         do_all=do_all,
                     )
                     preprocess_time = timer_dict["Preprocess Timer"].stop()
-                    state = State.get_id_state(dataset_id)
+                    state = State.get_id_state(continue_id)
 
                 if state.training is False:
                     # verbose not necessary here.
@@ -107,7 +107,7 @@ def main(
                         raise_on_in_progress=False,
                     )
                     train_time = timer_dict["Train Time"].stop()
-                    state = State.get_id_state(dataset_id)
+                    state = State.get_id_state(continue_id)
                 if state.get_performance is False:
                     monitor.log("task", "get_performance", epoch=al_iteration)
                     timer_dict["Val Time"].start()
@@ -118,7 +118,7 @@ def main(
                         verbose=verbose,
                     )
                     performance_time = timer_dict["Val Time"].stop()
-                    state = State.get_id_state(dataset_id)
+                    state = State.get_id_state(continue_id)
                 if al_iteration < config.query_steps - 1:
                     if state.pred_tr is False and state.query is False:
                         monitor.log("task", "query_pool", epoch=al_iteration)
@@ -130,13 +130,13 @@ def main(
                             verbose=verbose,
                         )
                         query_time = timer_dict["Query Time"].stop()
-                        state = State.get_id_state(dataset_id)
+                        state = State.get_id_state(continue_id)
                     if state.update_data is False:
                         monitor.log("task", "update_step", epoch=al_iteration)
                         timer_dict["Data-Update Time"].start()
                         step_update(config, continue_id=continue_id, annotated=True)
                         update_time = timer_dict["Data-Update Time"].stop()
-                        state = State.get_id_state(dataset_id)
+                        state = State.get_id_state(continue_id)
 
                     # time loop only if all tasks are completed
                     if time_loop:
@@ -163,4 +163,4 @@ def main(
         b_times["times"] = time_dict
         b_times["config"] = config.to_dict()
         b_times["runtime_config"] = runtime_config.to_dict()
-        save_json(b_times, get_results_folder(dataset_id) / "benchmark_times.json")
+        save_json(b_times, get_results_folder(continue_id) / "benchmark_times.json")
