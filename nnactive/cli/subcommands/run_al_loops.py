@@ -52,7 +52,11 @@ def main(
         )
         config.save_id(continue_id)
 
-    # TODO: update nnUNet env vars based on config
+    loop_budget = (
+        runtime_config.max_loops
+        if runtime_config.max_loops is not None
+        else config.query_steps
+    )
 
     with monitor.active_run(config=config.to_dict()):
         logger.info(config)
@@ -74,12 +78,17 @@ def main(
         state.save_state()
         try:
             for al_iteration in range(config.query_steps):
+                # If loop_budget is 0, we have reached the maximum number of loops
+                if loop_budget == 0:
+                    break
+
                 timer_dict["Loop Time"].start()
                 time_loop = False
                 if al_iteration < state.loop:
                     continue
                 if al_iteration > state.loop:
                     raise ValueError("A loop has not been executed!")
+
                 if state.preprocess is False:
                     time_loop = True
                     monitor.log("task", "preprocess", epoch=al_iteration)
@@ -142,6 +151,9 @@ def main(
                     if time_loop:
                         loop_time = timer_dict["Loop Time"].stop()
                         monitor.write_metric(loop_time, "Loop Time", epoch=al_iteration)
+
+                    # reduce loop budget
+                    loop_budget -= 1
                 if benchmark:
                     break
 

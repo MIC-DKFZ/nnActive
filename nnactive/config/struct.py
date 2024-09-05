@@ -45,7 +45,9 @@ class ActiveConfig:
     use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
     patch_overlap: float = 0  # how much overlap is allowed for patchs
-    additional_overlap: float = 0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
+    additional_overlap: float = (
+        0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
+    )
 
     def __post_init__(self):
         if self.n_patch_per_image is None:
@@ -140,6 +142,9 @@ class RuntimeConfig:
     n_gpus: int = 0
     max_ram_pred_query: int | float = 25
     save_probs: bool = False
+    max_loops: int | None = (
+        None  # how many loops should be run max None means run until query_steps
+    )
     # TODO optionally, save predictions (requires efficient computation of mean probs
     #      across folds)
     # save_preds: bool = False
