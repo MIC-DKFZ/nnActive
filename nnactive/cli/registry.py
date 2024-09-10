@@ -57,7 +57,6 @@ class ActionExperiment(Action):
     def apply_experiment_config(parser: ArgumentParser, cfg, dest, value) -> None:
         with previous_config_context(cfg):
             experiment_cfg = get_experiment(value)
-            print(experiment_cfg)
             tcfg = parser.parse_object(
                 {"config": asdict(experiment_cfg)},
                 env=False,
@@ -66,7 +65,6 @@ class ActionExperiment(Action):
             )
             cfg_merged = parser.merge_config(tcfg, cfg)
             cfg.__dict__.update(cfg_merged.__dict__)
-            print(cfg)
             cfg[dest] = value
 
 

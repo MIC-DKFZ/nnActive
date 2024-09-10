@@ -279,10 +279,7 @@ def util_get_experiment_dirs(
         config (ActiveConfig): ActiveConfig object
         continue_id (int, optional): Continue with this id in nnActive Structure. Defaults to None.
     """
-    from pprint import pprint
-
     config.set_nnunet_env()
-    # TODO: take state which is already prepared instead of next_free_state
     state = State.latest(config)
     continue_id = state.dataset_id
     print("\n")
