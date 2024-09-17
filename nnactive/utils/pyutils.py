@@ -15,6 +15,19 @@ def stitch_images(
     image_padding: int = 0,
     background_color: tuple[int, int, int] = (255, 255, 255),
 ):
+    """
+    Stitches multiple images from a directory into a single image arranged in a grid.
+
+    Args:
+        image_dir (Path): The directory containing the images to stitch.
+        output_file (Path | str): The path to save the stitched image.
+        columns (int, optional): The number of columns in the grid. Defaults to 3.
+        image_padding (int, optional): The padding between images in pixels. Defaults to 0.
+        background_color (tuple[int, int, int], optional): The background color of the stitched image. Defaults to (255, 255, 255).
+
+    Returns:
+        None
+    """
     # Get all image files from the folder
     image_files = [
         f.name
@@ -114,6 +127,24 @@ def pad_to_square(image: np.ndarray) -> np.ndarray:
         constant_values=0,
     )
     return padded_image
+
+
+def compute_conv_output_size(
+    input_size: int, kernel_size: int, stride: int, padding: int
+) -> int:
+    """
+    Computes the output size of a convolution operation.
+
+    Args:
+        input_size (int): The size of the input (e.g., height or width).
+        kernel_size (int): The size of the convolution kernel (e.g., height or width).
+        stride (int): The stride of the convolution.
+        padding (int): The amount of padding added to the input.
+
+    Returns:
+        int: The size of the output after the convolution operation.
+    """
+    return (input_size - kernel_size + 2 * padding) // stride + 1
 
 
 def get_subitems(folder: Path, level: int) -> List[Path]:
