@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
+import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -27,7 +28,6 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
-import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -54,21 +54,23 @@ class AbstractQueryMethod(ABC):
         **kwargs,
     ):
         logger.info(f"Initializing Query Method for loop {loop_val}")
+        self.loop_val = loop_val
         self.dataset_id = dataset_id
         self.additional_label_path = additional_label_path
         self.file_ending = file_ending
         self.top_patches: list[dict] = []
         self.verbose = verbose
         self.config = config
-        self.annotated_patches = get_patches_from_loop_files(
-            get_raw_path(self.dataset_id), loop_val
-        )
-        self.seed = seed if seed is not None else self.config.seed + loop_val
+        self.seed = seed if seed is not None else self.config.seed + self.loop_val
         self.rng = np.random.default_rng(self.seed)
         self.__post_init__()
 
     def __post_init__(self):
         pass
+
+    @property
+    def annotated_patches(self):
+        return get_patches_from_loop_files(get_raw_path(self.dataset_id), self.loop_val)
 
     @abstractmethod
     def query(
@@ -148,7 +150,7 @@ class AbstractQueryMethod(ABC):
         seed: int,
         additional_label_path: Path | None = None,
         **kwargs,
-    ):
+    ) -> AbstractQueryMethod:
         additional_label_path: Path = (
             get_raw_path(dataset_id) / "addTr"
             if additional_label_path is None
@@ -746,10 +748,10 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dicts: list[
-                dict[str, Any]
-            ] = self.predict_fold_logits_from_preprocessed_data(
-                data, properties, temp_file_handler=temp_file_handler
+            query_dicts: list[dict[str, Any]] = (
+                self.predict_fold_logits_from_preprocessed_data(
+                    data, properties, temp_file_handler=temp_file_handler
+                )
             )
             temp_file_handler.reset_ram_stats()
 

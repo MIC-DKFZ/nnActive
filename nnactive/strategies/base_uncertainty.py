@@ -17,8 +17,13 @@ from nnactive.strategies.base import BasePredictionQuery
 class AbstractUncertainQueryMethod(BasePredictionQuery):
     def __post_init__(self):
         super().__post_init__()
+        striding = (
+            self.config.agg_stride ** len(self.config.patch_size)
+            if isinstance(self.config.agg_stride, int)
+            else np.prod(self.config.agg_stride)
+        )
         if (
-            self.config.agg_stride == 1
+            striding == 1
         ):  # TODO: for strides < 8 for large images scipy is still faster. This can be implemented better
             self.aggregation = ConvolveAggScipy(
                 self.config.patch_size, stride=self.config.agg_stride
