@@ -365,8 +365,18 @@ class MultiExperimentAnalysis:
             df_results_dicts.extend(df_exp_dict)
 
         df = pd.DataFrame(df_results_dicts)
+        df = self.ensure_df_elt_hashable(df)
+
         vals = [seperator for seperator in df.columns if seperator not in exp_skip_keys]
         return df, vals
+
+    @staticmethod
+    def ensure_df_elt_hashable(df: pd.DataFrame):
+        for col in df.columns:
+            if df[col].dtype == object:
+                if len(df[col]) > 0 and isinstance(df[col][0], list):
+                    df[col] = df[col].apply(lambda x: tuple(x))
+        return df
 
     def dataset_analyze_statistics(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
@@ -391,6 +401,7 @@ class MultiExperimentAnalysis:
             df_row_dicts.extend(df_row_dict)
 
         df = pd.DataFrame(df_row_dicts)
+        df = self.ensure_df_elt_hashable(df)
 
         vals = [seperator for seperator in df.columns if seperator not in skip_keys]
         max_loop_ind = vals.index("query_steps")
@@ -453,6 +464,7 @@ class MultiExperimentAnalysis:
         )
 
         df = pd.DataFrame(merged_dicts)
+        df = self.ensure_df_elt_hashable(df)
 
         vals = [
             seperator
