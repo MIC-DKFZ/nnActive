@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable
 
+import pandas as pd
 from loguru import logger
 
+from nnactive.analyze.metrics import compute_auc
 from nnactive.config.struct import ActiveConfig
 from nnactive.utils.io import load_json
 
@@ -80,7 +83,7 @@ class SingleExperimentResults:
     def config(self) -> ActiveConfig:
         return ActiveConfig.from_json(self.experiment_path / ActiveConfig.filename())
 
-    @property
+    @cached_property
     def results(self) -> list[dict]:
         out_results = []
         for summary_file in self.summary_files:
@@ -94,6 +97,22 @@ class SingleExperimentResults:
             temp_dict["Experiment"] = self.experiment_path.name
             out_results.append(temp_dict)
         return out_results
+
+    @cached_property
+    def overview(self) -> float:
+        df, _ = self.to_df_row_dicts()
+        df = pd.DataFrame(df)
+
+        out_list = []
+        for col in df.columns:
+            if "Dice" in col:
+                out_dict = {}
+                out_dict["Metric"] = col
+                out_dict["AUBC"] = compute_auc(df[col])
+                out_dict["Final"] = df[col].iloc[-1]
+                out_list.append(out_dict)
+
+        return out_list
 
     # TODO: retrieve class names from dataset.json
     @property
@@ -200,3 +219,13 @@ class SingleExperimentResults:
                     }
                 )
         return y_fulls
+
+
+if __name__ == "__main__":
+    exp_path = Path(
+        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset040_Hippocampus__DEBUG__patch-20_20_20__sb-random-label2-all-classes__sbs-10__qs-10__unc-random-label__seed-12345"
+    )
+    exp = SingleExperimentResults(exp_path)
+    import IPython
+
+    IPython.embed()
