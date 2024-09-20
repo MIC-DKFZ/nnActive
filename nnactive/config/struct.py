@@ -57,8 +57,6 @@ class ActiveConfig:
         if self.train_folds is None:
             self.train_folds = self.full_folds
 
-    # TODO: nnUNet env var setter
-    # TODO: path getters
     def set_nnunet_env(self):
         experiment_path = self.group_dir()
         os.environ["nnUNet_raw"] = str(experiment_path / "nnUNet_raw")
@@ -69,7 +67,9 @@ class ActiveConfig:
             nnUNet_preprocessed=str(experiment_path / "nnUNet_preprocessed"),
             nnUNet_results=str(experiment_path / "nnUNet_results"),
         )
-        nnactive.paths.set_paths(nnActive_results=self.group_dir() / "nnActive_results")
+        nnactive.paths.set_paths(
+            nnActive_results=self.group_results_dir(),
+        )
 
     def name(self) -> str:
         dataset = self.dataset.replace(f"Dataset{self.base_id:03}_", "")
@@ -78,6 +78,10 @@ class ActiveConfig:
     def group_dir(self) -> Path:
         assert nnactive.paths.nnActive_data is not None
         return nnactive.paths.nnActive_data / self.dataset
+
+    def group_results_dir(self) -> Path:
+        assert nnactive.paths.nnActive_results is not None
+        return nnactive.paths.base_nnActive_results / self.dataset / "nnActive_results"
 
     @classmethod
     def from_json(cls, path: Path) -> ActiveConfig:
@@ -136,6 +140,17 @@ class ActiveConfig:
 class RuntimeConfig:
     num_processes: int = 4
     n_gpus: int = 0
+    max_ram_pred_query: int | float = 25
+    save_probs: bool = False
+    max_loops: int | None = (
+        None  # how many loops should be run max None means run until query_steps
+    )
+    # TODO optionally, save predictions (requires efficient computation of mean probs
+    #      across folds)
+    # save_preds: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return get_clean_dataclass_dict(self)
 
 
 @dataclass

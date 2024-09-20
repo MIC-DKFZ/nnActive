@@ -10,8 +10,8 @@ from nnactive.data import Patch
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.utils import (
-    _get_infinte_iter,
-    _obtain_random_patch_for_img,
+    get_infinte_iter,
+    obtain_random_patch_for_img,
     query_starting_budget_all_classes,
 )
 from nnactive.utils.io import load_label_map
@@ -20,31 +20,27 @@ from nnactive.utils.io import load_label_map
 class Random(AbstractQueryMethod):
     def __init__(
         self,
+        config: ActiveConfig,
         dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
+        loop_val: int,
         seed: int,
         trials_per_img: int = 600,
         file_ending: str = ".nii.gz",
         raw_labels_path: Path | None = None,
         additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
         verbose: bool = False,
-        config: ActiveConfig | None = None,
         **kwargs,
     ):
         super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            file_ending,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
+            dataset_id=dataset_id,
             config=config,
+            loop_val=loop_val,
+            file_ending=file_ending,
+            additional_label_path=additional_label_path,
+            verbose=verbose,
+            seed=seed,
         )
         self.trials_per_img = trials_per_img
-        self.rng = np.random.default_rng(seed)
 
         self.raw_labels_path = (
             raw_labels_path
@@ -67,13 +63,13 @@ class Random(AbstractQueryMethod):
         Returns:
             List[Patch]: patches for annotation
         """
-        img_generator = _get_infinte_iter(self.img_names)
+        img_generator = get_infinte_iter(self.img_names)
         if already_annotated_patches is None:
             patches = []
         else:
             patches = already_annotated_patches
         logger.info("verbose", verbose)
-        for _ in range(self.query_size - len(patches)):
+        for _ in range(self.config.query_size - len(patches)):
             labeled = False
             while True:
                 img_name = img_generator.__next__()
@@ -103,8 +99,8 @@ class Random(AbstractQueryMethod):
                 num_tries = 0
                 while True:
                     # propose a random patch
-                    iter_patch_loc, iter_patch_size = _obtain_random_patch_for_img(
-                        img_size, self.patch_size, self.rng
+                    iter_patch_loc, iter_patch_size = obtain_random_patch_for_img(
+                        img_size, self.config.patch_size, self.rng
                     )
 
                     patch = Patch(
@@ -137,7 +133,7 @@ class Random(AbstractQueryMethod):
                             count += 1
 
                         self.img_names.pop(count)
-                        img_generator = _get_infinte_iter(self.img_names)
+                        img_generator = get_infinte_iter(self.img_names)
                         break
                     num_tries += 1
                 if labeled:
@@ -146,46 +142,16 @@ class Random(AbstractQueryMethod):
 
 
 class RandomAllClasses(Random):
-    def __init__(
-        self,
-        dataset_id: int,
-        query_size: int,
-        patch_size: list[int],
-        seed: int,
-        trials_per_img: int = 600,
-        file_ending: str = ".nii.gz",
-        raw_labels_path: Path | None = None,
-        additional_label_path: Path | None = None,
-        additional_overlap: float = 0.1,
-        verbose: bool = False,
-        config: ActiveConfig | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            dataset_id,
-            query_size,
-            patch_size,
-            seed,
-            trials_per_img,
-            file_ending,
-            raw_labels_path,
-            additional_label_path,
-            additional_overlap,
-            verbose=verbose,
-            config=config**kwargs,
-        )
-        random.seed(seed)
-
     def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         selected_patches = query_starting_budget_all_classes(
             self.raw_labels_path,
             self.file_ending,
             annotated_patches=self.annotated_patches,
-            patch_size=self.patch_size,
+            patch_size=self.config.patch_size,
             rng=self.rng,
             trials_per_img=self.trials_per_img,
             additional_label_path=self.additional_label_path,
-            additional_overlap=self.additional_overlap,
+            additional_overlap=self.config.additional_overlap,
             verbose=verbose,
         )
         return super().query(

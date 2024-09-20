@@ -1,21 +1,29 @@
+import os
 import os.path
 import shutil
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import SimpleITK as sitk
 from loguru import logger
 
+import nnactive.paths as paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.steps import preprocess, step_update
 from nnactive.config.struct import ActiveConfig
-from nnactive.experiments import list_experiments, list_prepared_experiments
+from nnactive.experiments import (
+    list_experiments,
+    list_finished_experiments,
+    list_prepared_experiments,
+)
 from nnactive.loops.loading import (
     get_loop_patches,
     get_patches_from_loop_files,
     get_sorted_loop_files,
 )
-from nnactive.nnunet.utils import get_raw_path
+from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, get_results_path
+from nnactive.production import produce_empty_masks
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.utils.io import load_json
@@ -150,6 +158,56 @@ def util_verify_data(
                     )
 
 
+@register_subcommand("util_get_times")
+def util_get_times(base_path: str | None = None, filter_times=True):
+    """Get the times from the benchmark_times.json files in the base_path."""
+
+    def get_file_dicts(base_path: str):
+        # Find all files with name "benchmark_times.json"
+        base_path: Path = Path(base_path)
+        file_paths = base_path.rglob("benchmark_times.json")
+
+        file_dicts = []
+        for file in file_paths:
+            file = Path(file)
+            # Load the JSON file
+            data = load_json(file)
+
+            # Extract the time from the JSON file
+            file_dict = {}
+            file_dict["Experiment"] = file.parent.name
+            file_dict["Trainer"] = data["config"]["trainer"]
+            file_dict["n_gpus"] = data["runtime_config"]["n_gpus"]
+            file_dict.update(data["times"])
+            file_dicts.append(file_dict)
+        #
+        # Create a DataFrame from the list of dictionaries
+        return file_dicts
+
+    if base_path is None:
+        base_path = Path(os.getenv("nnActive_data"))
+        base_paths = os.listdir(base_path)
+        base_paths = [
+            (base_path / sub_path / "nnActive_results") for sub_path in base_paths
+        ]
+
+    else:
+        base_paths = [base_path]
+
+    df_dicts = []
+    for base_path in base_paths:
+        file_dicts = get_file_dicts(base_path)
+        df_dicts.extend(file_dicts)
+    df = pd.DataFrame(df_dicts)
+    # filter rows
+    if len(df) == 0:
+        print("No benchmark_times.json files found.")
+    else:
+        if filter_times:
+            df = df.loc[df["Loop Time"].isnull() == False]
+        print(df.to_csv())
+
+
 @register_subcommand("util_list_experiments")
 def util_list_experiments():
     """List all configured experiments each experiment in one row."""
@@ -157,8 +215,81 @@ def util_list_experiments():
         print(experiment)
 
 
+@register_subcommand("util_list_finished_experiments")
+def util_list_finished_experiments(base_id: int):
+    """List all finished experiments with dataset rowwise for a specific base_id."""
+    for experiment in list_finished_experiments(base_id):
+        print(experiment)
+
+
+@register_subcommand("util_list_unfinished_experiments")
+def util_list_unfinished_experiments(base_id: int):
+    """List all prepared but not finished experiments with dataset rowwise for a specific base_id."""
+    prepared_experiments = list_prepared_experiments(base_id)
+    finished_experiments = list_finished_experiments(base_id)
+    for experiment in prepared_experiments:
+        if experiment not in finished_experiments:
+            print(experiment)
+
+
 @register_subcommand("util_list_prepared_experiments")
 def util_list_prepared_experiments(base_id: int):
     """List all prepared experiments with dataset rowwise for a specific base_id."""
     for experiment in sorted(list_prepared_experiments(base_id)):
         print(experiment)
+
+
+@register_subcommand("util_produce_empty_masks")
+def util_produce_empty_masks(
+    images_folder: Path,
+    output_folder: Path,
+    fill_value: int,
+    file_ending: str = ".nii.gz",
+    additional_label_folder: Path | None = None,
+    modality_iden: str = "_0000",
+):
+    """Create empty labels for all images in images_folder.
+
+    Args:
+        images_folder (Path): Folder with images
+        output_folder (Path): Folder for labels
+        fill_value (int): Label for ignore regions
+        file_ending (str): File ending. Defaults to ".nii.gz".
+        additional_label_folder (Path, optional): Folder with additional labels. Defaults to None.
+        modality_iden (str): _0000 modality string after img_identifier. Defaults to "_0000".
+    """
+    produce_empty_masks(
+        images_folder,
+        output_folder,
+        fill_value,
+        file_ending,
+        additional_label_folder,
+        modality_iden,
+    )
+
+
+@register_subcommand("util_get_experiment_dirs")
+def util_get_experiment_dirs(
+    config: ActiveConfig,
+    continue_id: int | None = None,
+):
+    """Get the experiment directories for the current config.
+
+    Args:
+        config (ActiveConfig): ActiveConfig object
+        continue_id (int, optional): Continue with this id in nnActive Structure. Defaults to None.
+    """
+    config.set_nnunet_env()
+    state = State.latest(config)
+    continue_id = state.dataset_id
+    print("\n")
+    print("Experiment Directories:")
+    print("-" * 5)
+    out_dict = {}
+    out_dict["nnActive_raw"] = str(paths.nnActive_raw / "nnUNet_raw" / config.dataset)
+    out_dict["nnActive_results"] = str(get_nnactive_results_folder(continue_id))
+    out_dict["nnUNet_raw"] = str(get_raw_path(continue_id))
+    out_dict["nnUNet_preprocessed"] = str(get_preprocessed_path(continue_id))
+    out_dict["nnUNet_results"] = str(get_results_path(continue_id))
+    for key, val in out_dict.items():
+        print(f"{key}: '{val}'")

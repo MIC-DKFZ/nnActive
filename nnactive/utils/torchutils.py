@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Union
 
 import numpy as np
@@ -102,11 +103,48 @@ def log_cuda_memory_info(device: torch.device | int | str = "cuda:0"):
     memory_cached = torch.cuda.memory_reserved(device) / (1024**3)
 
     logger.debug("-" * 8)
-    logger.debug("Before Compute")
-    logger.debug(f"\tMemory allocated: {memory_allocated}")
-    logger.debug(f"\tMax Memory allocated: {max_memory_allocated}")
-    logger.debug(f"\tMemory cached: {memory_cached}")
-    logger.debug(f"\tMemory free: {total_memory-memory_allocated}")
+    logger.debug("GPU memory stats:")
+    logger.debug(f"\tMemory allocated: {memory_allocated:.2f}GB")
+    logger.debug(f"\tMax Memory allocated: {max_memory_allocated:.2f}GB")
+    logger.debug(f"\tMemory cached: {memory_cached:.2f}GB")
+    logger.debug(f"\tMemory free: {total_memory-memory_allocated:.2f}GB")
+
+
+def reset_cuda_memory_stats(device: torch.device, log_info: bool = True):
+    """Perform torch.cuda.reset_peak_memory_stats, if device is a CUDA device.
+
+    Args:
+        device (torch.device): The device.
+        log_info (bool, optional): Log GPU memory info. Defaults to True.
+    """
+    if device.type == "cuda":
+        try:
+            torch.cuda.reset_peak_memory_stats(device)
+        except RuntimeError:
+            # bypasses error
+            # RuntimeError: Invalid device argument 0: did you call init?
+            pass
+        if log_info:
+            log_cuda_memory_info(device)
+
+
+def move_tensor_check_vram(
+    tensor: torch.Tensor, device: torch.device, factor_required_vram: float = 1.0
+) -> torch.Tensor:
+    # If tensor is already on the desired device, reduce the amount of required
+    # additional VRAM.
+    if tensor.device == device:
+        logger.debug(f"Already on device. {tensor.device = }, {device = }")
+        factor_required_vram -= 1.0
+    # check if it will fit into GPU
+    if device.type == "cuda" and (
+        get_tensor_memory_usage(tensor) * factor_required_vram
+        > estimate_free_cuda_memory(device)
+    ):
+        msg = f"Computation on {device} not feasible due to VRAM."
+        logger.debug(msg)
+        raise RuntimeError(msg)
+    return tensor.to(device)
 
 
 if __name__ == "__main__":

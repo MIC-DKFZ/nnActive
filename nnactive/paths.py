@@ -14,6 +14,10 @@ __paths = {
     ),
 }
 
+base_nnActive_results = (
+    Path(value) if (value := os.environ.get("nnActive_results")) else None
+)
+
 
 def set_paths(
     nnActive_raw: str | Path | None = None,
@@ -54,7 +58,8 @@ def set_raw_paths():
     paths.set_paths(
         nnUNet_raw=__paths["nnActive_raw"] / "nnUNet_raw",
         nnUNet_preprocessed=__paths["nnActive_raw"] / "nnUNet_preprocessed",
-        nnUNet_results=__paths["nnActive_raw"] / "nnUNet_raw",
+        nnUNet_results=__paths["nnActive_raw"]
+        / "nnUNet_results",  # nnUNet_results is not used anyways in this context!
     )
     yield
     paths.set_paths(

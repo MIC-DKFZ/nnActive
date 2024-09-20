@@ -8,7 +8,7 @@ dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
-    "batchgenerators",
+    "batchgenerators @ git+https://github.com/MIC-DKFZ/batchgenerators.git",
     "nnunetv2 @ git+ssh://git@codebase.helmholtz.cloud/hi-dkfz/iml/active-nnu-net.git@nnactive_base",
     "SimpleITK",
     "rich",

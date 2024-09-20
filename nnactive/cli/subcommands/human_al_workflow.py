@@ -2,20 +2,33 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import nnunetv2.paths
 import numpy as np
+from loguru import logger
+from tqdm import tqdm
 
 from nnactive.cli.registry import register_subcommand
-from nnactive.loops.loading import get_sorted_loop_files, save_loop
+from nnactive.loops.loading import (
+    get_patches_from_loop_files,
+    get_sorted_loop_files,
+    save_loop,
+)
+from nnactive.update_data import update_data
 from nnactive.utils import create_mitk_geometry_patch
 from nnactive.utils.io import load_json
 from nnactive.utils.mitk_integration import get_file_patch_list
 
 
+# TODO: verify how to give patch_size to the model.
 @register_subcommand("human_al_selection_to_loop")
-def human_al_manual_selection_to_loop(raw_folder: str, debug: bool = False) -> None:
+def human_al_manual_selection_to_loop(
+    raw_folder: str,
+    patch_size: Tuple[int, int, int] = (48, 224, 224),
+    loop: int | None = None,
+    debug: bool = False,
+) -> None:
     """
     Create a loop_XXX file that contains the manually selected patches as a list that should be included for
     training in the next cycle. The manual selected patches are stored as cropped versions of the original images
@@ -23,7 +36,9 @@ def human_al_manual_selection_to_loop(raw_folder: str, debug: bool = False) -> N
     If some of the manually selected patches overlap, the loop file will not be created and the user is asked to
     create the patches again without overlap.
     """
-
+    # turn around the patch size list to match the order inside of MITK...
+    patch_size = list(patch_size)[::-1]
+    patch_size = tuple(patch_size)
     # create an empty dict to store all patches that should be in the loop_XXX.json file
     all_patches_dict = {"patches": []}
 
@@ -31,25 +46,38 @@ def human_al_manual_selection_to_loop(raw_folder: str, debug: bool = False) -> N
     data_path = Path(raw_folder)
     dataset_json = load_json(data_path / "dataset.json")
     file_ending = dataset_json["file_ending"]
+    if loop is None:
+        loop = len(get_sorted_loop_files(data_path))
 
     images_tr_dir = data_path / "imagesTr"
-    selected_patch_dir = data_path / "patches_manual_selected"
-    os.makedirs(selected_patch_dir, exist_ok=True)
-    images = [
-        images_tr_dir / image
-        for image in os.listdir(images_tr_dir)
-        if image.endswith(file_ending)
+    selected_patch_dir = data_path / f"patches_manual_selected_{loop:02d}"
+
+    image_patch = [
+        images_tr_dir / (image.name[: -len("_00.nrrd")] + file_ending)
+        for image in selected_patch_dir.iterdir()
+        if image.name.endswith(".nrrd")
     ]
 
     # preliminary is set to true as soon as some patches overlap, which means no loop file is created
     preliminary = False
 
     # iterate through images and get patch list for the images
-    for image in images:
+
+    # subtract one value from loop_val as we want to only take the patches from the previous loop into account
+    all_patches = get_patches_from_loop_files(data_path, loop - 1)
+    logger.info("Found {} patches for loop {}".format(len(all_patches), loop))
+    for image in tqdm(image_patch):
+        file_patches = [
+            patch
+            for patch in all_patches
+            if patch.file[: -len(file_ending)]
+            == image.name[: -(len(file_ending) + len("_0000"))]
+        ]
         patches_image_list, preliminary_image = get_file_patch_list(
             original_image_path=image,
             cropped_path=selected_patch_dir,
-            data_path=data_path,
+            patch_size_required=patch_size,
+            file_patches=file_patches,
             debug=debug,
         )
         all_patches_dict["patches"].extend(patches_image_list)
@@ -57,11 +85,42 @@ def human_al_manual_selection_to_loop(raw_folder: str, debug: bool = False) -> N
             preliminary = True
     # store loop file if no patches overlap
     if not preliminary:
-        loop = len(get_sorted_loop_files(data_path))
         save_loop(data_path, all_patches_dict, loop)
         # prelim_patches is the folder where overlapping patches are stored as .mitkgeometry files
         if os.path.isdir(selected_patch_dir / "prelim_patches"):
             shutil.rmtree(selected_patch_dir / "prelim_patches")
+
+
+# TODO: allow updating of data based on annotations based on paths!
+# @register_subcommand("human_al_update_data")
+# def human_al_update_data(
+#     target_raw_folder: str, splits_file_path: str, loop: int, debug: bool = False
+# ):
+#     """Update the data based on the loop file.
+#     Can be executed outside of nnActive folder structure.
+
+#     Args:
+#         target_raw_folder (str): Path to the raw data folder
+#         splits_file (str): Path to the splits_file file
+#         loop (int): Loop number
+#         debug (bool, optional): Debug mode. Defaults to False.
+#     """
+#     datap_path = Path(target_raw_folder)
+#     splits_file_path = Path(splits_file_path)
+
+#     update_data(
+#         data_path=datap_path,
+#         save_splits_file=splits_file_path,
+#         ignore_label=...,
+#         base_dir=datap_path / "",
+#         target_dir=datap_path / "labelsTr",
+#         file_ending=".nii.gz",
+#         loop=loop,
+#         debug=debug,
+#     )
+#     nnunet_plans_path = Path(plans_file)
+#     target_dir = Path(target_raw_folder)
+#     assert nnunet_plans_path.exists()
 
 
 @register_subcommand("human_al_create_mitk_geometry_file")

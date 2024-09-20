@@ -115,16 +115,19 @@ class nnActiveMonitor:
         self.assert_wandb_active()
         return _nnActiveLogger()
 
-    def log(self, key, value, epoch: int) -> None:
+    def log(self, key: str, value: Any, epoch: int) -> None:
         self.assert_wandb_active()
         wandb.log({key: value, "epoch": epoch})
 
-    def write_metric(self, value, name: str):
+    def write_metric(self, value: Any, name: str, epoch: int | None = None) -> None:
         self.assert_wandb_active()
         if f"{name}" not in self._defined_metrics:
             wandb.define_metric(f"{name}", summary="mean")
             self._defined_metrics.add(f"{name}")
-        wandb.log({name: value})
+        log_dict = {name: value}
+        if epoch is not None:
+            log_dict["epoch"] = epoch
+        wandb.log(log_dict)
         logger.info(f"{name}: {value}s")
 
 

@@ -28,10 +28,10 @@ PALETTE = {
     "expected_dice": "tab:purple",
     "random-label": "tab:red",
     "random-label2": "tab:cyan",
-    # "other_3": "tab:brown",
-    # "other_4": "tab:gray",
-    # "other_5": "tab:pink",
-    # "other_6": "tab:olive",
+    "power_bald": "tab:brown",
+    "power_pe": "tab:gray",
+    "softrank_bald": "tab:pink",
+    "kmeans_bald": "tab:olive",
 }
 
 
@@ -64,14 +64,25 @@ class MultiExperimentAnalysis:
     @cached_property
     def exp_results_paths(self):
         experiment_paths = [
-            fn.parent for fn in self.base_results_path.rglob("config.json")
+            fn.parent for fn in self.base_results_path.rglob("*/config.json")
         ]
+        logger.debug(f"Found {len(experiment_paths)} experiments.")
         if self.filter_final:
             experiment_paths = [
                 exp_path
                 for exp_path in experiment_paths
                 if Final.from_json(exp_path / Final.filename()).final
             ]
+
+        # Filter out debug and prototype runs
+        experiment_paths = [
+            e
+            for e in experiment_paths
+            if not "DEBUG" in str(e)
+            and not "PROTOTYPE" in str(e)
+            and not "small" in str(e)
+        ]
+
         return experiment_paths
 
     @cached_property
@@ -142,6 +153,152 @@ class MultiExperimentAnalysis:
                 axs.axhline(**y_full)
         return fig, axs
 
+    def plot_experiment_overview(
+        self,
+        df: pd.DataFrame,
+        selected_classes: list[int] | list[tuple[int]] | None = None,
+        horizontal_lines: dict[str, Any] | None = None,
+        x_axis_dict: dict[str, Any] | None = None,
+    ):
+        n_rows, n_cols = 3, 9
+        n_performance_cols = 3
+        plot_size = 4
+        if selected_classes is None:
+            selected_classes = [
+                int(i.split(" ")[1]) for i in df.columns if i.startswith("Class")
+            ][:3]
+            while len(selected_classes) < n_performance_cols:
+                selected_classes.append(None)
+
+        cols = [[] for _ in range(n_cols)]
+        col_num = 0
+        # fill first 4 columns
+        col0_x = [
+            "#Patches",
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+        ]
+        for x_n in col0_x:
+            cols[col_num].append({"x_name": x_n, "y_name": "Mean Dice"})
+
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                y_names = [f"Class {cls_index} Dice"] * n_rows
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
+                x_names = [
+                    "#Patches",
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
+                    "avg_percentage_of_voxels_fg_cls",
+                ]
+
+            cols[col_num].extend(
+                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
+            )
+
+        # fill last 4 columns
+        x_names = [
+            "percentage_of_num_voxels",
+            "percentage_of_num_voxels",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+            "patches_foreground",
+        ]
+        col_num += 1
+        for x_n, y_n in zip(x_names, y_names):
+            cols[col_num].append({"x_name": x_n, "y_name": y_n})
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                x_names = [
+                    "percentage_of_num_voxels",
+                    None,
+                    "#Patches",
+                ]
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
+                y_names = [
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
+                    None,
+                    f"patches_per_cls_{perctentage_index}",
+                ]
+            cols[col_num].extend(
+                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
+            )
+
+        x_names = [
+            "Loop",
+            "#Patches",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxel_percentage_foreground",
+            "percentage_of_num_unique_files",
+            "num_unique_files",
+        ]
+        col_num += 1
+        for x_n, y_n in zip(x_names, y_names):
+            cols[col_num].append({"x_name": x_n, "y_name": y_n})
+
+        fig, axs = plt.subplots(
+            nrows=n_rows, ncols=n_cols, figsize=(n_cols * plot_size, n_rows * plot_size)
+        )
+
+        for i, j in product(range(n_rows), range(n_cols)):
+            x_name, y_name = cols[j][i]["x_name"], cols[j][i]["y_name"]
+            if x_name is None or y_name is None:
+                axs[i, j].set_axis_off()
+                continue
+            if x_name in x_axis_dict:
+                x_kwargs = x_axis_dict[x_name]
+            else:
+                x_kwargs = {}
+
+            axs[i, j] = plot_dataframe(
+                axs[i, j],
+                df,
+                x_name,
+                y_name,
+                hue_key=self.query_key,
+                palette=PALETTE,
+                legend=None,
+                **x_kwargs,
+            )
+            if y_name in horizontal_lines:
+                hline_printers = horizontal_lines[y_name]
+                for y_full in hline_printers:
+                    axs[i, j].axhline(**y_full)
+        handles, labels = axs[0][0].get_legend_handles_labels()
+        fig.legend(
+            handles,
+            labels,
+            # loc="lower center",
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.02),
+            ncol=8,
+        )
+        fig.tight_layout()
+        for i, j in product(range(n_rows), range(n_cols)):
+            legend = axs[i, j].get_legend()
+            if legend is not None:
+                legend.remove()
+
+        return fig, axs
+
     def dataset_analyze_performance(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
     ):
@@ -176,10 +333,12 @@ class MultiExperimentAnalysis:
                 os.makedirs(save_dir)
             dataset = key[dataset_ind]
             x_name_dict = {
-                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind])},
+                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)},
                 "#Patches": {
                     "x_ticks": np.arange(
-                        key[sb_ind], key[qs_ind] * key[max_loop_ind], key[qs_ind]
+                        key[sb_ind],
+                        key[sb_ind] + key[qs_ind] * (key[max_loop_ind] + 1),
+                        key[qs_ind],
                     )
                 },
             }
@@ -206,8 +365,18 @@ class MultiExperimentAnalysis:
             df_results_dicts.extend(df_exp_dict)
 
         df = pd.DataFrame(df_results_dicts)
+        df = self.ensure_df_elt_hashable(df)
+
         vals = [seperator for seperator in df.columns if seperator not in exp_skip_keys]
         return df, vals
+
+    @staticmethod
+    def ensure_df_elt_hashable(df: pd.DataFrame):
+        for col in df.columns:
+            if df[col].dtype == object:
+                if len(df[col]) > 0 and isinstance(df[col][0], list):
+                    df[col] = df[col].apply(lambda x: tuple(x))
+        return df
 
     def dataset_analyze_statistics(
         self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
@@ -232,6 +401,7 @@ class MultiExperimentAnalysis:
             df_row_dicts.extend(df_row_dict)
 
         df = pd.DataFrame(df_row_dicts)
+        df = self.ensure_df_elt_hashable(df)
 
         vals = [seperator for seperator in df.columns if seperator not in skip_keys]
         max_loop_ind = vals.index("query_steps")
@@ -244,9 +414,8 @@ class MultiExperimentAnalysis:
             if not save_dir.is_dir():
                 os.makedirs(save_dir)
             dataset = key[dataset_ind]
-            x_name_dict = {"Loop": {"x_ticks": np.arange(0, key[max_loop_ind])}}
+            x_name_dict = {"Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)}}
             for y_name, x_name in product(y_names, x_name_dict):
-
                 fig, axs = self.plot_single_experiment(
                     df_g,
                     y_name,
@@ -295,6 +464,7 @@ class MultiExperimentAnalysis:
         )
 
         df = pd.DataFrame(merged_dicts)
+        df = self.ensure_df_elt_hashable(df)
 
         vals = [
             seperator
@@ -314,12 +484,49 @@ class MultiExperimentAnalysis:
         y_full_dict = dataset_results[0].to_full_dataset_performance_dict(value)
 
         pre_suffix_ind = vals.index("pre_suffix")
+        max_loop_ind = vals.index("query_steps")
+        dataset_ind = vals.index("dataset")
+        qs_ind = vals.index("query_size")
+        sb_ind = vals.index("starting_budget_size")
+        pre_suffix_ind = vals.index("pre_suffix")
         for key, df_g in df.groupby(vals):
             # create plots for each unique setting of the respective dataset
             save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "result_statistics"
             if not save_dir.is_dir():
                 os.makedirs(save_dir)
             dataset = key[dataset_ind]
+
+            selected_classes = None
+            if dataset == "Dataset216_AMOS2022_task1":
+                selected_classes = [1, 13, 15]
+            if dataset == "Dataset137_BraTS2021":
+                selected_classes = [(1, 2, 3), (2, 3), (3,)]
+
+            x_name_dict = {
+                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)},
+                "#Patches": {
+                    "x_ticks": np.arange(
+                        key[sb_ind],
+                        key[sb_ind] + key[qs_ind] * (key[max_loop_ind] + 1),
+                        key[qs_ind],
+                    )
+                },
+            }
+
+            fig, axs = self.plot_experiment_overview(
+                df_g,
+                selected_classes=selected_classes,
+                horizontal_lines=y_full_dict,
+                x_axis_dict=x_name_dict,
+            )
+            fig.suptitle(
+                dataset,
+                y=1.05,
+            )
+            filename = "overview.png"
+            plt.savefig(save_dir.parent / filename, bbox_inches="tight")
+            plt.close("all")
+
             x_name_dict = {x_n: {} for x_n in x_names}
             for x_name, y_name in product(x_name_dict, y_names):
                 # create plots for each value to be plotted
@@ -329,6 +536,7 @@ class MultiExperimentAnalysis:
                     y_name,
                     x_name,
                     dataset,
+                    hline_printers=y_full_dict[y_name],
                     **x_name_dict[x_name],
                 )
 
@@ -341,7 +549,7 @@ class MultiExperimentAnalysis:
                 if not save_dir_final.is_dir():
                     os.makedirs(save_dir_final)
 
-                plt.savefig(save_dir_final / f"{file_name}.png")
+                plt.savefig(save_dir_final / f"{file_name}.png", bbox_inches="tight")
                 plt.close("all")
 
     def analyze_multi_datasets(

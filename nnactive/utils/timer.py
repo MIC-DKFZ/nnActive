@@ -42,11 +42,27 @@ class CudaTimer:
 
 
 class Timer:
+    """Returns the time elapsed between start and stop in seconds."""
+
+    def __init__(self):
+        self.start_time = None
+        self.measured = []
+
     def start(self):
         self.start_time = time.time()
 
-    def stop(self):
+    def stop(self) -> float:
+        """Returns time between start and stop in seconds."""
+        if self.start_time is None:
+            raise ValueError("Timer has not been started.")
         end_time = time.time()
         elapsed_time = end_time - self.start_time
+        self.measured.append(elapsed_time)
         del self.start_time
         return elapsed_time
+
+    def average(self) -> float | None:
+        """Returns the average time between start and stop in seconds."""
+        if len(self.measured) == 0:
+            return None
+        return sum(self.measured) / len(self.measured)

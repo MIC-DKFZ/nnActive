@@ -8,10 +8,11 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnactive.config.struct import ActiveConfig
 from nnactive.nnunet.utils import get_patch_size
 from nnactive.paths import get_nnActive_data, set_raw_paths
+from nnactive.results.state import State
 
 __experiments = {}
 
-__seeds = list(i + 12345 for i in range(3))
+__seeds = list(i + 12345 for i in range(4))
 
 __strategies = [
     "random-label",
@@ -19,6 +20,9 @@ __strategies = [
     "random",
     "pred_entropy",
     "mutual_information",
+    "power_bald",
+    "power_pe",
+    "softrank_bald",
 ]
 
 __standard_trainer = "nnActiveTrainer_200epochs"
@@ -60,6 +64,20 @@ def list_prepared_experiments(base_id: int):
         file.name for file in results_path.iterdir() if file.name.startswith("Dataset")
     ]
     out_list.sort()
+    return out_list
+
+
+def list_finished_experiments(base_id: int):
+    with set_raw_paths():
+        dataset_name = convert_id_to_dataset_name(base_id)
+    results_path: Path = get_nnActive_data() / dataset_name / "nnActive_results"
+    out_list = [
+        file.name
+        for file in results_path.iterdir()
+        if file.name.startswith("Dataset")
+        and file.is_dir()
+        and State.experiment_finished(file)
+    ]
     return out_list
 
 
@@ -226,7 +244,7 @@ def make_brats_small_config(
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=1,
         patch_overlap=0,
         additional_overlap=0.2,
     )
@@ -262,7 +280,7 @@ def make_brats_config(
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=1,
         patch_overlap=0,
         additional_overlap=0.2,
     )
@@ -298,7 +316,7 @@ def make_hippocampus_config(
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=1,
         patch_overlap=0,
     )
     config.set_pre_suffix(pre_suffix_format)
@@ -331,7 +349,7 @@ def make_hippocampus_debug_config(
         dataset=dataset_name,
         train_folds=2,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=1,
         patch_overlap=0,
     )
     config.set_pre_suffix(pre_suffix_format)
@@ -366,7 +384,7 @@ def make_acdc_config(
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=[1, 8, 8],
         patch_overlap=0,
     )
 
@@ -401,7 +419,7 @@ def make_acdc_small_config(
         dataset=dataset_name,
         train_folds=5,
         full_folds=5,
-        agg_stride=8,
+        agg_stride=[1, 8, 8],
         patch_overlap=0,
     )
     config.set_pre_suffix(pre_suffix_format)
