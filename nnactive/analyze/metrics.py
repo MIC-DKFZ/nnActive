@@ -39,7 +39,7 @@ class PairwisePenaltyMatrix:
         value_key: str = "test_acc",
         budget_key: str = "num_samples",
         qm_key: str = "Query Method",
-        confidence: float = 0.05,
+        alpha: float = 0.05,
     ):
         """Initializes the PairwiseMatrix class with the given DataFrame and keys for a single Experiment Setting.
 
@@ -62,7 +62,7 @@ class PairwisePenaltyMatrix:
         self.algs.sort()
         self._matrix = {a1: {a2: 0 for a2 in self.algs} for a1 in self.algs}
         self.nBudgets = len(df[budget_key].unique())
-        self.alpha_level = confidence
+        self.alpha_level = alpha
         self.compute_matrix()
 
     def compute_matrix(self):

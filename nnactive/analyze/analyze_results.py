@@ -87,6 +87,9 @@ class MultiExperimentAnalysis:
 
     @cached_property
     def exp_results(self) -> list[SingleExperimentResults]:
+        """Returns list of SingleExperimentResults for all experiments in base_results_path.
+        Skips experiments with no results.
+        """
         exp_results = []
         for exp_path in self.exp_results_paths:
             single_exp = SingleExperimentResults(exp_path)
@@ -97,7 +100,8 @@ class MultiExperimentAnalysis:
         return exp_results
 
     @cached_property
-    def exp_raw_paths(self):
+    def exp_raw_paths(self) -> list[Path]:
+        """Returns list of paths to raw data for all experiments in base_results_path."""
         raw_paths = []
         for experiment in self.exp_results:
             rel_raw_path = str(experiment.experiment_path)[
@@ -358,7 +362,9 @@ class MultiExperimentAnalysis:
                 plt.savefig(save_dir / f"{file_name}.png")
                 plt.close("all")
 
-    def create_df(self, dataset_results, value):
+    def create_df(
+        self, dataset_results: list[SingleExperimentResults], value: str | None
+    ) -> tuple[pd.DataFrame, list[str]]:
         df_results_dicts: list[dict] = []
         for exp in dataset_results:
             df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
@@ -602,115 +608,6 @@ def analyze_multi_experiment_results(
         all_raw_plots=all_plots,
         all_combi_plots=all_plots,
     )
-
-    # #     ### Label Efficency Plot starts here
-
-    # #     label_eff_plot = []
-
-    # try:
-    if False:
-        #######################
-        # version for each random
-        #######################
-        # df_g_random = df_g[df_g[query_key] == "random"]
-        # for val, df_g_unc in df_g.groupby(query_key):
-        #     if val == "random":
-        #         continue
-
-        #     # version for each random select best query
-        #     for index, row in df_g_random.iterrows():
-        #         label_efficency = (row["Loop"] + 1) / (
-        #             min(df_g_unc[df_g_unc["Mean Dice"] >= row["Mean Dice"]]["Loop"])
-        #             + 1
-        #         )
-        #         label_eff_plot.append(
-        #             {
-        #                 "Label Efficiency": label_efficency,
-        #                 "Mean Dice": row["Mean Dice"],
-        #                 query_key: val,
-        #             }
-        #         )
-
-        # version for each random select one for each seed of query
-        # for seed, df_g_unc_seed in df_g_unc.groupby("seed"):
-        #     for index, row in df_g_random.iterrows():
-        #         try:
-        #             label_efficency = (row["Loop"] + 1) / (
-        #                 min(
-        #                     df_g_unc_seed[
-        #                         df_g_unc_seed["Mean Dice"] >= row["Mean Dice"]
-        #                     ]["Loop"]
-        #                 )
-        #                 + 1
-        #             )
-        #             label_eff_plot.append(
-        #                 {
-        #                     "Label Efficiency": label_efficency,
-        #                     "Mean Dice": row["Mean Dice"],
-        #                     query_key: val,
-        #                     "seed": seed,
-        #                 }
-        #             )
-        #         except:
-        #             pass
-
-        # version for means
-        out_dfs = dict()
-        for query, df_g_query in df_g.groupby(query_key):
-            print(query)
-            count = 0
-            for seed, df_seed in df_g_query.groupby("seed"):
-                print(f"Seed {seed}: len DataFrame {len(df_seed)}")
-                if len(df_seed) < df_seed["query_steps"].unique()[0]:
-                    continue
-                if count == 0:
-                    df_g_mean = df_seed.sort_values(by=["Loop"]).reset_index()
-                else:
-                    df_g_mean["Mean Dice"] = (
-                        df_g_mean["Mean Dice"]
-                        + df_seed.sort_values(by=["Loop"]).reset_index()["Mean Dice"]
-                    )
-                count += 1
-            df_g_mean["Mean Dice"] = df_g_mean["Mean Dice"] / count
-            out_dfs[query] = df_g_mean
-
-        for val, df_g_unc in out_dfs.items():
-            if val == "random":
-                continue
-
-            # version for each random select best query
-            for index, row in out_dfs["random"].iterrows():
-                try:
-                    label_efficency = (row["Loop"] + 1) / (
-                        min(
-                            df_g_unc[
-                                df_g_unc["Mean Dice"] >= (row["Mean Dice"] - 0.0002)
-                            ]["Loop"]
-                        )
-                        + 1
-                    )
-                    label_eff_plot.append(
-                        {
-                            "Label Efficiency": label_efficency,
-                            "Mean Dice": row["Mean Dice"],
-                            query_key: val,
-                        }
-                    )
-                except:
-                    pass
-        fig, axs = plt.subplots()
-
-        sns.lineplot(
-            data=pd.DataFrame(label_eff_plot),
-            x="Mean Dice",
-            y="Label Efficiency",
-            hue="uncertainty",
-            errorbar="sd",
-            ax=axs,
-            markers="O",
-            palette=PALETTE,
-        )
-        plt.savefig(f"Efficiency__{key}.png")
 
 
 if __name__ == "__main__":
