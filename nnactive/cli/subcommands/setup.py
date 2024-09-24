@@ -39,6 +39,8 @@ def main(
     config.set_nnunet_env()
     # Prepare new experiment state
     state = setup_al(config)
+
+    print(state)
     # Create partly annotated dataset
     convert_dataset_to_partannotated(
         base_id=config.base_id,

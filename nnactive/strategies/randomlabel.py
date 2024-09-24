@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import List, Union
 
 import numpy as np
-import wandb
 from loguru import logger
 
+import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -194,10 +194,11 @@ class RandomLabel(Random):
                                 locs, img_size, self.config.patch_size, self.rng
                             )
                         if area in ["all"]:
-                            iter_patch_loc, iter_patch_size = (
-                                obtain_random_patch_for_img(
-                                    img_size, self.config.patch_size, self.rng
-                                )
+                            (
+                                iter_patch_loc,
+                                iter_patch_size,
+                            ) = obtain_random_patch_for_img(
+                                img_size, self.config.patch_size, self.rng
                             )
 
                         patch = Patch(

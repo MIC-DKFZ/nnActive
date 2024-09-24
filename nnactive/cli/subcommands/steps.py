@@ -1,3 +1,4 @@
+import itertools
 import json
 import multiprocessing
 import multiprocessing as mp
@@ -5,7 +6,7 @@ import os
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Iterable
 
@@ -52,29 +53,29 @@ from nnactive.utils.timer import Timer
 nnActive_results = get_nnActive_results()
 
 
-@contextmanager
-def noop_context_manager(**kwargs):
-    yield
-
-
 def wrap_training(
     dataset_id: int,
     config: ActiveConfig,
     folds: Iterable[int],
     device: torch.device,
     wandbgroup: str | None,
+    state: State | None = None,
 ):
     config.set_nnunet_env()
 
     if wandb.run is None:
         # No active wandb run, create a new one
-        wandb_context = monitor.active_run(config=config)
+        wandb_context = monitor.active_run(
+            config=config, state=state, state_tag="training"
+        )
     elif wandbgroup is None:
         # Do nothing, assuming active wandb context
-        wandb_context = noop_context_manager()
+        wandb_context = nullcontext()
     else:
         # Initialize with wandb group (for multi gpu compatibility)
-        wandb_context = monitor.active_run(group=wandbgroup)
+        wandb_context = monitor.active_run(
+            group=wandbgroup, state=state, state_tag="training"
+        )
 
     with wandb_context:
         # ensure that each fold/fork is mapped onto one gpu
@@ -155,6 +156,7 @@ def step_train(
                 folds=list(range(num_folds)),
                 device=torch.device("cuda:0"),
                 wandbgroup=None,
+                state=state,
             )
         else:
             devices = [torch.device(f"cuda:{i}") for i in range(runtime_config.n_gpus)]
@@ -174,6 +176,7 @@ def step_train(
                         folds,
                         devices,
                         [wandb.run.group] * num_folds,
+                        [state] * num_folds,
                     ):
                         pass
             except BrokenProcessPool as exc:
@@ -204,9 +207,10 @@ def wrap_prediction(
     part_id: int,
     device: torch.device,
     wandb_group: str,
+    state: State | None = None,
 ):
     config.set_nnunet_env()
-    with monitor.active_run(group=wandb_group):
+    with monitor.active_run(group=wandb_group, state=state, state_tag="prediction"):
         logger.info(
             f"Running prediction in process '{multiprocessing.current_process()}' with device '{device}'"
         )
@@ -474,7 +478,7 @@ def step_query(
             "to re-run the query step."
         )
 
-    with monitor.active_run(config=config.to_dict()):
+    with monitor.active_run(config=config.to_dict(), state=state, state_tag="query"):
         timer.start()
         query_pool(
             config, runtime_config, state.dataset_id, force=force, verbose=verbose

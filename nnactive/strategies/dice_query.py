@@ -8,10 +8,10 @@ from typing import Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 import torch
-import wandb
 from loguru import logger
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
+import wandb
 from nnactive.aggregations.convolution import ConvolveAggScipy, ConvolveAggTorch
 from nnactive.config import ActiveConfig
 from nnactive.data import Patch

@@ -58,7 +58,9 @@ def main(
         else config.query_steps
     )
 
-    with monitor.active_run(config=config.to_dict()):
+    with monitor.active_run(
+        config=config.to_dict(), state=state, state_tag="run_experiment"
+    ):
         logger.info(config)
 
         try:

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from datetime import datetime
 from time import time
 from typing import Any, Generator, Iterable, TypeVar
 
-import wandb
 from loguru import logger
 from nnunetv2.training.logging.nnunet_logger import nnUNetLogger
 from wandb.errors import CommError
+
+import wandb
+from nnactive.results.state import State
 
 ItemT = TypeVar("ItemT")
 
@@ -45,6 +48,8 @@ class nnActiveMonitor:
         config: dict | None = None,
         force: bool = False,
         group: str | None = None,
+        state: State | None = None,
+        state_tag: str | None = None,
     ) -> Generator[None, None, None]:
         if self._wandb_active:
             if force:
@@ -55,23 +60,34 @@ class nnActiveMonitor:
                 )
 
                 def _inner():
-                    yield
+                    yield wandb.run
 
                 return _inner()
 
         try:
-            wandb.init(project=project, name=name, config=config, group=group)
+            run = wandb.init(project=project, name=name, config=config, group=group)
         except CommError:
-            wandb.init(project=project, name=name, config=config, mode="offline")
+            run = wandb.init(project=project, name=name, config=config, mode="offline")
 
         self._wandb_active = True
+        if state is not None:
+            # Save info about the current wandb run to the list of associated runs
+            run_info = dict(
+                id=run.id,
+                name=run.name,
+                url=run.url,
+                start_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            if state_tag is not None:
+                run_info["tag"] = state_tag
+            state.wandb_runs.append(run_info)
+            state.save_state()
 
-        def _inner():
-            yield
+        try:
+            yield run
+        finally:
             wandb.finish()
             self._wandb_active = False
-
-        return _inner()
 
     @contextmanager
     def timer(self, name: str) -> Generator[None, None, None]:

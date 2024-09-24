@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import field
 from pathlib import Path
 
 from loguru import logger
@@ -27,6 +28,7 @@ class State:
     query: bool = False
     update_data: bool = False
     in_progress: bool = False
+    wandb_runs: list[dict] = field(default_factory=list)
 
     def new_loop(self):
         self.loop += 1
@@ -47,6 +49,7 @@ class State:
         self.query = False
         self.update_data = False
         self.in_progress = False
+        self.wandb_runs = []
 
     def save_state(self):
         try:
