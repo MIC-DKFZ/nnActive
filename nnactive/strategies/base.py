@@ -13,7 +13,6 @@ from typing import Any, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
-import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -28,6 +27,7 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
+import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -748,10 +748,10 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dicts: list[dict[str, Any]] = (
-                self.predict_fold_logits_from_preprocessed_data(
-                    data, properties, temp_file_handler=temp_file_handler
-                )
+            query_dicts: list[
+                dict[str, Any]
+            ] = self.predict_fold_logits_from_preprocessed_data(
+                data, properties, temp_file_handler=temp_file_handler
             )
             temp_file_handler.reset_ram_stats()
 
