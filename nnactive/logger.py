@@ -4,10 +4,11 @@ from contextlib import contextmanager
 from time import time
 from typing import Any, Generator, Iterable, TypeVar
 
-import wandb
 from loguru import logger
 from nnunetv2.training.logging.nnunet_logger import nnUNetLogger
 from wandb.errors import CommError
+
+import wandb
 
 ItemT = TypeVar("ItemT")
 
@@ -55,23 +56,22 @@ class nnActiveMonitor:
                 )
 
                 def _inner():
-                    yield
+                    yield wandb.run
 
                 return _inner()
 
         try:
-            wandb.init(project=project, name=name, config=config, group=group)
+            run = wandb.init(project=project, name=name, config=config, group=group)
         except CommError:
-            wandb.init(project=project, name=name, config=config, mode="offline")
+            run = wandb.init(project=project, name=name, config=config, mode="offline")
 
         self._wandb_active = True
 
-        def _inner():
-            yield
+        try:
+            yield run
+        finally:
             wandb.finish()
             self._wandb_active = False
-
-        return _inner()
 
     @contextmanager
     def timer(self, name: str) -> Generator[None, None, None]:
