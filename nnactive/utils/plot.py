@@ -7,9 +7,17 @@ REMOVE_LIST = [" ", "_", "-"]
 
 
 def create_unique_name(
-    x_name: str, y_name: str, identifier: tuple | None, ignore_ident: list[int]
+    x_name: str,
+    y_name: str,
+    identifier: tuple | None = None,
+    ignore_ident: list[int] | None = None,
 ) -> str:
-    ident_name = tuple([k for i, k in enumerate(identifier) if i not in ignore_ident])
+    ignore_ident = ignore_ident if ignore_ident is not None else []
+    ident_name = (
+        tuple([k for i, k in enumerate(identifier) if i not in ignore_ident])
+        if identifier is not None
+        else tuple()
+    )
     ident_name = f"{ident_name}"
 
     for rm_char in REMOVE_LIST:

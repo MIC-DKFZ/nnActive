@@ -2,6 +2,7 @@ _version.py
 docs/source/api
 wandb/
 results/
+temp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from nnactive.utils.io import load_json, save_json
+
 
 def compute_auc(
     value: np.ndarray,
@@ -106,13 +108,46 @@ class PairwisePenaltyMatrix:
         # Shouldn't we perform a one-sided test?
         # e.g.
         # t, pval = stats.ttest_1samp(z, 0.0, alternative='less')
-        t, pval = stats.ttest_1samp(z, 0.0)
+        # Jeremias agrees that this test should be one-sided.
+        ######## Correction Term for significance level? ########
+        # Should we correct for multiple testing?
+        #
+        #### Motivation for Not Correcting for Multiple Testing ####
+        # We test multiple tests, but we are interested in relative values.
+        # X is better than Y due to lower values.
+        # But X and Y are both subject to the multiple testing issue.
+        # So does it really matter?
+        #
+        #### Motivation for Correcting for Multiple Testing ####
+        # Ranking is created based on tests.
+        # Question: Do specific algorithms get better/worse results by not correcting for multiple testing?
+        # If so, we should correct for multiple testing.
+        # If not, we can ignore the multiple testing issue.
+        #
+        # Approach: correct along budget axis (e.g.10 loops, therefore correct for 10 tests)
+        # Example: 3 methods X, Y, Z. GT: X better Z=0.03. Y better Z=0.1.
+        # Results: X and Y have equal score against Z. (0.5) due to multiple tests (but X has much lower pval).
+        # Therefore X gets a disadvantage against Y.
+        # --> Correct for multiple tests along budget-axis.
+        #
+        # Approach: correct along algorithm axis (e.g. 4 algorithms, therefore correct for 4 tests)
+        #
+        ##########################################################
+        # Original Test (two-sided)
+        # t, pval = stats.ttest_1samp(z, 0.0)
+        # Proposed Left-sided Test (one-sided)
+        t, pval = stats.ttest_1samp(z, 0.0, alternative="less")
         if mu < 0 and pval < self.alpha_level:
             return True
 
     @property
     def matrix(self) -> dict[str, dict[str, float]]:
+        """Returns the pairwise penalty matrix without the mean row."""
         return self._matrix
+
+    def save(self, path: str):
+        """Save the pairwise penalty matrix to a json file."""
+        save_json(self.matrix, path)
 
     def print(self):
         df = PairwisePenaltyMatrix.creat_vis_df(self.matrix)
@@ -150,15 +185,21 @@ class PairwisePenaltyMatrix:
             df_matrix.rename(columns=name_dict, index=name_dict, inplace=True)
 
         # Plot the heatmap
-        plt.figure(figsize=(10, 8))
+        fig, axs = plt.subplots(figsize=(10, 8))
         sns.heatmap(
-            df_matrix, annot=True, cmap="viridis", cbar=True, vmin=0, vmax=max_poss_ent
+            ax=axs,
+            data=df_matrix,
+            annot=True,
+            cmap="viridis",
+            cbar=True,
+            vmin=0,
+            vmax=max_poss_ent,
         )
-        plt.title(f"Pairwise Penalty Matrix ({title_tag})")
+        axs.set_title(f"Pairwise Penalty Matrix ({title_tag})")
 
         # Save the plot if savepath is provided
         if savepath:
-            plt.savefig(savepath)
+            plt.savefig(savepath, bbox_inches="tight")
 
         # Show the plot if show is True
         if show:

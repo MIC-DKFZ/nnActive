@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import SimpleITK as sitk
 from pydantic import dataclasses
 
@@ -36,3 +37,14 @@ def save_dataclass_to_json(data: dataclasses, filepath: Path):
     with open(filepath, "w") as file:
         datadict = get_clean_dataclass_dict(data)
         json.dump(datadict, file, indent=4)
+
+
+def save_df_to_txt(df: pd.DataFrame, filepath: Path):
+    """Saves the DataFrame as txt file
+
+    Args:
+        df (pd.DataFrame): _description_
+        filepath (Path): _description_
+    """
+    with open(filepath, "w") as file:
+        file.write(df.to_string())

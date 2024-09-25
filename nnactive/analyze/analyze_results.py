@@ -442,6 +442,7 @@ class MultiExperimentAnalysis:
         all_plots: bool = True,
         output_dir: Path = Path("."),
         value: str = "Dice",
+        save_df: bool = False,
     ):
         dataset_statistics = [
             exp for exp in self.exp_statistics if exp.base_id == unique_id
@@ -478,8 +479,6 @@ class MultiExperimentAnalysis:
             if seperator not in (exp_skip_keys + stat_skip_keys)
         ]
 
-        dataset_ind = vals.index("dataset")
-
         if all_plots:
             x_names = dataset_statistics[0].plot_vals
             y_names = dataset_results[0].get_value_dict(plot_val=value).keys()
@@ -494,7 +493,18 @@ class MultiExperimentAnalysis:
         dataset_ind = vals.index("dataset")
         qs_ind = vals.index("query_size")
         sb_ind = vals.index("starting_budget_size")
-        pre_suffix_ind = vals.index("pre_suffix")
+
+        if save_df:
+            temp_file = (
+                Path(__file__).parent.parent.parent
+                / "temp"
+                / (dataset_results[0].config.dataset + ".json")
+            )
+            if not temp_file.parent.is_dir():
+                os.makedirs(temp_file.parent)
+            logger.debug(f"Saving temporary json to {temp_file}")
+            df.to_json(temp_file)
+
         for key, df_g in df.groupby(vals):
             # create plots for each unique setting of the respective dataset
             save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "result_statistics"
@@ -513,7 +523,7 @@ class MultiExperimentAnalysis:
                 "#Patches": {
                     "x_ticks": np.arange(
                         key[sb_ind],
-                        key[sb_ind] + key[qs_ind] * (key[max_loop_ind] + 1),
+                        key[sb_ind] + key[qs_ind] * key[max_loop_ind],
                         key[qs_ind],
                     )
                 },
