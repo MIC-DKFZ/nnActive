@@ -602,7 +602,7 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=__strategies,
+    uncertainties=[*__strategies, "kmeans_bald"],
     query_size=20,
     query_steps=10,
 )
@@ -610,7 +610,7 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=__strategies,
+    uncertainties=[*__strategies, "kmeans_bald"],
     query_size=40,
     query_steps=5,
 )
@@ -618,7 +618,7 @@ register(
 register(
     make_acdc_config,
     seeds=__seeds,
-    uncertainties=__strategies,
+    uncertainties=[*__strategies, "kmeans_bald"],
     query_size=30,
     query_steps=5,
 )
