@@ -12,12 +12,12 @@ import pandas as pd
 import seaborn as sns
 from loguru import logger
 
+from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
 from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
 from nnactive.config.struct import Final
-from nnactive.utils.io import load_json
-from nnactive.utils.plot import create_unique_name, plot_dataframe
-from nnactive.utils.pyutils import merge_dict_lists_on_indices
+from nnactive.utils.io import load_json, save_df_to_txt
+from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
 
 sns.set_style("whitegrid")
 
@@ -33,6 +33,21 @@ PALETTE = {
     "softrank_bald": "tab:pink",
     "kmeans_bald": "tab:olive",
 }
+
+SELECTED_CLASSES_OVERVIEW = {
+    "Dataset216_AMOS2022_task1": [1, 13, 15],
+    "Dataset137_BraTS2021": [(1, 2, 3), (2, 3), (3,)],
+}
+
+REMOVE_IND_COLS_SETTING_KEY = [
+    "pre_suffix",
+    "base_id",
+    "dataset",
+    "model_plans",
+    "model_config",
+    "train_folds",
+    "starting_budget",
+]
 
 
 class MultiExperimentAnalysis:
@@ -130,239 +145,11 @@ class MultiExperimentAnalysis:
     def query_key(self) -> str:
         return "uncertainty"
 
-    def plot_single_experiment(
-        self,
-        df_g: pd.DataFrame,
-        y_name: str,
-        x_name: str,
-        dataset: str | None = None,
-        x_ticks: Iterable | None = None,
-        hline_printers: list[dict, Any] | None = None,
-    ):
-        fig, axs = plt.subplots()
-        axs = plot_dataframe(
-            axs,
-            df_g,
-            x_name,
-            y_name,
-            hue_key=self.query_key,
-            plot_title=dataset,
-            palette=PALETTE,
-            x_ticks=x_ticks,
-        )
+    @property
+    def merge_keys(self) -> list[str]:
+        return ["Experiment", "Loop"]
 
-        # add vertical line
-        if hline_printers is not None:
-            for y_full in hline_printers:
-                axs.axhline(**y_full)
-        return fig, axs
-
-    def plot_experiment_overview(
-        self,
-        df: pd.DataFrame,
-        selected_classes: list[int] | list[tuple[int]] | None = None,
-        horizontal_lines: dict[str, Any] | None = None,
-        x_axis_dict: dict[str, Any] | None = None,
-    ):
-        n_rows, n_cols = 3, 9
-        n_performance_cols = 3
-        plot_size = 4
-        if selected_classes is None:
-            selected_classes = [
-                int(i.split(" ")[1]) for i in df.columns if i.startswith("Class")
-            ][:3]
-            while len(selected_classes) < n_performance_cols:
-                selected_classes.append(None)
-
-        cols = [[] for _ in range(n_cols)]
-        col_num = 0
-        # fill first 4 columns
-        col0_x = [
-            "#Patches",
-            "percentage_of_voxels_foreground",
-            "avg_percentage_of_voxels_fg_cls",
-        ]
-        for x_n in col0_x:
-            cols[col_num].append({"x_name": x_n, "y_name": "Mean Dice"})
-
-        for i, cls_index in enumerate(selected_classes):
-            col_num += 1
-            if cls_index is None:
-                x_names = [None] * n_rows
-                y_names = [None] * n_rows
-            else:
-                y_names = [f"Class {cls_index} Dice"] * n_rows
-                if isinstance(cls_index, (tuple, list)):
-                    perctentage_index = cls_index[0]
-                else:
-                    perctentage_index = cls_index
-                x_names = [
-                    "#Patches",
-                    f"percentage_of_voxels_per_cls_{perctentage_index}",
-                    "avg_percentage_of_voxels_fg_cls",
-                ]
-
-            cols[col_num].extend(
-                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
-            )
-
-        # fill last 4 columns
-        x_names = [
-            "percentage_of_num_voxels",
-            "percentage_of_num_voxels",
-            "#Patches",
-        ]
-        y_names = [
-            "percentage_of_voxels_foreground",
-            "avg_percentage_of_voxels_fg_cls",
-            "patches_foreground",
-        ]
-        col_num += 1
-        for x_n, y_n in zip(x_names, y_names):
-            cols[col_num].append({"x_name": x_n, "y_name": y_n})
-        for i, cls_index in enumerate(selected_classes):
-            col_num += 1
-            if cls_index is None:
-                x_names = [None] * n_rows
-                y_names = [None] * n_rows
-            else:
-                x_names = [
-                    "percentage_of_num_voxels",
-                    None,
-                    "#Patches",
-                ]
-                if isinstance(cls_index, (tuple, list)):
-                    perctentage_index = cls_index[0]
-                else:
-                    perctentage_index = cls_index
-                y_names = [
-                    f"percentage_of_voxels_per_cls_{perctentage_index}",
-                    None,
-                    f"patches_per_cls_{perctentage_index}",
-                ]
-            cols[col_num].extend(
-                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
-            )
-
-        x_names = [
-            "Loop",
-            "#Patches",
-            "#Patches",
-        ]
-        y_names = [
-            "percentage_of_voxel_percentage_foreground",
-            "percentage_of_num_unique_files",
-            "num_unique_files",
-        ]
-        col_num += 1
-        for x_n, y_n in zip(x_names, y_names):
-            cols[col_num].append({"x_name": x_n, "y_name": y_n})
-
-        fig, axs = plt.subplots(
-            nrows=n_rows, ncols=n_cols, figsize=(n_cols * plot_size, n_rows * plot_size)
-        )
-
-        for i, j in product(range(n_rows), range(n_cols)):
-            x_name, y_name = cols[j][i]["x_name"], cols[j][i]["y_name"]
-            if x_name is None or y_name is None:
-                axs[i, j].set_axis_off()
-                continue
-            if x_name in x_axis_dict:
-                x_kwargs = x_axis_dict[x_name]
-            else:
-                x_kwargs = {}
-
-            axs[i, j] = plot_dataframe(
-                axs[i, j],
-                df,
-                x_name,
-                y_name,
-                hue_key=self.query_key,
-                palette=PALETTE,
-                legend=None,
-                **x_kwargs,
-            )
-            if y_name in horizontal_lines:
-                hline_printers = horizontal_lines[y_name]
-                for y_full in hline_printers:
-                    axs[i, j].axhline(**y_full)
-        handles, labels = axs[0][0].get_legend_handles_labels()
-        fig.legend(
-            handles,
-            labels,
-            # loc="lower center",
-            loc="upper center",
-            bbox_to_anchor=(0.5, -0.02),
-            ncol=8,
-        )
-        fig.tight_layout()
-        for i, j in product(range(n_rows), range(n_cols)):
-            legend = axs[i, j].get_legend()
-            if legend is not None:
-                legend.remove()
-
-        return fig, axs
-
-    def dataset_analyze_performance(
-        self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
-    ):
-        dataset_results = [
-            exp for exp in self.exp_results if exp.config.base_id == unique_id
-        ]
-        value = "Dice"
-
-        df, vals = self.create_df(dataset_results, value)
-
-        y_full_dict = dataset_results[0].to_full_dataset_performance_dict(value)
-
-        output_dir = output_dir / dataset_results[0].config.dataset
-        if not output_dir.is_dir():
-            os.makedirs(output_dir)
-
-        if all_plots:
-            y_names = dataset_results[0].get_value_dict(plot_val=value).keys()
-        else:
-            y_names = ["Mean Dice"]
-
-        max_loop_ind = vals.index("query_steps")
-        dataset_ind = vals.index("dataset")
-        sb_ind = vals.index("starting_budget_size")
-        qs_ind = vals.index("query_size")
-        pre_suffix_ind = vals.index("pre_suffix")
-
-        # create plots for each unique setting of the respective dataset
-        for key, df_g in df.groupby(vals):
-            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "performance"
-            if not save_dir.is_dir():
-                os.makedirs(save_dir)
-            dataset = key[dataset_ind]
-            x_name_dict = {
-                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)},
-                "#Patches": {
-                    "x_ticks": np.arange(
-                        key[sb_ind],
-                        key[sb_ind] + key[qs_ind] * (key[max_loop_ind] + 1),
-                        key[qs_ind],
-                    )
-                },
-            }
-            for y_name, x_name in product(y_names, x_name_dict):
-                fig, axs = self.plot_single_experiment(
-                    df_g,
-                    y_name,
-                    x_name,
-                    dataset,
-                    hline_printers=y_full_dict[y_name],
-                    **x_name_dict[x_name],
-                )
-                file_name = create_unique_name(
-                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
-                )
-
-                plt.savefig(save_dir / f"{file_name}.png")
-                plt.close("all")
-
-    def create_df(
+    def create_results_df(
         self, dataset_results: list[SingleExperimentResults], value: str | None
     ) -> tuple[pd.DataFrame, list[str]]:
         df_results_dicts: list[dict] = []
@@ -373,8 +160,46 @@ class MultiExperimentAnalysis:
         df = pd.DataFrame(df_results_dicts)
         df = self.ensure_df_elt_hashable(df)
 
-        vals = [seperator for seperator in df.columns if seperator not in exp_skip_keys]
-        return df, vals
+        return df, exp_skip_keys
+
+    def create_statistics_df(
+        self, dataset_statistics: list[SingleExperimentStastistics]
+    ) -> tuple[pd.DataFrame, list[str]]:
+        df_row_dicts: list[dict] = []
+        for exp in dataset_statistics:
+            df_row_dict, skip_keys = exp.to_df_row_dicts()
+            df_row_dicts.extend(df_row_dict)
+
+        df = pd.DataFrame(df_row_dicts)
+        df = self.ensure_df_elt_hashable(df)
+
+        return df, skip_keys
+
+    def create_merged_df(
+        self,
+        dataset_statistics: list[SingleExperimentStastistics],
+        dataset_results: list[SingleExperimentResults],
+        value: str = "Dice",
+    ):
+        df_stat_dicts: list[dict] = []
+        for exp in dataset_statistics:
+            df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
+            df_stat_dicts.extend(df_stat_dict)
+
+        df_results_dicts: list[dict] = []
+        for exp in dataset_results:
+            df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
+            df_results_dicts.extend(df_exp_dict)
+
+        merged_dicts = merge_dict_lists_on_indices(
+            df_results_dicts, df_stat_dicts, self.merge_keys
+        )
+
+        merged_skip_keys = list(set(exp_skip_keys + stat_skip_keys))
+
+        df = pd.DataFrame(merged_dicts)
+        df = self.ensure_df_elt_hashable(df)
+        return df, merged_skip_keys
 
     @staticmethod
     def ensure_df_elt_hashable(df: pd.DataFrame):
@@ -384,62 +209,9 @@ class MultiExperimentAnalysis:
                     df[col] = df[col].apply(lambda x: tuple(x))
         return df
 
-    def dataset_analyze_statistics(
-        self, unique_id: int, all_plots: bool = True, output_dir: Path = Path(".")
-    ):
-        if not output_dir.is_dir():
-            os.makedirs(output_dir)
-        dataset_statistics = [
-            exp for exp in self.exp_statistics if exp.base_id == unique_id
-        ]
-
-        # how to get pre_suffix?
-        output_dir = output_dir / dataset_statistics[0].source_dataset_path.name
-
-        if all_plots:
-            y_names = dataset_statistics[0].plot_vals
-        else:
-            y_names = ["percentage_of_voxels_foreground"]
-
-        df_row_dicts = []
-        for exp in dataset_statistics:
-            df_row_dict, skip_keys = exp.to_df_row_dicts()
-            df_row_dicts.extend(df_row_dict)
-
-        df = pd.DataFrame(df_row_dicts)
-        df = self.ensure_df_elt_hashable(df)
-
-        vals = [seperator for seperator in df.columns if seperator not in skip_keys]
-        max_loop_ind = vals.index("query_steps")
-        dataset_ind = vals.index("dataset")
-        pre_suffix_ind = vals.index("pre_suffix")
-
-        # create plots for each unique setting of the respective dataset
-        for key, df_g in df.groupby(vals):
-            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "statistics"
-            if not save_dir.is_dir():
-                os.makedirs(save_dir)
-            dataset = key[dataset_ind]
-            x_name_dict = {"Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)}}
-            for y_name, x_name in product(y_names, x_name_dict):
-                fig, axs = self.plot_single_experiment(
-                    df_g,
-                    y_name,
-                    x_name,
-                    dataset,
-                    **x_name_dict[x_name],
-                )
-                file_name = create_unique_name(
-                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
-                )
-
-                plt.savefig(save_dir / f"{file_name}.png")
-                plt.close("all")
-
     def dataset_analyze_statistics_results(
         self,
         unique_id: int,
-        all_plots: bool = True,
         output_dir: Path = Path("."),
         value: str = "Dice",
         save_df: bool = False,
@@ -451,142 +223,117 @@ class MultiExperimentAnalysis:
             exp for exp in self.exp_results if exp.config.base_id == unique_id
         ]
 
-        output_dir = output_dir / dataset_results[0].config.dataset
+        dataset_name = dataset_results[0].config.dataset
+        output_dir = output_dir / dataset_name
         if not output_dir.is_dir():
             os.makedirs(output_dir)
 
-        df_stat_dicts: list[dict] = []
-        for exp in dataset_statistics:
-            df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
-            df_stat_dicts.extend(df_stat_dict)
-
-        df_results_dicts: list[dict] = []
-        for exp in dataset_results:
-            df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
-            df_results_dicts.extend(df_exp_dict)
-
-        indices = ["Experiment", "Loop"]
-        merged_dicts = merge_dict_lists_on_indices(
-            df_results_dicts, df_stat_dicts, indices
+        df, skip_keys = self.create_merged_df(
+            dataset_statistics, dataset_results, value
         )
 
-        df = pd.DataFrame(merged_dicts)
-        df = self.ensure_df_elt_hashable(df)
-
-        vals = [
-            seperator
-            for seperator in df.columns
-            if seperator not in (exp_skip_keys + stat_skip_keys)
-        ]
-
-        if all_plots:
-            x_names = dataset_statistics[0].plot_vals
-            y_names = dataset_results[0].get_value_dict(plot_val=value).keys()
-        else:
-            x_names = ["percentage_of_voxels_foreground"]
-            y_names = ["Mean Dice"]
+        vals = [seperator for seperator in df.columns if seperator not in skip_keys]
 
         y_full_dict = dataset_results[0].to_full_dataset_performance_dict(value)
 
-        pre_suffix_ind = vals.index("pre_suffix")
-        max_loop_ind = vals.index("query_steps")
-        dataset_ind = vals.index("dataset")
-        qs_ind = vals.index("query_size")
-        sb_ind = vals.index("starting_budget_size")
+        remove_ind = [vals.index(col_name) for col_name in REMOVE_IND_COLS_SETTING_KEY]
 
         if save_df:
             temp_file = (
-                Path(__file__).parent.parent.parent
-                / "temp"
-                / (dataset_results[0].config.dataset + ".json")
+                Path(__file__).parent.parent.parent / "temp" / (dataset_name + ".json")
             )
             if not temp_file.parent.is_dir():
                 os.makedirs(temp_file.parent)
             logger.debug(f"Saving temporary json to {temp_file}")
             df.to_json(temp_file)
 
-        for key, df_g in df.groupby(vals):
+        for key, df_g in df.groupby(vals, as_index=False):
+            pre_suffix = df_g["pre_suffix"].iloc[0]
+            identifier = create_string_identifier(key, ignore_ident=remove_ind)
             # create plots for each unique setting of the respective dataset
-            save_dir: Path = output_dir / key[pre_suffix_ind][2:] / "result_statistics"
-            if not save_dir.is_dir():
-                os.makedirs(save_dir)
-            dataset = key[dataset_ind]
+            setting_dir: Path = output_dir / (pre_suffix[2:])
+            if not setting_dir.is_dir():
+                os.makedirs(setting_dir)
 
-            selected_classes = None
-            if dataset == "Dataset216_AMOS2022_task1":
-                selected_classes = [1, 13, 15]
-            if dataset == "Dataset137_BraTS2021":
-                selected_classes = [(1, 2, 3), (2, 3), (3,)]
-
-            x_name_dict = {
-                "Loop": {"x_ticks": np.arange(0, key[max_loop_ind] + 1)},
-                "#Patches": {
-                    "x_ticks": np.arange(
-                        key[sb_ind],
-                        key[sb_ind] + key[qs_ind] * key[max_loop_ind],
-                        key[qs_ind],
-                    )
-                },
-            }
-
-            fig, axs = self.plot_experiment_overview(
+            # most default values from SettingAnalysis are already set for this analysis
+            analysis = SettingAnalysis(
                 df_g,
+                dataset=dataset_name,
+                query_key=self.query_key,
+                main_performance_key="Mean Dice",
+                budget_key="#Patches",
+                statistic_keys=dataset_statistics[0].plot_vals,
+                performance_keys=dataset_results[0]
+                .get_value_dict(plot_val=value)
+                .keys(),
+                full_performance_dict=y_full_dict,
+                palette=PALETTE,
+                string_id=identifier,
+            )
+
+            analysis.save(save_path=setting_dir / "analysis.pkl")
+
+            # overview metrics
+            auc_df = analysis.compute_auc_df()
+            # pprint(auc_df)
+            auc_df.to_json(setting_dir / "auc.json")
+            save_df_to_txt(auc_df, setting_dir / "auc.txt")
+
+            ppm = analysis.compute_pairwise_penalty("Mean Dice")
+            ppm.plot_pairwise_matrix(ppm.matrix, savepath=setting_dir / "ppm.png")
+            ppm.save(setting_dir / "ppm.json")
+
+            # overview plots
+            selected_classes = SELECTED_CLASSES_OVERVIEW.get(dataset_name, None)
+            x_names = ["Loop", "#Patches"]
+            analysis.save_overview_plots(
+                save_dir=setting_dir,
                 selected_classes=selected_classes,
                 horizontal_lines=y_full_dict,
-                x_axis_dict=x_name_dict,
+                x_names=x_names,
             )
-            fig.suptitle(
-                dataset,
-                y=1.05,
+
+            # performance plots
+            x_names = ["Loop", "#Patches"]
+            y_names = analysis.performance_keys
+            analysis.save_setting_plots(
+                setting_dir / "results",
+                y_names,
+                x_names,
+                x_ticks=True,
+                y_full_dict=y_full_dict,
             )
-            filename = "overview.png"
-            plt.savefig(save_dir.parent / filename, bbox_inches="tight")
-            plt.close("all")
 
-            x_name_dict = {x_n: {} for x_n in x_names}
-            for x_name, y_name in product(x_name_dict, y_names):
-                # create plots for each value to be plotted
+            # statistic plots
+            x_names = ["Loop"]
+            y_names = analysis.statistic_keys
+            analysis.save_setting_plots(
+                setting_dir / "statistics", y_names, x_names, x_ticks=True
+            )
 
-                fig, axs = self.plot_single_experiment(
-                    df_g,
-                    y_name,
-                    x_name,
-                    dataset,
-                    hline_printers=y_full_dict[y_name],
-                    **x_name_dict[x_name],
+            # statistic results plots
+            x_names = analysis.statistic_keys
+            y_names = analysis.performance_keys
+            for y_name in y_names:
+                y_names_ = [y_name]
+                analysis.save_setting_plots(
+                    setting_dir / "results_statistics" / y_name,
+                    y_names_,
+                    x_names,
+                    y_full_dict=y_full_dict,
+                    x_ticks=False,
                 )
-
-                file_name = create_unique_name(
-                    x_name, y_name, key, [dataset_ind, pre_suffix_ind]
-                )
-
-                plot_name_file = file_name.split("-")[0]  # y_name
-                save_dir_final = save_dir / plot_name_file
-                if not save_dir_final.is_dir():
-                    os.makedirs(save_dir_final)
-
-                plt.savefig(save_dir_final / f"{file_name}.png", bbox_inches="tight")
-                plt.close("all")
 
     def analyze_multi_datasets(
         self,
         output_dir: Path = Path("."),
-        all_results_plots: bool = True,
-        all_raw_plots: bool = True,
-        all_combi_plots: bool = True,
     ):
         for dataset_id in self.unique_datasets:
             logger.info(
                 f"Analyzing results for experiments derived from dataset id {dataset_id}"
             )
-            self.dataset_analyze_performance(
-                unique_id=dataset_id, all_plots=all_results_plots, output_dir=output_dir
-            )
-            self.dataset_analyze_statistics(
-                unique_id=dataset_id, all_plots=all_raw_plots, output_dir=output_dir
-            )
             self.dataset_analyze_statistics_results(
-                unique_id=dataset_id, all_plots=all_combi_plots, output_dir=output_dir
+                unique_id=dataset_id, output_dir=output_dir
             )
 
 
@@ -594,7 +341,6 @@ def analyze_multi_experiment_results(
     base_path: Path,
     base_raw_path: Path | None,
     filter_final: bool = True,
-    all_plots: bool = True,
     output_dir: bool = Path("."),
 ):
     """Analyze Experiments return a multi folder structure contatining plots for performance,
@@ -614,9 +360,6 @@ def analyze_multi_experiment_results(
     )
     analysis.analyze_multi_datasets(
         output_dir=output_dir,
-        all_results_plots=all_plots,
-        all_raw_plots=all_plots,
-        all_combi_plots=all_plots,
     )
 
 

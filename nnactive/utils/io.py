@@ -1,4 +1,5 @@
 import json
+import pickle
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,18 @@ def load_label_map(image_id: str, data_path: Path, file_ending: str) -> np.ndarr
     image_path = data_path / f"{image_id}{file_ending}"
     sitk_image = sitk.ReadImage(image_path)
     return sitk.GetArrayFromImage(sitk_image)
+
+
+def save_pickle(data: Any, filepath: Path):
+    """Saves the data as pickle file as a binary file."""
+    with open(filepath, "wb") as file:
+        pickle.dump(data, file)
+
+
+def load_pickle(filepath: Path) -> Any:
+    """Loads the data from a pickle file as binary."""
+    with open(filepath, "rb") as file:
+        return pickle.load(file)
 
 
 def save_dataclass_to_json(data: dataclasses, filepath: Path):

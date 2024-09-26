@@ -7,7 +7,9 @@ from typing import Any, Callable
 
 import pandas as pd
 from loguru import logger
+from pydantic.dataclasses import dataclass
 
+from nnactive.analyze.analysis import HorizontalLine
 from nnactive.analyze.metrics import compute_auc
 from nnactive.config.struct import ActiveConfig
 from nnactive.utils.io import load_json
@@ -183,7 +185,7 @@ class SingleExperimentResults:
 
     def to_full_dataset_performance_dict(
         self, value: str | None = "Dice"
-    ) -> dict[str, list[dict[str, Any]]]:
+    ) -> dict[str, list[HorizontalLine]]:
         out = {}
         if value is None:
             raise NotImplementedError
@@ -217,19 +219,17 @@ class SingleExperimentResults:
 
     def full_dataset_performance(
         self, plot_fct=lambda x: x["foreground_mean"]["Dice"]
-    ) -> list[dict[str, Any]]:
+    ) -> list[HorizontalLine]:
         y_fulls = []
         for dataset_performance in DATASET_PERFORMANCES:
             if dataset_performance["Dataset"] == self.config.dataset:
                 y_fulls.append(
-                    {
-                        "y": plot_fct(dataset_performance),
-                        "label": "{} full dataset performance".format(
-                            dataset_performance["Trainer"]
-                        ),
-                        "linestyle": FULL_LINESTYLE[len(y_fulls)],
-                        "color": "black",
-                    }
+                    HorizontalLine(
+                        plot_fct(dataset_performance),
+                        label=dataset_performance["Trainer"],
+                        linestyle=FULL_LINESTYLE[len(y_fulls)],
+                        color="black",
+                    )
                 )
         return y_fulls
 

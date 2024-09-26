@@ -44,6 +44,7 @@ class PairwisePenaltyMatrix:
         alpha: float = 0.05,
     ):
         """Initializes the PairwiseMatrix class with the given DataFrame and keys for a single Experiment Setting.
+        The computation does not ensure that each algorithm has the full budget available and that each algorithm has the same amount of experiments.
 
         Information:
         Code is adapted from: https://github.com/JordanAsh/badge/blob/master/scripts/agg_results.py

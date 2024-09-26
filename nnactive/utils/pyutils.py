@@ -1,11 +1,39 @@
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Hashable, List
+from typing import Any, Hashable, Iterable, List
 
 import numpy as np
 from PIL import Image
 from pydantic import dataclasses
+
+
+def create_string_identifier(
+    values: Iterable | None = None,
+    ignore_ident: Iterable[int] | None = None,
+    remove_list: Iterable[str] = (" ", "_", "-"),
+) -> str:
+    """Create a unique identifier from the given identifier values with commas separated.
+
+    Args:
+        identifier (Iterable | None, optional): _description_. Defaults to None.
+        ignore_ident (Iterable[int] | None, optional): _description_. Defaults to None.
+
+    Returns:
+        str: _description_
+    """
+    ignore_ident = ignore_ident if ignore_ident is not None else []
+    ident_name = (
+        tuple([k for i, k in enumerate(values) if i not in ignore_ident])
+        if values is not None
+        else tuple()
+    )
+    ident_name = f"{ident_name}"
+    for rm_char in remove_list:
+        ident_name = ident_name.replace(rm_char, "")
+    # remove the brackets from list
+    ident_name = ident_name[1:-1]
+    return ident_name
 
 
 def stitch_images(

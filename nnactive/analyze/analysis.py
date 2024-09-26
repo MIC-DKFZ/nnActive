@@ -8,87 +8,68 @@ import pandas as pd
 import seaborn as sns
 from loguru import logger
 from matplotlib import pyplot as plt
+from pydantic.dataclasses import dataclass
+from typing_extensions import Self
 
 from nnactive.analyze.metrics import PairwisePenaltyMatrix, compute_auc
-from nnactive.utils.io import save_df_to_txt
-from nnactive.utils.plot import create_unique_name, plot_dataframe
-
-SELECTED_CLASSES = {
-    "Dataset216_AMOS2022_task1": [1, 13, 15],
-    "Dataset137_BraTS2021": [(1, 2, 3), (2, 3), (3,)],
-}
+from nnactive.utils.io import load_pickle, save_df_to_txt, save_pickle
+from nnactive.utils.plot import plot_dataframe
 
 
+@dataclass
+class HorizontalLine:
+    y: float
+    label: str
+    color: str = "black"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"y": self.y, "label": self.label, "color": self.color}
+
+
+@dataclass(config={"arbitrary_types_allowed": True})
 class SettingAnalysis:
-    def __init__(
-        self,
-        dataframe: pd.DataFrame,
-        dataset: str | None = None,
-        query_key: str = "uncertainty",
-        performance_val: str = "Dice",
-        performance_key: str = "Mean Dice",
-        budget_key: str = "#Patches",
-        palette: dict[str, str] | None = None,
-        results_skip_keys: list[str] | None = None,
-        statistics_skip_keys: list[str] | None = None,
-        key: Iterable | None = None,
-    ):
-        """Analyse the dataset statistics and performance of the experiments corresponding to one Dataset.
+    df: pd.DataFrame
+    dataset: str | None = None
+    seed_key: str = "seed"
+    query_key: str = "uncertainty"
+    budget_key: str = "#Patches"
+    max_loops_key: str = "query_steps"
+    main_performance_key: str = "Mean Dice"
+    main_statistic_key: str = "avg_percentage_of_voxels_fg_cls"
+    full_performance_dict: dict[str, list[HorizontalLine]] | None = (
+        None  # possibly for each performance key multiple horizontal line
+    )
+    performance_keys: list[str] | None = None
+    statistic_keys: list[str] | None = None
+    palette: dict[str, str] | None = None
+    string_id: str | None = None
 
-        Notes:
-        key: already cleaned of vales that should not be used for naming the files.
-        """
-        self.df = dataframe
-        self.palette = palette
-        self.query_key = query_key
-        self.performance_val = performance_val
-        self.performance_key = performance_key
-        self.results_skip_keys = [] if results_skip_keys is None else results_skip_keys
-        self.statistics_skip_keys = (
-            [] if statistics_skip_keys is None else statistics_skip_keys
-        )
-        self.budget_key = budget_key
-        self.key = key
-        self.dataset = dataset
-
-    @property
-    def results_group_keys(self) -> list[str]:
-        return [col for col in self.df.columns if col not in self.results_skip_keys]
-
-    @property
-    def statistics_group_keys(self) -> list[str]:
-        return [col for col in self.df.columns if col not in self.statistics_skip_keys]
-
-    @property
-    def all_group_keys(self) -> list[str]:
-        return [
-            col
-            for col in self.df.columns
-            if col not in self.statistics_skip_keys + self.results_skip_keys
-        ]
+    def __post_init__(self):
+        if self.statistic_keys is None:
+            self.statistic_keys = []
+        if self.performance_keys is None:
+            self.performance_keys = []
 
     def create_filename(self, x_name: str, y_name: str) -> str:
-        fn = create_unique_name(
-            x_name,
-            y_name,
-            self.key,
-        )
+        fn = f"{y_name}-{x_name}__{self.string_id}"[:250]
         return fn
 
-    def compute_auc_row_dicts(self) -> list[dict]:
-        # TODO: replace this placeholder
-        performance_cols = [self.performance_key]
+    def _compute_auc_row_dicts(self, performance_keys: list[str]) -> list[dict]:
         # group each experiment by query_key and seed
-        df_grouped = self.df.groupby([self.query_key, "seed"])
+        df_grouped = self.df.groupby([self.query_key, self.seed_key])
 
         df_row_dicts = []
         for name, group_df in df_grouped:
             row_dict = {"Query Method": name[0], "seed": name[1]}
-            for performance_col in performance_cols:
+            for performance_col in performance_keys:
                 # compute AUC for each group
+                group_df = group_df.sort_values(self.budget_key)
                 values = group_df[performance_col]
                 n_loops = len(values)
-                auc = compute_auc(values)
+                if n_loops > 1:
+                    auc = compute_auc(values)
+                else:
+                    auc = np.nan
                 final_performance = values.iloc[-1]
                 row_dict[performance_col + " AUBC"] = auc
                 row_dict[performance_col + " Final"] = final_performance
@@ -101,28 +82,55 @@ class SettingAnalysis:
 
         return df_row_dicts
 
-    def compute_auc_df(self) -> pd.DataFrame:
-        df_row_dicts = self.compute_auc_row_dicts()
+    def compute_auc_df(
+        self, performance_vals: str | Iterable[str] | None = None
+    ) -> pd.DataFrame:
+        performance_vals = self.get_performance_vals(performance_vals)
+        df_row_dicts = self._compute_auc_row_dicts(performance_vals)
         df = pd.DataFrame(df_row_dicts)
-        num_loops = self.df["query_steps"].max()
-        # TODO: This check could perhaps be done in a post init method
-        assert all(num_loops == self.df["query_steps"].unique())
+        num_loops = self.df[self.max_loops_key].max()
+
+        # Ensure that all experiments have the same number of loops (maximum amount)
+        assert all(num_loops == self.df[self.max_loops_key].unique())
+
         df = df[df["#Loops"] == num_loops]
-        df: pd.DataFrame = df[
-            [
-                "Query Method",
-                self.performance_key + " AUBC",
-                self.performance_key + " Final",
-            ]
+
+        df_cols = [
+            [performance_val + " AUBC", performance_val + " Final"]
+            for performance_val in performance_vals
         ]
-        df = df.groupby("Query Method").aggregate(["mean", "std", "count"])
+        qm_key = "Query Method"
+        df_cols = [qm_key] + [item for sublist in df_cols for item in sublist]
+        df: pd.DataFrame = df[df_cols]
+        df = df.groupby(qm_key).aggregate(["mean", "std", "count"])
         return df
 
-    def compute_pairwise_penalty(self, alpha: float = 0.05) -> PairwisePenaltyMatrix:
+    def get_performance_vals(
+        self, performance_keys: str | Iterable[str] | None
+    ) -> list[str]:
+        if performance_keys is None and len(self.performance_keys) > 0:
+            performance_keys = self.performance_keys
+        elif performance_keys is None and self.main_performance_key is not None:
+            performance_keys = [self.main_performance_key]
+        elif isinstance(performance_keys, str):
+            performance_keys = [performance_keys]
+        else:
+            performance_keys = list(performance_keys)
+        assert (
+            len(performance_keys) > 0
+        )  # performance_keys has to be longer than 0. See this function to know your options!
+        return performance_keys
+
+    def compute_pairwise_penalty(
+        self, performance_key: str | None = None, alpha: float = 0.05
+    ) -> PairwisePenaltyMatrix:
+        if performance_key is None:
+            performance_key = self.main_performance_key
+
         return PairwisePenaltyMatrix(
             self.df,
             alpha=alpha,
-            value_key=self.performance_key,
+            value_key=performance_key,
             qm_key=self.query_key,
             budget_key=self.budget_key,
         )
@@ -134,7 +142,7 @@ class SettingAnalysis:
         x_name: str,
         dataset: str | None = None,
         x_ticks: Iterable | None = None,
-        hline_printers: list[dict, Any] | None = None,
+        hline_printers: list[dict, Any] | list[HorizontalLine] | None = None,
     ) -> tuple[plt.Figure, plt.Axes]:
         fig, axs = plt.subplots()
         axs = plot_dataframe(
@@ -151,13 +159,18 @@ class SettingAnalysis:
         # add vertical line
         if hline_printers is not None:
             for y_full in hline_printers:
-                axs.axhline(**y_full)
+                if isinstance(y_full, HorizontalLine):
+                    axs.axhline(**(y_full.to_dict()))
+                else:
+                    axs.axhline(**y_full)
         return fig, axs
 
     def plot_experiment_overview(
         self,
         selected_classes: list[int] | list[tuple[int]] | None = None,
-        horizontal_lines: dict[str, Any] | None = None,
+        horizontal_lines: (
+            dict[str, list[dict]] | dict[str, list[HorizontalLine]] | None
+        ) = None,
         x_axis_dict: dict[str, Any] | None = None,
     ) -> tuple[plt.Figure, list[list[plt.Axes]]]:
         n_rows, n_cols = 3, 9
@@ -281,7 +294,10 @@ class SettingAnalysis:
             if horizontal_lines is not None and y_name in horizontal_lines:
                 hline_printers = horizontal_lines[y_name]
                 for y_full in hline_printers:
-                    axs[i, j].axhline(**y_full)
+                    if isinstance(y_full, HorizontalLine):
+                        axs[i, j].axhline(**(y_full.to_dict()))
+                    else:
+                        axs[i, j].axhline(**y_full)
         handles, labels = axs[0][0].get_legend_handles_labels()
         fig.legend(
             handles,
@@ -306,7 +322,6 @@ class SettingAnalysis:
         x_names: list[str],
         y_full_dict: dict | None = None,
         x_ticks: bool = True,
-        short_name: bool = False,
     ):
         if not save_dir.is_dir():
             os.makedirs(save_dir)
@@ -349,71 +364,18 @@ class SettingAnalysis:
         plt.savefig(save_dir / "overview.png", bbox_inches="tight")
         plt.close("all")
 
-    @staticmethod
-    def ensure_df_elt_hashable(df: pd.DataFrame):
-        for col in df.columns:
-            if df[col].dtype == object:
-                if len(df[col]) > 0 and isinstance(df[col][0], list):
-                    df[col] = df[col].apply(lambda x: tuple(x))
-        return df
+    def save(self, save_path: Path, save_df: bool = True):
+        """Saves the SettingAnalysis object as a binary pickle file and the dataframe for easy access."""
+        save_pickle(self, save_path)
+        if save_df:
+            fn = save_path.name.split(".")[0]
+            fn += "_df.pkl"
+            self.df.to_pickle(save_path.parent / fn)
 
-    # TODO: move this method to the class which orchestrates everything
-    def analyze_all(self, save_dir: Path, y_full_dict: dict[str, Any] | None = None):
-        if not save_dir.is_dir():
-            os.makedirs(save_dir)
-        selected_classes = SELECTED_CLASSES.get(self.dataset, None)
-
-        # overview plot
-        x_names = ["Loop", "#Patches"]
-        self.save_overview_plots(
-            save_dir=save_dir,
-            selected_classes=selected_classes,
-            horizontal_lines=y_full_dict,
-            x_names=x_names,
-        )
-
-        # performance plots
-        x_names = ["Loop", "#Patches"]
-        y_names = [col for col in self.df.columns if col.endswith(self.performance_val)]
-        self.save_setting_plots(
-            save_dir / "results",
-            y_names,
-            x_names,
-            x_ticks=True,
-            y_full_dict=y_full_dict,
-        )
-
-        # statistic plots
-        x_names = ["Loop"]
-        # TODO: clear reading out what statistics are
-        y_names = ["percentage_of_patches_percentage_foreground"]
-        self.save_setting_plots(save_dir / "statistics", y_names, x_names, x_ticks=True)
-
-        # statistic results plots
-        # TODO: clear reading out what statistics are
-        x_names = [
-            "percentage_of_patches_percentage_foreground",
-            "avg_percentage_of_voxels_fg_cls",
-        ]
-        y_names = [col for col in self.df.columns if col.endswith(self.performance_val)]
-        for y_name in y_names:
-            y_names_ = [y_name]
-            self.save_setting_plots(
-                save_dir / "results_statistics" / y_name,
-                y_names_,
-                x_names,
-                y_full_dict=y_full_dict,
-                x_ticks=False,
-            )
-
-        auc_df = self.compute_auc_df()
-        # pprint(auc_df)
-        auc_df.to_json(save_dir / "auc.json")
-        save_df_to_txt(auc_df, save_dir / "auc.txt")
-
-        ppm = self.compute_pairwise_penalty()
-        ppm.plot_pairwise_matrix(ppm.matrix, savepath=save_dir / "ppm.png")
-        ppm.save(save_dir / "ppm.json")
+    @classmethod
+    def load(cls, load_path: Path) -> Self:
+        """Initializes the Setting Analysis object from a pickle file."""
+        return load_pickle(load_path)
 
 
 if __name__ == "__main__":
@@ -425,11 +387,73 @@ if __name__ == "__main__":
     groups = df.groupby(["pre_suffix"], as_index=False)
     l_groups = list(groups)
     analysis = SettingAnalysis(l_groups[1][1])
-    df_auc = analysis.compute_auc_df()
+    performance_val = "Dice"
+    performance_cols = [
+        col for col in analysis.df.columns if col.endswith(performance_val)
+    ]
+    df_auc = analysis.compute_auc_df(performance_cols)
 
     pprint(df_auc)
 
     save_dir = temp_file.parent / "test_analysis" / d_set
     if not save_dir.is_dir():
         os.makedirs(save_dir)
-    analysis.analyze_all(save_dir)
+
+    SELECTED_CLASSES = {
+        "Dataset216_AMOS2022_task1": [1, 13, 15],
+        "Dataset137_BraTS2021": [(1, 2, 3), (2, 3), (3,)],
+    }
+    selected_classes = SELECTED_CLASSES.get(d_set, None)
+    y_full_dict = None
+
+    if not save_dir.is_dir():
+        os.makedirs(save_dir)
+
+    # overview plot
+    x_names = ["Loop", "#Patches"]
+    analysis.save_overview_plots(
+        save_dir=save_dir,
+        selected_classes=selected_classes,
+        horizontal_lines=y_full_dict,
+        x_names=x_names,
+    )
+
+    # performance plots
+    x_names = ["Loop", "#Patches"]
+    y_names = [col for col in analysis.df.columns if col.endswith(performance_val)]
+    analysis.save_setting_plots(
+        save_dir / "results",
+        y_names,
+        x_names,
+        x_ticks=True,
+        y_full_dict=y_full_dict,
+    )
+
+    # statistic plots
+    x_names = ["Loop"]
+    # TODO: clear reading out what statistics are
+    y_names = ["percentage_of_patches_percentage_foreground"]
+    analysis.save_setting_plots(save_dir / "statistics", y_names, x_names, x_ticks=True)
+
+    # statistic results plots
+    x_names = [
+        "percentage_of_patches_percentage_foreground",
+        "avg_percentage_of_voxels_fg_cls",
+    ]
+    y_names = [col for col in analysis.df.columns if col.endswith(performance_val)]
+    for y_name in y_names:
+        y_names_ = [y_name]
+        analysis.save_setting_plots(
+            save_dir / "results_statistics" / y_name,
+            y_names_,
+            x_names,
+            y_full_dict=y_full_dict,
+            x_ticks=False,
+        )
+
+    df_auc.to_json(save_dir / "auc.json")
+    save_df_to_txt(df_auc, save_dir / "auc.txt")
+
+    ppm = analysis.compute_pairwise_penalty(performance_key="Mean Dice")
+    ppm.plot_pairwise_matrix(ppm.matrix, savepath=save_dir / "ppm.png")
+    ppm.save(save_dir / "ppm.json")
