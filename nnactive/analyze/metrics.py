@@ -287,45 +287,45 @@ class PairwisePenaltyMatrix(PairwiseMatrix):
 
 
 if __name__ == "__main__":
-    from copy import deepcopy
+    # from copy import deepcopy
 
-    values = np.array([0.9] * 3 + [0.8] * 6)
-    print(f"values={values}")
-    print(f"auc={compute_auc(values)}")
+    # values = np.array([0.9] * 3 + [0.8] * 6)
+    # print(f"values={values}")
+    # print(f"auc={compute_auc(values)}")
 
-    data = [
-        {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.8},
-        {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.9},
-        {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.85},
-        {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.8},
-        {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.9},
-        {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.85},
-        {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.8},
-        {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.9},
-        {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.85},
-    ]
-    data2 = deepcopy(data)
-    for d in data2:
-        d["Query Method"] = "alg2"
+    # data = [
+    #     {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.8},
+    #     {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.9},
+    #     {"Query Method": "alg1", "num_samples": 10, "test_acc": 0.85},
+    #     {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.8},
+    #     {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.9},
+    #     {"Query Method": "alg1", "num_samples": 20, "test_acc": 0.85},
+    #     {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.8},
+    #     {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.9},
+    #     {"Query Method": "alg1", "num_samples": 30, "test_acc": 0.85},
+    # ]
+    # data2 = deepcopy(data)
+    # for d in data2:
+    #     d["Query Method"] = "alg2"
 
-    data3 = deepcopy(data)
-    for d in data3:
-        d["Query Method"] = "win_alg"
-        d["test_acc"] += 0.2
+    # data3 = deepcopy(data)
+    # for d in data3:
+    #     d["Query Method"] = "win_alg"
+    #     d["test_acc"] += 0.2
 
-    data = data + data2 + data3
-    df = pd.DataFrame(data)
-    pm = PairwisePenaltyMatrix.from_df(df)
-    pm.print()
-    pm.plot_pairwise_matrix(pm.matrix, savepath="ppm.png")
-    pm.save("ppm.json")
+    # data = data + data2 + data3
+    # df = pd.DataFrame(data)
+    # pm = PairwisePenaltyMatrix.from_df(df)
+    # pm.print()
+    # pm.plot_pairwise_matrix(pm.matrix, savepath="ppm.png")
+    # pm.save("ppm.json")
 
-    pm3 = PairwisePenaltyMatrix.create_merged_matrix([pm, pm, pm])
-    pm3.print()
-    pm3.detete_alg("win_alg")
-    pm3.print()
+    # pm3 = PairwisePenaltyMatrix.create_merged_matrix([pm, pm, pm])
+    # pm3.print()
+    # pm3.detete_alg("win_alg")
+    # pm3.print()
 
-    pm2 = PairwisePenaltyMatrix.load("ppm.json")
+    # pm2 = PairwisePenaltyMatrix.load("ppm.json")
     # pm = PairwisePenaltyMatrix(df)
     # pm.compute_matrix()
     # pm.print()
