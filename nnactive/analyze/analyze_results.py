@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import os
 from functools import cached_property
-from itertools import product
 from pathlib import Path
-from typing import Any, Iterable
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 from loguru import logger
@@ -16,7 +12,7 @@ from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
 from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
 from nnactive.config.struct import Final
-from nnactive.utils.io import load_json, save_df_to_txt
+from nnactive.utils.io import save_df_to_txt
 from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
 
 sns.set_style("whitegrid")
@@ -241,9 +237,12 @@ class MultiExperimentAnalysis:
         if not output_dir.is_dir():
             os.makedirs(output_dir)
 
+        logger.info(f"Building dataframe for {dataset_name}")
+
         df, skip_keys = self.create_merged_df(
             dataset_statistics, dataset_results, value
         )
+        logger.info(f"Finished buiding dataframe for {dataset_name}")
 
         vals = [seperator for seperator in df.columns if seperator not in skip_keys]
 

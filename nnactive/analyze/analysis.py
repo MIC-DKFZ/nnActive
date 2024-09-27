@@ -127,7 +127,7 @@ class SettingAnalysis:
         if performance_key is None:
             performance_key = self.main_performance_key
 
-        return PairwisePenaltyMatrix(
+        return PairwisePenaltyMatrix.from_df(
             self.df,
             alpha=alpha,
             value_key=performance_key,
