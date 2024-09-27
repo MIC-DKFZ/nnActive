@@ -287,6 +287,7 @@ class PairwisePenaltyMatrix(PairwiseMatrix):
 
 
 if __name__ == "__main__":
+    pass
     # from copy import deepcopy
 
     # values = np.array([0.9] * 3 + [0.8] * 6)
