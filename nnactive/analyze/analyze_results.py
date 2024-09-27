@@ -78,9 +78,22 @@ class MultiExperimentAnalysis:
 
     @cached_property
     def exp_results_paths(self):
-        experiment_paths = [
-            fn.parent for fn in self.base_results_path.rglob("*/config.json")
-        ]
+
+        search_paths = [self.base_results_path]
+        experiment_paths = []
+        while len(search_paths) > 0:
+            search_path = search_paths.pop(0)
+            if search_path.name == "nnActive_data":
+                results_paths = [
+                    s_p / "nnActive_results"
+                    for s_p in search_path.iterdir()
+                    if s_p.name.startswith("Dataset")
+                ]
+                search_paths.extend(results_paths)
+            else:
+                experiment_paths.extend(
+                    [fn.parent for fn in search_path.rglob("*/config.json")]
+                )
         logger.debug(f"Found {len(experiment_paths)} experiments.")
         if self.filter_final:
             experiment_paths = [
