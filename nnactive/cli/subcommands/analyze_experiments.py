@@ -26,8 +26,7 @@ def analyze_experiments(
         raw_path (str | Path | None, optional): path with nnActive_data folder structure. get_nnActive_data().
         output_path (str | Path, optional): Path where to output results. Defaults to Path(".").
     """
-    if raw_path is not None:
-        raw_path = Path(raw_path)
+    raw_path = Path(raw_path)
     base_path = Path(base_path)
     output_path = Path(output_path)
     analyze_multi_experiment_results(

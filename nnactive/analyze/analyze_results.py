@@ -53,7 +53,7 @@ class MultiExperimentAnalysis:
     def __init__(
         self,
         base_results_path: Path,
-        base_raw_path: Path | None = None,
+        base_raw_path: Path,
         filter_final: bool = True,
     ):
         """Allows analysis of multiple experiments from a base_folder.
@@ -453,7 +453,7 @@ class MultiExperimentAnalysis:
 
 def analyze_multi_experiment_results(
     base_path: Path,
-    base_raw_path: Path | None,
+    base_raw_path: Path,
     filter_final: bool = True,
     output_dir: bool = Path("."),
 ):
