@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 from loguru import logger
 
-from nnactive.analyze.analysis import SettingAnalysis
+from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
 from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
 from nnactive.config.struct import Final
@@ -30,6 +30,9 @@ PALETTE = {
     "kmeans_bald": "tab:olive",
 }
 
+# Defuault is Class 1, 2, 3, ....
+# For some datasets we only want to plot a subset of classes
+# If Less than 3 classes are available, None is used to fill the list
 SELECTED_CLASSES_OVERVIEW = {
     "Dataset216_AMOS2022_task1": [1, 13, 15],
     "Dataset137_BraTS2021": [(1, 2, 3), (2, 3), (3,)],
@@ -74,7 +77,6 @@ class MultiExperimentAnalysis:
 
     @cached_property
     def exp_results_paths(self):
-
         search_paths = [self.base_results_path]
         experiment_paths = []
         while len(search_paths) > 0:
@@ -297,10 +299,20 @@ class MultiExperimentAnalysis:
 
             # overview plots
             selected_classes = SELECTED_CLASSES_OVERVIEW.get(dataset_name, None)
+            n_performance_cols = 3
+            if selected_classes is None:
+                selected_classes = [
+                    int(i.split(" ")[1])
+                    for i in self.df.columns
+                    if i.startswith("Class")
+                ][:3]
+                while len(selected_classes) < n_performance_cols:
+                    selected_classes.append(None)
+            grid = self.generate_grid(selected_classes)
             x_names = ["Loop", "#Patches"]
             analysis.save_overview_plots(
                 save_dir=setting_dir,
-                selected_classes=selected_classes,
+                grid=grid,
                 horizontal_lines=y_full_dict,
                 x_names=x_names,
             )
@@ -347,6 +359,96 @@ class MultiExperimentAnalysis:
             self.dataset_analyze_statistics_results(
                 unique_id=dataset_id, output_dir=output_dir
             )
+
+    @staticmethod
+    def generate_grid(
+        selected_classes: list[int] | list[tuple[int,]],
+    ) -> GridPlotter:
+        n_rows = 3
+        n_cols = 9
+        grid = GridPlotter(n_rows, n_cols)
+
+        # fill column 1 with main performance metric
+        col_num = 0
+        x_names = [
+            "#Patches",
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+        ]
+        y_names = ["Mean Dice"] * n_rows
+        grid.set_col_from_values(col_num, x_names, y_names)
+
+        # fill columns 2-4 with class performance metrics
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                y_names = [f"Class {cls_index} Dice"] * n_rows
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
+                x_names = [
+                    "#Patches",
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
+                    "avg_percentage_of_voxels_fg_cls",
+                ]
+            grid.set_col_from_values(col_num, x_names, y_names)
+
+        # fill column 5 with statistic metrics
+        col_num += 1
+        x_names = [
+            "percentage_of_num_voxels",
+            "percentage_of_num_voxels",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxels_foreground",
+            "avg_percentage_of_voxels_fg_cls",
+            "patches_foreground",
+        ]
+        grid.set_col_from_values(col_num, x_names, y_names)
+
+        # fill column 6-8 with statistic metrics per class
+        for i, cls_index in enumerate(selected_classes):
+            col_num += 1
+            if cls_index is None:
+                x_names = [None] * n_rows
+                y_names = [None] * n_rows
+            else:
+                x_names = [
+                    "percentage_of_num_voxels",
+                    None,
+                    "#Patches",
+                ]
+                if isinstance(cls_index, (tuple, list)):
+                    perctentage_index = cls_index[0]
+                else:
+                    perctentage_index = cls_index
+                y_names = [
+                    f"percentage_of_voxels_per_cls_{perctentage_index}",
+                    None,
+                    f"patches_per_cls_{perctentage_index}",
+                ]
+            col = [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
+            grid.set_col_from_dicts(col_num, col)
+
+        # fill column 9 with file statistics
+        x_names = [
+            "Loop",
+            "#Patches",
+            "#Patches",
+        ]
+        y_names = [
+            "percentage_of_voxel_percentage_foreground",
+            "percentage_of_num_unique_files",
+            "num_unique_files",
+        ]
+        col_num += 1
+        grid.set_col_from_values(col_num, x_names, y_names)
+        return grid
 
 
 def analyze_multi_experiment_results(

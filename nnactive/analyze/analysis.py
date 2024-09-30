@@ -26,6 +26,83 @@ class HorizontalLine:
         return {"y": self.y, "label": self.label, "color": self.color}
 
 
+class GridPlotter:
+    def __init__(self, n_rows: int, n_cols: int):
+        """A class to help with plotting multiple plots in a grid.
+        For an example usecase see the SettingAnalysis class."""
+        self.grid: list[list[dict[str, str]]] = [[None] * n_cols for _ in range(n_rows)]
+        self.n_rows = n_rows
+        self.n_cols = n_cols
+
+    def set_spot(self, row: int, col: int, x_name: str, y_name: str, **kwargs):
+        self.grid[row][col] = {"x_name": x_name, "y_name": y_name, **kwargs}
+
+    def set_col_from_dicts(self, col: int, column_dicts: list[dict[str, str]]):
+        assert len(column_dicts) == self.n_rows
+        for row, col_dict in enumerate(column_dicts):
+            self.grid[row][col] = col_dict
+
+    def set_row_from_dicts(self, row: int, row_dicts: list[dict[str, str]]):
+        assert len(row_dicts) == self.n_cols
+        self.grid[row] = row_dicts
+
+    def set_col_from_values(
+        self,
+        col: int,
+        x_names: list[str],
+        y_names: list[str],
+        additional: dict[str, list[str]] = {},
+    ):
+        assert len(x_names) == self.n_rows
+        assert len(y_names) == self.n_rows
+
+        for row, (x_name, y_name) in enumerate(zip(x_names, y_names)):
+            add = {key: value[row] for key, value in additional.items()}
+            self.grid[row][col] = {"x_name": x_name, "y_name": y_name, **add}
+
+    def set_row_from_values(
+        self,
+        row: int,
+        x_names: list[str],
+        y_names: list[str],
+        additional: dict[str, list[str]],
+    ):
+        assert len(x_names) == self.n_cols
+        assert len(y_names) == self.n_cols
+        for col, (x_name, y_name) in enumerate(zip(x_names, y_names)):
+            add = {key: value[col] for key, value in additional.items()}
+            self.grid[row][col] = {"x_name": x_name, "y_name": y_name, **add}
+
+    def __repr__(self) -> str:
+        return "\n".join(
+            ["[{}]".format(",\t".join([str(elt) for elt in row])) for row in self.grid]
+        )
+
+    def shape(self) -> tuple[int, int]:
+        return self.n_rows, self.n_cols
+
+    def __getitem__(self, key: tuple[int, int]) -> dict[str, str]:
+        return self.grid[key[0]][key[1]]
+
+    def __setitem__(self, key: tuple[int, int], value: dict[str, str]):
+        self.grid[key[0]][key[1]] = value
+
+    def from_dict(
+        self,
+        grid_dict: list[list[dict[str, str]]],
+        row_offset: int = 0,
+        col_offset: int = 0,
+    ):
+        for row, col_dicts in enumerate(grid_dict):
+            for col, plot_dict in enumerate(col_dicts):
+                self.grid[row + row_offset][col + col_offset] = plot_dict
+        for i, j in product(range(self.n_rows), range(self.n_cols)):
+            if self.grid[i][j] is not None:
+                keys = list(self.grid[i][j].keys())
+                assert "x_name" in keys
+                assert "y_name" in keys
+
+
 @dataclass(config={"arbitrary_types_allowed": True})
 class SettingAnalysis:
     df: pd.DataFrame
@@ -54,13 +131,21 @@ class SettingAnalysis:
         fn = f"{y_name}-{x_name}__{self.string_id}"[:250]
         return fn
 
+    @property
+    def auc_qm_key(self) -> str:
+        return "Query Method"
+
+    @property
+    def auc_loops_key(self) -> str:
+        return "#Loops"
+
     def _compute_auc_row_dicts(self, performance_keys: list[str]) -> list[dict]:
         # group each experiment by query_key and seed
         df_grouped = self.df.groupby([self.query_key, self.seed_key])
 
         df_row_dicts = []
         for name, group_df in df_grouped:
-            row_dict = {"Query Method": name[0], "seed": name[1]}
+            row_dict = {self.auc_qm_key: name[0], self.seed_key: name[1]}
             for performance_col in performance_keys:
                 # compute AUC for each group
                 group_df = group_df.sort_values(self.budget_key)
@@ -73,9 +158,9 @@ class SettingAnalysis:
                 final_performance = values.iloc[-1]
                 row_dict[performance_col + " AUBC"] = auc
                 row_dict[performance_col + " Final"] = final_performance
-                row_dict["#Loops"] = (
-                    min(row_dict["#Loops"], n_loops)
-                    if "#Loops" in row_dict
+                row_dict[self.auc_loops_key] = (
+                    min(row_dict[self.auc_loops_key], n_loops)
+                    if self.auc_loops_key in row_dict
                     else n_loops
                 )
             df_row_dicts.append(row_dict)
@@ -93,13 +178,13 @@ class SettingAnalysis:
         # Ensure that all experiments have the same number of loops (maximum amount)
         assert all(num_loops == self.df[self.max_loops_key].unique())
 
-        df = df[df["#Loops"] == num_loops]
+        df = df[df[self.auc_loops_key] == num_loops]
 
         df_cols = [
             [performance_val + " AUBC", performance_val + " Final"]
             for performance_val in performance_vals
         ]
-        qm_key = "Query Method"
+        qm_key = self.auc_qm_key
         df_cols = [qm_key] + [item for sublist in df_cols for item in sublist]
         df: pd.DataFrame = df[df_cols]
         df = df.groupby(qm_key).aggregate(["mean", "std", "count"])
@@ -165,114 +250,31 @@ class SettingAnalysis:
                     axs.axhline(**y_full)
         return fig, axs
 
-    def plot_experiment_overview(
+    def plot_setting_overview(
         self,
-        selected_classes: list[int] | list[tuple[int]] | None = None,
+        grid: list[list[dict[str, str]]] | GridPlotter,
         horizontal_lines: (
             dict[str, list[dict]] | dict[str, list[HorizontalLine]] | None
         ) = None,
         x_axis_dict: dict[str, Any] | None = None,
+        plot_size: float = 4,
     ) -> tuple[plt.Figure, list[list[plt.Axes]]]:
-        n_rows, n_cols = 3, 9
-        n_performance_cols = 3
-        plot_size = 4
-        if selected_classes is None:
-            selected_classes = [
-                int(i.split(" ")[1]) for i in self.df.columns if i.startswith("Class")
-            ][:3]
-            while len(selected_classes) < n_performance_cols:
-                selected_classes.append(None)
 
-        cols = [[] for _ in range(n_cols)]
-        col_num = 0
-        # fill first 4 columns
-        col0_x = [
-            "#Patches",
-            "percentage_of_voxels_foreground",
-            "avg_percentage_of_voxels_fg_cls",
-        ]
-        for x_n in col0_x:
-            cols[col_num].append({"x_name": x_n, "y_name": "Mean Dice"})
+        if isinstance(grid, list):
+            grid = GridPlotter(len(grid), len(grid[0]))
+            grid.from_dict(grid)
 
-        for i, cls_index in enumerate(selected_classes):
-            col_num += 1
-            if cls_index is None:
-                x_names = [None] * n_rows
-                y_names = [None] * n_rows
-            else:
-                y_names = [f"Class {cls_index} Dice"] * n_rows
-                if isinstance(cls_index, (tuple, list)):
-                    perctentage_index = cls_index[0]
-                else:
-                    perctentage_index = cls_index
-                x_names = [
-                    "#Patches",
-                    f"percentage_of_voxels_per_cls_{perctentage_index}",
-                    "avg_percentage_of_voxels_fg_cls",
-                ]
-
-            cols[col_num].extend(
-                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
-            )
-
-        # fill last 4 columns
-        x_names = [
-            "percentage_of_num_voxels",
-            "percentage_of_num_voxels",
-            "#Patches",
-        ]
-        y_names = [
-            "percentage_of_voxels_foreground",
-            "avg_percentage_of_voxels_fg_cls",
-            "patches_foreground",
-        ]
-        col_num += 1
-        for x_n, y_n in zip(x_names, y_names):
-            cols[col_num].append({"x_name": x_n, "y_name": y_n})
-        for i, cls_index in enumerate(selected_classes):
-            col_num += 1
-            if cls_index is None:
-                x_names = [None] * n_rows
-                y_names = [None] * n_rows
-            else:
-                x_names = [
-                    "percentage_of_num_voxels",
-                    None,
-                    "#Patches",
-                ]
-                if isinstance(cls_index, (tuple, list)):
-                    perctentage_index = cls_index[0]
-                else:
-                    perctentage_index = cls_index
-                y_names = [
-                    f"percentage_of_voxels_per_cls_{perctentage_index}",
-                    None,
-                    f"patches_per_cls_{perctentage_index}",
-                ]
-            cols[col_num].extend(
-                [{"x_name": x_n, "y_name": y_n} for x_n, y_n in zip(x_names, y_names)]
-            )
-
-        x_names = [
-            "Loop",
-            "#Patches",
-            "#Patches",
-        ]
-        y_names = [
-            "percentage_of_voxel_percentage_foreground",
-            "percentage_of_num_unique_files",
-            "num_unique_files",
-        ]
-        col_num += 1
-        for x_n, y_n in zip(x_names, y_names):
-            cols[col_num].append({"x_name": x_n, "y_name": y_n})
-
+        n_rows, n_cols = grid.shape()
         fig, axs = plt.subplots(
             nrows=n_rows, ncols=n_cols, figsize=(n_cols * plot_size, n_rows * plot_size)
         )
 
         for i, j in product(range(n_rows), range(n_cols)):
-            x_name, y_name = cols[j][i]["x_name"], cols[j][i]["y_name"]
+            plot_dict = grid[i, j]
+            if plot_dict is None:
+                axs[i, j].set_axis_off()
+                continue
+            x_name, y_name = plot_dict["x_name"], plot_dict["y_name"]
             if x_name is None or y_name is None:
                 axs[i, j].set_axis_off()
                 continue
@@ -349,15 +351,15 @@ class SettingAnalysis:
     def save_overview_plots(
         self,
         save_dir: Path,
-        selected_classes: list[int] | list[tuple[int]] | None = None,
+        grid: list[list[dict[str, str]]] | GridPlotter,
         horizontal_lines: dict[str, Any] | None = None,
         x_names: list[str] | tuple[str,] = tuple(),
     ):
         x_axis_dict = dict()
         for x_name in x_names:
             x_axis_dict[x_name] = {"x_ticks": self.df[x_name].unique()}
-        fig, axs = self.plot_experiment_overview(
-            selected_classes=selected_classes,
+        fig, axs = self.plot_setting_overview(
+            grid=grid,
             horizontal_lines=horizontal_lines,
             x_axis_dict=x_axis_dict,
         )
@@ -379,6 +381,14 @@ class SettingAnalysis:
 
 
 if __name__ == "__main__":
+    # grid = GridPlotter(3, 3)
+    # grid.set_spot(0, 0, "x1", "y1")
+    # grid.set_spot(0, 1, "x2", "y2")
+    # print(grid)
+    # import IPython
+
+    # IPython.embed()
+
     from pprint import pprint
 
     d_set = "Dataset216_AMOS2022_task1"
