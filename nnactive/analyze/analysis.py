@@ -105,6 +105,25 @@ class GridPlotter:
 
 @dataclass(config={"arbitrary_types_allowed": True})
 class SettingAnalysis:
+    """
+    A class to analyze settings and performance metrics from a DataFrame.
+
+    Attributes:
+        df (pd.DataFrame): The DataFrame containing the data to be analyzed.
+        dataset (str | None): The name of the dataset. Defaults to None.
+        seed_key (str): The column name for the seed values. Defaults to "seed".
+        query_key (str): The column name for the query method. Defaults to "uncertainty".
+        budget_key (str): The column name for the budget values. Defaults to "#Patches".
+        max_loops_key (str): The column name for the maximum loops. Defaults to "query_steps".
+        main_performance_key (str): The column name for the main performance metric. Defaults to "Mean Dice".
+        main_statistic_key (str): The column name for the main statistic. Defaults to "avg_percentage_of_voxels_fg_cls".
+        full_performance_dict (dict[str, list[HorizontalLine]] | None): A dictionary containing performance metrics for each key. Defaults to None.
+        performance_keys (list[str] | None): A list of performance keys. Defaults to None.
+        statistic_keys (list[str] | None): A list of statistic keys. Defaults to None.
+        palette (dict[str, str] | None): A dictionary mapping keys to colors for plotting. Defaults to None.
+        string_id (str | None): A string identifier for the analysis. Defaults to None.
+    """
+
     df: pd.DataFrame
     dataset: str | None = None
     seed_key: str = "seed"
@@ -128,18 +147,37 @@ class SettingAnalysis:
             self.performance_keys = []
 
     def create_filename(self, x_name: str, y_name: str) -> str:
+        """Creates a filename based on x_name, y_name, and string_id."""
         fn = f"{y_name}-{x_name}__{self.string_id}"[:250]
         return fn
 
     @property
     def auc_qm_key(self) -> str:
+        """Returns the key for the query method used for AUC computation."""
         return "Query Method"
 
     @property
     def auc_loops_key(self) -> str:
+        """Returns the key for the number of loops used for AUC computation."""
         return "#Loops"
 
     def _compute_auc_row_dicts(self, performance_keys: list[str]) -> list[dict]:
+        """
+        Computes the Area Under the Curve (AUC) for each group of experiments and returns a list of dictionaries containing the results.
+
+        Args:
+            performance_keys (list[str]): A list of column names representing the performance metrics to compute AUC for.
+
+        Returns:
+            list[dict]: A list of dictionaries where each dictionary contains the AUC and final performance values for each performance metric,
+                        along with the query key, seed key, and the number of loops used in the AUC computation.
+
+        Notes:
+            - The DataFrame `self.df` is expected to have columns corresponding to `self.query_key`, `self.seed_key`, and `self.budget_key`.
+            - The AUC is computed for each group of experiments defined by unique combinations of `self.query_key` and `self.seed_key`.
+            - If a group has only one value, the AUC is set to NaN.
+            - The final performance value is taken as the last value in the sorted group.
+        """
         # group each experiment by query_key and seed
         df_grouped = self.df.groupby([self.query_key, self.seed_key])
 
@@ -170,6 +208,24 @@ class SettingAnalysis:
     def compute_auc_df(
         self, performance_vals: str | Iterable[str] | None = None
     ) -> pd.DataFrame:
+        """
+        Computes the Area Under the Curve (AUC) DataFrame for the given performance values.
+
+        This method processes performance values to compute AUC-related metrics and returns
+        a DataFrame containing the aggregated results.
+
+        Args:
+            performance_vals (str | Iterable[str] | None): A string or an iterable of strings
+            representing the performance values to be considered. If None, default
+            performance values will be used.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the aggregated AUC metrics, including mean,
+            standard deviation, and count for each performance value.
+
+        Raises:
+            AssertionError: If the number of loops is not consistent across all experiments.
+        """
         performance_vals = self.get_performance_vals(performance_vals)
         df_row_dicts = self._compute_auc_row_dicts(performance_vals)
         df = pd.DataFrame(df_row_dicts)
@@ -229,6 +285,21 @@ class SettingAnalysis:
         x_ticks: Iterable | None = None,
         hline_printers: list[dict, Any] | list[HorizontalLine] | None = None,
     ) -> tuple[plt.Figure, plt.Axes]:
+        """
+        Plots a single experiment from the given DataFrame.
+
+        Args:
+            df_g (pd.DataFrame): The DataFrame containing the data to plot.
+            y_name (str): The name of the column to use for the y-axis.
+            x_name (str): The name of the column to use for the x-axis.
+            dataset (str | None, optional): The title of the plot. Defaults to None.
+            x_ticks (Iterable | None, optional): Custom x-ticks for the plot. Defaults to None.
+            hline_printers (list[dict, Any] | list[HorizontalLine] | None, optional):
+            List of dictionaries or HorizontalLine objects to add horizontal lines to the plot. Defaults to None.
+
+        Returns:
+            tuple[plt.Figure, plt.Axes]: The figure and axes of the plot.
+        """
         fig, axs = plt.subplots()
         axs = plot_dataframe(
             axs,
