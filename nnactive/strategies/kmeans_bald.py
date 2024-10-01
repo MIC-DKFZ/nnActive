@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -25,7 +26,12 @@ class KMeansBALD(BaseDiversityQueryMethod, BALD):
         self, query_dicts: list[dict[str, Any]], device: device = ...
     ) -> list[dict[str, Any]]:
         img_unc, potential_patches = BALD.strategy(self, query_dicts, device=device)
-        input_shape = np.load(query_dicts[0]["probs"]).shape[1:]
+        if isinstance(query_dicts[0]["probs"], (Path, str)):
+            input_shape = np.load(query_dicts[0]["probs"]).shape[1:]
+        elif isinstance(query_dicts[0]["probs"], torch.Tensor):
+            input_shape = query_dicts[0]["probs"].shape[1:]
+        else:
+            raise ValueError(f"probs are of type {type(query_dicts[0]['probs'])}")
         representation = [q_d["repr"] for q_d in query_dicts]
         representation = torch.from_numpy(np.concatenate(representation, axis=0))
         representation = RepresentationHandler.init_from_representation(
