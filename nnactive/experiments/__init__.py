@@ -586,6 +586,14 @@ register(
 )
 
 register(
+    make_kits_config,
+    seeds=__seeds,
+    uncertainties=__strategies,
+    query_size=200,
+    query_steps=5,
+)
+
+register(
     make_brats_small_config,
     seeds=__seeds,
     uncertainties=__strategies,
@@ -623,6 +631,15 @@ register(
     query_steps=5,
 )
 
+
+register(
+    make_acdc_config,
+    seeds=__seeds,
+    uncertainties=[*__strategies, "kmeans_bald"],
+    query_size=90,
+    query_steps=5,
+)
+
 register(
     make_acdc_small_config,
     seeds=__seeds,
@@ -634,6 +651,14 @@ register(
     seeds=__seeds,
     uncertainties=__strategies,
     query_size=40,
+    query_steps=5,
+)
+
+register(
+    make_amos_config,
+    seeds=__seeds,
+    uncertainties=__strategies,
+    query_size=200,
     query_steps=5,
 )
 
