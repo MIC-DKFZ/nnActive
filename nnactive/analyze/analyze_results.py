@@ -264,6 +264,7 @@ class MultiExperimentAnalysis:
         for key, df_g in df.groupby(vals, as_index=False):
             pre_suffix = df_g["pre_suffix"].iloc[0]
             identifier = create_string_identifier(key, ignore_ident=remove_ind)
+            logger.info(f"Creating plots for Identifier: {identifier}")
             # create plots for each unique setting of the respective dataset
             setting_dir: Path = output_dir / (pre_suffix[2:])
             if not setting_dir.is_dir():
@@ -302,9 +303,7 @@ class MultiExperimentAnalysis:
             n_performance_cols = 3
             if selected_classes is None:
                 selected_classes = [
-                    int(i.split(" ")[1])
-                    for i in self.df.columns
-                    if i.startswith("Class")
+                    int(i.split(" ")[1]) for i in df_g.columns if i.startswith("Class")
                 ][:3]
                 while len(selected_classes) < n_performance_cols:
                     selected_classes.append(None)
