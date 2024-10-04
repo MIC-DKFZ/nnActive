@@ -7,7 +7,9 @@ from typing import Any, Callable
 
 import pandas as pd
 from loguru import logger
+from pydantic.dataclasses import dataclass
 
+from nnactive.analyze.analysis import HorizontalLine
 from nnactive.analyze.metrics import compute_auc
 from nnactive.config.struct import ActiveConfig
 from nnactive.utils.io import load_json
@@ -67,7 +69,10 @@ class ClassValue(AbstractValue):
 
 class SingleExperimentResults:
     def __init__(self, experiment_path: Path):
+        """Class to handle results of a single experiment.
+        Where one experiment consists of multiple loops."""
         self.experiment_path = experiment_path
+        self.performance_metric = "Dice"
 
     @property
     def summary_files(self) -> list[Path]:
@@ -99,20 +104,26 @@ class SingleExperimentResults:
         return out_results
 
     @cached_property
-    def overview(self) -> float:
+    def overview(self) -> pd.DataFrame:
+        """Computes the AUBC and final value for each metric in the summary files.
+
+        Returns:
+            float: _description_
+        """
         df, _ = self.to_df_row_dicts()
         df = pd.DataFrame(df)
 
         out_list = []
         for col in df.columns:
-            if "Dice" in col:
+            if self.performance_metric in col:
                 out_dict = {}
                 out_dict["Metric"] = col
                 out_dict["AUBC"] = compute_auc(df[col])
                 out_dict["Final"] = df[col].iloc[-1]
                 out_list.append(out_dict)
+        out_df = pd.DataFrame(out_list)
 
-        return out_list
+        return out_df
 
     # TODO: retrieve class names from dataset.json
     @property
@@ -135,7 +146,9 @@ class SingleExperimentResults:
         ]
         return skip_keys
 
-    def get_value_dict(self, plot_val: str = "Dice") -> dict[str, AbstractValue]:
+    def get_value_dict(self, plot_val: str | None = None) -> dict[str, AbstractValue]:
+        if plot_val is None:
+            plot_val = self.performance_metric
         # better to do this with classes for names of plots
         plot_dict = {f"Mean {plot_val}": MeanValue(plot_val)}
         for cls in self.results[0]["summary"]["mean"]:
@@ -143,16 +156,18 @@ class SingleExperimentResults:
             plot_dict[f"Class {cls} {plot_val}"] = ClassValue(plot_val, cls)
         return plot_dict
 
-    def get_plot_vals(self, plot_val: str = "Dice") -> list[str]:
+    def get_plot_vals(self, plot_val: str | None = "Dice") -> list[str]:
+        if plot_val is None:
+            plot_val = self.performance_metric
         return list(self.get_value_dict(plot_val).keys())
 
     def to_df_row_dicts(
         self, plot_val: str | None = "Dice"
     ) -> tuple[list[dict], list[str]]:
         if plot_val is None:
-            raise NotImplementedError
-        else:
-            value_dict = self.get_value_dict(plot_val)
+            plot_val = self.performance_metric
+
+        value_dict = self.get_value_dict(plot_val)
         out = []
         skip_keys = [] + self.plot_skip_keys
         for result in self.results:
@@ -170,7 +185,7 @@ class SingleExperimentResults:
 
     def to_full_dataset_performance_dict(
         self, value: str | None = "Dice"
-    ) -> dict[str, list[dict[str, Any]]]:
+    ) -> dict[str, list[HorizontalLine]]:
         out = {}
         if value is None:
             raise NotImplementedError
@@ -187,7 +202,7 @@ class SingleExperimentResults:
         """Returns list of dict with experiment results where self.plot_name is key for the value obtained with plot_fct.
 
         Args:
-            plot_fct (_type_, optional): _description_. Defaults to lambdax:x["foreground_mean"]["Dice"].
+            plot_fct (_type_, optional): _description_. Defaults to lambda:x["foreground_mean"]["Dice"].
 
         Returns:
         """
@@ -204,19 +219,17 @@ class SingleExperimentResults:
 
     def full_dataset_performance(
         self, plot_fct=lambda x: x["foreground_mean"]["Dice"]
-    ) -> list[dict[str, Any]]:
+    ) -> list[HorizontalLine]:
         y_fulls = []
         for dataset_performance in DATASET_PERFORMANCES:
             if dataset_performance["Dataset"] == self.config.dataset:
                 y_fulls.append(
-                    {
-                        "y": plot_fct(dataset_performance),
-                        "label": "{} full dataset performance".format(
-                            dataset_performance["Trainer"]
-                        ),
-                        "linestyle": FULL_LINESTYLE[len(y_fulls)],
-                        "color": "black",
-                    }
+                    HorizontalLine(
+                        plot_fct(dataset_performance),
+                        label=dataset_performance["Trainer"],
+                        linestyle=FULL_LINESTYLE[len(y_fulls)],
+                        color="black",
+                    )
                 )
         return y_fulls
 
@@ -226,6 +239,6 @@ if __name__ == "__main__":
         "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset040_Hippocampus__DEBUG__patch-20_20_20__sb-random-label2-all-classes__sbs-10__qs-10__unc-random-label__seed-12345"
     )
     exp = SingleExperimentResults(exp_path)
-    import IPython
+    from pprint import pprint
 
-    IPython.embed()
+    pprint(exp.overview)

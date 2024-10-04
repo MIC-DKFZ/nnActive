@@ -18,7 +18,6 @@ def analyze_experiments(
     base_path: str | Path = get_nnActive_results(),
     raw_path: str | Path = get_nnActive_data(),
     output_path: str | Path = Path("."),
-    all_plots: bool = True,
 ):
     """Analyze Experiment Results. Requires nnUNet_raw data to be set up properly.
 
@@ -26,10 +25,8 @@ def analyze_experiments(
         base_path (str | Path, optional): path with nnActive_results folder structure. Defaults to get_nnActive_results().
         raw_path (str | Path | None, optional): path with nnActive_data folder structure. get_nnActive_data().
         output_path (str | Path, optional): Path where to output results. Defaults to Path(".").
-        all_plots (bool, optional): Whether to create all possible plots. Defaults to True.
     """
-    if raw_path is not None:
-        raw_path = Path(raw_path)
+    raw_path = Path(raw_path)
     base_path = Path(base_path)
     output_path = Path(output_path)
     analyze_multi_experiment_results(
@@ -37,7 +34,6 @@ def analyze_experiments(
         base_raw_path=raw_path,
         filter_final=True,
         output_dir=output_path,
-        all_plots=all_plots,
     )
 
 
