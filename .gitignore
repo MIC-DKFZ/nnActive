@@ -3,6 +3,7 @@ docs/source/api
 wandb/
 results/
 temp/
+*.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

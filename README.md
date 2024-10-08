@@ -1,4 +1,4 @@
-# nnActive Playground
+# nnActive
 
 Scripts for nnActive development
 
@@ -158,9 +158,65 @@ $nnActive_results
 │   │   │   └── loop_000 # these will be created for validation and performance etc.
 ```
 
-After the experiment has been set up, it can now be run.
+After the experiment has been set up, it can now be executed.
 ```bash
 nnactive run_experiment --experiment Hippocampus__patch-20_20_20__qs-40__unc-random__seed-12345
+```
+
+## Analysis
+### Visualizing Results
+To get a detailed analysis with plots and computed metrics for each different setting the following command can be used:
+```bash
+nnactive analyze_experiments --base_path $nnActive_results --raw_path $nnActive_data --output_path {OUTPUT_PATH}
+```
+
+This results in the following folder structure.
+```
+{OUTPUT_PATH}
+├── DatasetXXX_NAME
+│   ├── Setting 1
+│   │   ├── results
+│   │   ├── results_statistics
+│   │   │   ├── Class X Dice
+...
+│   │   │   ├── Class Y Dice
+│   │   │   └── Mean Dice
+│   │   └── statistics
+│   └── Setting 2
+│       ├── results
+│       ├── results_statistics
+│       │   ├── Class X Dice
+...
+│       │   ├── Class Y Dice
+│       │   └── Mean Dice
+│       └── statistics
+...
+```
+
+### Visualizing Queries (Images)
+```bash
+nnactive visualize_queries_images --raw_folder $nnActive_data/DatasetXXX/nnUNet_raw/DatasetXYZ --img_folder $nnActive_raw/nnUNet_raw/ DatasetXXX --output_folder {OUTPUT_FOLDER}
+```
+
+Results in the following folder structure
+```
+{OUTPUT_FOLDER}/DatasetXYZ
+├── loop_000
+│   ├── loop-00__id-00__img-BraTS2021_01541.png
+│   ├── loop-00__id-01__img-BraTS2021_00542.png
+│   ├── loop-00__id-02__img-BraTS2021_01504.png
+│   └── loop-00__id-19__img-BraTS2021_00260.png
+├── loop_001
+...
+├── loop_002
+...
+├── loop_009
+...
+├── overview-loop_000.png
+├── overview-loop_001.png
+...
+├── overview-loop_002.png
+└── overview-loop_XXX.png
 ```
 
 
