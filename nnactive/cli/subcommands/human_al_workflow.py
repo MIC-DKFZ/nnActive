@@ -92,35 +92,43 @@ def human_al_manual_selection_to_loop(
 
 
 # TODO: allow updating of data based on annotations based on paths!
-# @register_subcommand("human_al_update_data")
-# def human_al_update_data(
-#     target_raw_folder: str, splits_file_path: str, loop: int, debug: bool = False
-# ):
-#     """Update the data based on the loop file.
-#     Can be executed outside of nnActive folder structure.
+@register_subcommand("human_al_update_data")
+def human_al_update_data(
+    target_raw_folder: str,
+    splits_file_path: str,
+    loop_val: int,
+    ignore_label: int,
+):
+    """Update the data based on the loop file.
+    Can be executed outside of nnActive folder structure.
 
-#     Args:
-#         target_raw_folder (str): Path to the raw data folder
-#         splits_file (str): Path to the splits_file file
-#         loop (int): Loop number
-#         debug (bool, optional): Debug mode. Defaults to False.
-#     """
-#     datap_path = Path(target_raw_folder)
-#     splits_file_path = Path(splits_file_path)
+    Args:
+        target_raw_folder (str): Path to the raw data folder
+        splits_file (str): Path to the splits_file file created for current loop
+        loop_val (int): Loop number
+        debug (bool, optional): Debug mode. Defaults to False.
+    """
+    data_path = Path(target_raw_folder)
+    splits_file_path = Path(splits_file_path)
 
-#     update_data(
-#         data_path=datap_path,
-#         save_splits_file=splits_file_path,
-#         ignore_label=...,
-#         base_dir=datap_path / "",
-#         target_dir=datap_path / "labelsTr",
-#         file_ending=".nii.gz",
-#         loop=loop,
-#         debug=debug,
-#     )
-#     nnunet_plans_path = Path(plans_file)
-#     target_dir = Path(target_raw_folder)
-#     assert nnunet_plans_path.exists()
+    label_dir = data_path / f"annoTr_{loop_val:02}"
+
+    additional_label_path = data_path / f"additional_labels"
+    additional_label_path = (
+        additional_label_path if additional_label_path.is_dir() else None
+    )
+
+    update_data(
+        data_path=data_path,
+        save_splits_file=splits_file_path,
+        ignore_label=ignore_label,
+        base_dir=label_dir,
+        target_dir=data_path / "labelsTr",
+        file_ending=".nii.gz",
+        loop_val=loop_val,
+        additional_label_path=additional_label_path,
+        annotated=False,
+    )
 
 
 @register_subcommand("human_al_create_mitk_geometry_file")
