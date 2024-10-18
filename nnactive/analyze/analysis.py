@@ -20,10 +20,16 @@ from nnactive.utils.plot import plot_dataframe
 class HorizontalLine:
     y: float
     label: str
+    linestyle: str = "-"
     color: str = "black"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"y": self.y, "label": self.label, "color": self.color}
+        return {
+            "y": self.y,
+            "label": self.label,
+            "color": self.color,
+            "linestyle": self.linestyle,
+        }
 
 
 class GridPlotter:

@@ -29,7 +29,7 @@ else:
         f"Folder for full_data_results does not exist.\n{full_data_results_folder}"
     )
 
-FULL_LINESTYLE = ["-", "- "]
+FULL_LINESTYLE = ["solid", "dashed", "dashdot", "dotted"]
 
 
 class AbstractValue:
