@@ -85,6 +85,44 @@ def list_finished_experiments(base_id: int):
     return out_list
 
 
+def make_config(
+    seed: int,
+    uncertainty: str,
+    base_id: int,
+    query_size: int,
+    query_steps: int,
+    patch_size: list[int] | None = None,
+    agg_stride: int = 8,
+    trainer: str = __standard_trainer,
+    starting_budget: str = __standard_starting_budget,
+    pre_suffix_format: str = __standard_pre_suffix_format,
+    **config_kwargs,
+) -> ActiveConfig:
+    with set_raw_paths():
+        dataset_name = convert_id_to_dataset_name(base_id)
+        if patch_size is None:
+            patch_size = get_patch_size(base_id)
+
+    config = ActiveConfig(
+        trainer=trainer,
+        base_id=base_id,
+        patch_size=patch_size,
+        uncertainty=uncertainty,
+        query_size=query_size,
+        query_steps=query_steps,
+        starting_budget=starting_budget,
+        seed=seed,
+        dataset=dataset_name,
+        train_folds=5,
+        full_folds=5,
+        agg_stride=agg_stride,
+        patch_overlap=0,
+        **config_kwargs,
+    )
+    config.set_pre_suffix(pre_suffix_format)
+    return config
+
+
 def make_kits_small_config(
     seed: int,
     uncertainty: str,
@@ -671,6 +709,37 @@ register(
     seeds=__seeds,
     uncertainties=__strategies,
 )
+
+################## Dataset Exploration Experiments #########
+#### Entire Dataset 10-50% ####
+# rounded down 10% of training set query size.
+
+pre_suffix_format = "__patch-{patch_size}__qs-{query_size}__tr-{trainer}"
+
+full_patch_size = [1000, 1000, 1000]
+
+dataset_list: list[dict] = [
+    {"base_id": 216, "query_size": 15},
+    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0},
+    {"base_id": 135, "query_size": 22},
+    {"base_id": 27, "query_size": 15},
+]
+
+for dataset in dataset_list:
+    additional_overlap = dataset.get("additional_overlap", 0.4)
+    register(
+        make_config,
+        base_id=dataset["base_id"],
+        seeds=__seeds,
+        uncertainties=["random"],
+        patch_size=full_patch_size,
+        query_size=dataset["query_size"],
+        query_steps=5,
+        trainer="nnUNetTrainer_200epochs",
+        starting_budget="random",
+        pre_suffix_format=pre_suffix_format,
+        additional_overlap=additional_overlap,
+    )
 
 ################## Prototyping Experiments #########
 register(
