@@ -15,10 +15,15 @@ from nnactive.data.create_empty_masks import (
     add_ignore_label_to_dataset_json,
     read_dataset_json,
 )
+from nnactive.loops.cross_validation import (
+    kfold_cv_from_patches,
+    read_classes_from_dataset_json,
+)
 from nnactive.loops.loading import save_loop
 from nnactive.paths import nnActive_data, set_raw_paths
 from nnactive.strategies import init_strategy
 from nnactive.utils.hostutils import get_verbose
+from nnactive.utils.io import save_json
 
 
 def convert_dataset_to_partannotated(
@@ -32,6 +37,7 @@ def convert_dataset_to_partannotated(
     strategy: str = "random",
     seed: int = 12345,
     additional_overlap: float = 0.6,
+    all_class_splits: bool = True,
 ):
     """Converts base dataset to partly annotated dataset for AL. Raises a RuntimeError if
     the target dataset folder already exists.
@@ -125,6 +131,22 @@ def convert_dataset_to_partannotated(
 
     loop_json = {"patches": patches}
     save_loop(target_dir, loop_json, 0)
+
+    target_preprocessed = Path(paths.nnUNet_preprocessed) / target_dataset
+    os.makedirs(nnActive_data / base_dataset / "nnUNet_preprocessed" / target_dataset)
+    splits_file = target_preprocessed / "splits_final.json"
+    if all_class_splits:
+        ensure_classes = read_classes_from_dataset_json(target_dataset_json)
+    else:
+        ensure_classes = None
+    splits = kfold_cv_from_patches(
+        5,
+        patches,
+        ensure_classes=ensure_classes,
+        labels_path=target_labelsTr_dir,
+        file_ending=file_ending,
+    )
+    save_json(splits, splits_file)
 
 
 def get_patches_for_partannotation(

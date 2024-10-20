@@ -13,6 +13,7 @@ from typing import Iterable
 import nnunetv2.paths
 import numpy as np
 import torch
+import wandb
 from batchgenerators.utilities.file_and_folder_operations import (
     join,
     maybe_mkdir_p,
@@ -26,12 +27,15 @@ from nnunetv2.utilities.dataset_name_id_conversion import convert_id_to_dataset_
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
-import wandb
 from nnactive import paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.logger import monitor
-from nnactive.loops.cross_validation import get_mean_cv, get_mean_foreground_cv
+from nnactive.loops.cross_validation import (
+    get_mean_cv,
+    get_mean_foreground_cv,
+    read_classes_from_dataset_json,
+)
 from nnactive.loops.loading import get_sorted_loop_files
 from nnactive.nnunet.predict import predict_entry_point
 from nnactive.nnunet.preprocessor import nnActivePreprocessor
@@ -534,14 +538,7 @@ def step_update(
 
     if ensure_classes_in_folds:
         logger.info("Ensure every class in all train folds.")
-        file_ending = dataset_json["file_ending"]
-        dataset_classes = dataset_json["labels"]
-        for label in dataset_classes:
-            if isinstance(dataset_classes[label], (list, tuple)):
-                dataset_classes[label] = dataset_classes[label][0]
-        ensure_classes = [
-            val for key, val in dataset_classes.items() if key != "ignore"
-        ]
+        ensure_classes = read_classes_from_dataset_json(dataset_json)
 
     else:
         logger.info(

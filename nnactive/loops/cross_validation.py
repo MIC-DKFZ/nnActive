@@ -37,9 +37,12 @@ def kfold_cv(
             label = label_use[0][0]
             images = label_dict_use.pop(label)
             if len(images) < 2 and label != -1:
-                raise ValueError(
+                logger.warning(
                     f"Label {label} has less than 2 images. Cannot ensure that all train folds contain all classes."
                 )
+                # this break is necessary so that immediately folds are selected randomly after that.
+                # the verification step then ensures that all classes are present in sufficient folds.
+                break
             if label == -1:
                 continue
             rand_np_state.shuffle(images)
@@ -117,7 +120,7 @@ def kfold_cv_from_patches(
     ensure_classes: list[int] = None,
     labels_path: Path = None,
     file_ending: str = None,
-    verify: bool = False,
+    verify: bool = True,
 ) -> list[dict[str, list[str]]]:
     """Create K Fold CV splits with patches as inputs
 
@@ -137,7 +140,7 @@ def kfold_cv_from_patches(
         and labels_path is not None
         and file_ending is not None
     ):
-        label_dict = {}
+        label_dict: dict[int, list[str]] = {}
         for labeled_image in labeled_images:
             label_map = load_label_map(labeled_image, labels_path, file_ending)
             unique_labels = set(np.unique(label_map))
@@ -182,7 +185,7 @@ def kfold_cv_from_patches(
         for l in occurences:
             logger.debug(f"Label {l} occurs in {occurences[l]} folds")
             if occurences[l] < 2:
-                raise RuntimeError(f"Label {l} does not occur in less than two folds.")
+                raise RuntimeError(f"Label {l} does occur in less than two folds.")
 
     return splits_final
 
@@ -236,3 +239,12 @@ def get_mean_cv(summary_cross_val_dict, n_folds):
                 [d[class_idx][key] for d in mean_dicts_list]
             ).mean()
     return class_dicts
+
+
+def read_classes_from_dataset_json(dataset_json: dict) -> list[int]:
+    dataset_classes = dataset_json["labels"]
+    for label in dataset_classes:
+        if isinstance(dataset_classes[label], (list, tuple)):
+            dataset_classes[label] = dataset_classes[label][0]
+    ensure_classes = [val for key, val in dataset_classes.items() if key != "ignore"]
+    return ensure_classes

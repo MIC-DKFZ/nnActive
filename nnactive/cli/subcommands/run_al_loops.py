@@ -24,6 +24,7 @@ def main(
     continue_id: int | None = None,
     verbose: bool = False,
     benchmark: bool = False,
+    force_run: bool = False,
 ) -> None:
     config.set_nnunet_env()
     timer_dict: dict[str, Timer] = {}
@@ -42,6 +43,12 @@ def main(
         state = State.latest(config)
     else:
         state = State.get_id_state(continue_id)
+
+    if state.in_progress and not force_run:
+        raise RuntimeError(
+            f"Training already in progress for experiment {config.name()}. Check "
+            "the current trainings or set up a new nnActive experiment."
+        )
 
     continue_id = state.dataset_id
     # Update config file if needed
@@ -70,12 +77,6 @@ def main(
             # see https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html
             if torch.__version__ >= "2.0":
                 os.environ["nnUNet_compile"] = "True"
-
-        if state.in_progress:
-            raise RuntimeError(
-                f"Training already in progress for experiment {config.name()}. Check "
-                "the current trainings or set up a new nnActive experiment."
-            )
         state.in_progress = True
         state.save_state()
         try:
