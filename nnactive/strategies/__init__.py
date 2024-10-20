@@ -31,6 +31,7 @@ def get_strategy(
     return strategy
 
 
+# This function should be replaced with get_strategy
 def init_strategy(
     strategy_name: str,
     dataset_id: int,
@@ -40,6 +41,7 @@ def init_strategy(
     agg_stride: Union[int, list[int]],
     n_patch_per_image: int,
     loop_val: int | None = -1,
+    additional_overlap: float = 0.4,
     **kwargs,
 ) -> AbstractQueryMethod:
     config = ActiveConfig(
@@ -48,6 +50,7 @@ def init_strategy(
         n_patch_per_image=n_patch_per_image,
         seed=seed,
         agg_stride=agg_stride,
+        additional_overlap=additional_overlap,
     )
     strategy = get_strategy(strategy_name, config, dataset_id, loop_val, seed, **kwargs)
     # strategy = strategydict[strategy_name](
