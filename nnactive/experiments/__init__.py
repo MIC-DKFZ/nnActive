@@ -719,27 +719,28 @@ pre_suffix_format = "__patch-{patch_size}__qs-{query_size}__tr-{trainer}"
 full_patch_size = [1000, 1000, 1000]
 
 dataset_list: list[dict] = [
-    {"base_id": 216, "query_size": 15},
-    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0},
-    {"base_id": 135, "query_size": 22},
-    {"base_id": 27, "query_size": 15},
+    {"base_id": 216, "query_size": 15}, # AMOS
+    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0}, # BraTS
+    {"base_id": 135, "query_size": 22}, # KiTS
+    {"base_id": 27, "query_size": 15}, # ACDC
 ]
 
 for dataset in dataset_list:
     additional_overlap = dataset.get("additional_overlap", 0.4)
-    register(
-        make_config,
-        base_id=dataset["base_id"],
-        seeds=__seeds,
-        uncertainties=["random"],
-        patch_size=full_patch_size,
-        query_size=dataset["query_size"],
-        query_steps=5,
-        trainer="nnUNetTrainer_200epochs",
-        starting_budget="random",
-        pre_suffix_format=pre_suffix_format,
-        additional_overlap=additional_overlap,
-    )
+    for trainer in ["nnUNetTrainer_200epochs", "nnUNetTrainer_500epochs"]:
+        register(
+            make_config,
+            base_id=dataset["base_id"],
+            seeds=__seeds,
+            uncertainties=["random"],
+            patch_size=full_patch_size,
+            query_size=dataset["query_size"],
+            query_steps=5,
+            trainer=trainer,
+            starting_budget="random",
+            pre_suffix_format=pre_suffix_format,
+            additional_overlap=additional_overlap,
+        )
 
 ################## Prototyping Experiments #########
 register(
