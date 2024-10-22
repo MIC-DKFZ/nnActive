@@ -163,6 +163,7 @@ def make_kits_config(
     query_size: int = 20,
     query_steps: int = 10,
     patch_size: list[int] = [64, 64, 64],
+    trainer: str = __standard_trainer,
     starting_budget: str = __standard_starting_budget,
     pre_suffix_format: str = __standard_pre_suffix_format,
 ):
@@ -173,7 +174,7 @@ def make_kits_config(
             patch_size = get_patch_size(base_id)
 
     config = ActiveConfig(
-        trainer=__standard_trainer,
+        trainer=trainer,
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
@@ -474,6 +475,7 @@ def make_amos_config(
     query_size: int = 20,
     query_steps: int = 10,
     patch_size: list[int] | None = [32, 74, 74],
+    trainer: str = __standard_trainer,
     starting_budget: str = __standard_starting_budget,
     pre_suffix_format: str = __standard_pre_suffix_format,
 ):
@@ -484,7 +486,7 @@ def make_amos_config(
             patch_size = get_patch_size(base_id)
 
     config = ActiveConfig(
-        trainer=__standard_trainer,
+        trainer=trainer,
         base_id=base_id,
         patch_size=patch_size,
         uncertainty=uncertainty,
@@ -708,6 +710,29 @@ register(
     make_airway_small_config,
     seeds=__seeds,
     uncertainties=__strategies,
+)
+
+################## Training Length Experiments #############
+pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}"
+
+register(
+    make_kits_config,
+    seeds=__seeds,
+    uncertainties=[s for s in __strategies if s != "random"],
+    query_size=200,
+    query_steps=5,
+    trainer="nnActiveTrainer_500epochs",
+    pre_suffix_format=pre_suffix_format,
+)
+
+register(
+    make_amos_config,
+    seeds=__seeds,
+    uncertainties=[s for s in __strategies if s != "random"],
+    query_size=200,
+    query_steps=5,
+    trainer="nnActiveTrainer_500epochs",
+    pre_suffix_format=pre_suffix_format,
 )
 
 ################## Dataset Exploration Experiments #########
