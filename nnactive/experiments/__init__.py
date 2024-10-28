@@ -615,21 +615,15 @@ register(
     uncertainties=__strategies,
 )
 
-register(
-    make_kits_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=40,
-    query_steps=5,
-)
-
-register(
-    make_kits_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=200,
-    query_steps=5,
-)
+_query_sizes = [40, 200, 500]
+for qs in _query_sizes:
+    register(
+        make_kits_config,
+        seeds=__seeds,
+        uncertainties=__strategies,
+        query_size=qs,
+        query_steps=5,
+    )
 
 register(
     make_brats_small_config,
@@ -684,21 +678,15 @@ register(
     uncertainties=__strategies,
 )
 
-register(
-    make_amos_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=40,
-    query_steps=5,
-)
-
-register(
-    make_amos_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=200,
-    query_steps=5,
-)
+_query_sizes = [40, 200, 500]
+for qs in _query_sizes:
+    register(
+        make_amos_config,
+        seeds=__seeds,
+        uncertainties=__strategies,
+        query_size=qs,
+        query_steps=5,
+    )
 
 register(
     make_airway_config,
