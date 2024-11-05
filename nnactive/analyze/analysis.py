@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
-from nnactive.analyze.metrics import PairwisePenaltyMatrix, compute_auc
+from nnactive.analyze.metrics import DatasetBeta, PairwisePenaltyMatrix, compute_auc
 from nnactive.utils.io import load_pickle, save_df_to_txt, save_pickle
 from nnactive.utils.plot import plot_dataframe
 
@@ -268,6 +268,35 @@ class SettingAnalysis:
         )  # performance_keys has to be longer than 0. See this function to know your options!
         return performance_keys
 
+    def compute_beta_curve(
+        self,
+        trainer: str,
+        budget_key: str | None = None,
+        performance_key: str | None = None,
+    ):
+        if performance_key is None:
+            performance_key = self.main_performance_key
+        if budget_key is None:
+            budget_key = self.budget_key
+        full_performance = [
+            f.y
+            for f in self.full_performance_dict[performance_key]
+            if f.label == trainer
+        ]
+        if len(full_performance) == 0:
+            trainers = [f.label for f in self.full_performance_dict[performance_key]]
+            raise ValueError(
+                f"""
+                Could not find full performance for trainer {trainer} and performance key {performance_key}.
+                Please try one following {trainers}
+                """
+            )
+        full_performance = full_performance[0]
+
+        return DatasetBeta.from_df(
+            self.df, budget_key, performance_key, full_performance, self.query_key
+        )
+
     def compute_pairwise_penalty(
         self, performance_key: str | None = None, alpha: float = 0.05
     ) -> PairwisePenaltyMatrix:
@@ -335,6 +364,7 @@ class SettingAnalysis:
         ) = None,
         x_axis_dict: dict[str, Any] | None = None,
         plot_size: float = 4,
+        style: str | None = None,
     ) -> tuple[plt.Figure, list[list[plt.Axes]]]:
 
         if isinstance(grid, list):
@@ -368,6 +398,7 @@ class SettingAnalysis:
                 hue_key=self.query_key,
                 palette=self.palette,
                 legend=None,
+                style=style,
                 **x_kwargs,
             )
             if horizontal_lines is not None and y_name in horizontal_lines:
@@ -431,6 +462,7 @@ class SettingAnalysis:
         grid: list[list[dict[str, str]]] | GridPlotter,
         horizontal_lines: dict[str, Any] | None = None,
         x_names: list[str] | tuple[str,] = tuple(),
+        style: str | None = None,
     ):
         x_axis_dict = dict()
         for x_name in x_names:
@@ -439,6 +471,7 @@ class SettingAnalysis:
             grid=grid,
             horizontal_lines=horizontal_lines,
             x_axis_dict=x_axis_dict,
+            style=style,
         )
         plt.savefig(save_dir / "overview.png", bbox_inches="tight")
         plt.close("all")

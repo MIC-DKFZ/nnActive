@@ -8,6 +8,7 @@ import pandas as pd
 import seaborn as sns
 from loguru import logger
 
+from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
 from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
@@ -120,7 +121,7 @@ class MultiExperimentAnalysis:
         for exp_path in self.exp_results_paths:
             single_exp = SingleExperimentResults(exp_path)
             if len(single_exp.results) == 0:
-                print(f"Skippig Experiment in {exp_path} due to no results.")
+                # print(f"Skippig Experiment in {exp_path} due to no results.")
                 continue
             exp_results.append(single_exp)
         return exp_results
@@ -217,7 +218,9 @@ class MultiExperimentAnalysis:
         for col in df.columns:
             if df[col].dtype == object:
                 if len(df[col]) > 0 and isinstance(df[col][0], list):
-                    df[col] = df[col].apply(lambda x: tuple(x))
+                    df[col] = df[col].apply(
+                        lambda x: tuple(x) if isinstance(x, list) else x
+                    )
         return df
 
     def dataset_analyze_statistics_results(
@@ -261,6 +264,12 @@ class MultiExperimentAnalysis:
             logger.debug(f"Saving temporary json to {temp_file}")
             df.to_json(temp_file)
 
+        # TEMPORARY FIX FOR agg_stride to allow for grouping
+        # TODO: clean this up!
+        if any([isinstance(val, tuple) for val in df["agg_stride"].unique()]):
+            df["agg_stride"] = df["agg_stride"].apply(
+                lambda x: tuple([x] * 3) if isinstance(x, int) else x
+            )
         for key, df_g in df.groupby(vals, as_index=False):
             pre_suffix = df_g["pre_suffix"].iloc[0]
             identifier = create_string_identifier(key, ignore_ident=remove_ind)
@@ -293,10 +302,42 @@ class MultiExperimentAnalysis:
             # pprint(auc_df)
             auc_df.to_json(setting_dir / "auc.json")
             save_df_to_txt(auc_df, setting_dir / "auc.txt")
+            save_df_to_txt(
+                pretty_auc(pd.read_json(setting_dir / "auc.json"), seeds=True),
+                setting_dir / "auc_pretty.txt",
+            )
 
             ppm = analysis.compute_pairwise_penalty("Mean Dice")
             ppm.plot_pairwise_matrix(ppm.matrix, savepath=setting_dir / "ppm.png")
             ppm.save(setting_dir / "ppm.json")
+
+            trainer = str(analysis.df["trainer"].unique()[0])
+            trainer_use = "nnUNetTrainer"
+            if len(trainer.split("_")) > 1:
+                epochs = trainer.split("_")
+                trainer_use = f"{trainer_use}_{epochs[-1]}"
+                logger.info(f"Using Full Performance Trainer: {trainer_use}")
+            trainers = [
+                f.label
+                for f in analysis.full_performance_dict[analysis.main_performance_key]
+            ]
+            compute_beta = True
+            if trainer_use not in trainers:
+                if len(trainers) > 0:
+                    trainer_use = trainers[0]
+                    logger.info(
+                        f"Using substitute Full Performance Trainer {trainer_use} from {trainers}"
+                    )
+                else:
+                    compute_beta = False
+            if compute_beta:
+                betas = analysis.compute_beta_curve(
+                    trainer_use,
+                    "percentage_of_voxels_foreground",
+                )
+                betas_df = betas.to_beta_df()
+                betas_df.to_json(setting_dir / "beta.json")
+                save_df_to_txt(betas_df, setting_dir / "beta.txt")
 
             # overview plots
             selected_classes = SELECTED_CLASSES_OVERVIEW.get(dataset_name, None)

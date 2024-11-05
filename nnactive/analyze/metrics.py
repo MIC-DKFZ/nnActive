@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from pydantic.dataclasses import dataclass
 from scipy import stats
+from scipy.optimize import curve_fit
 
 from nnactive.utils.io import load_json, save_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -37,6 +38,79 @@ def compute_auc(
             # simulated integral goes from 0 to 1
             dx = 1 / (len(value) - 1)
     return np.trapz(value, x, dx).item()
+
+
+@dataclass
+class DatasetBeta:
+    beta_dict: dict[str, float]
+    beta_std_dict: dict[str, float]
+    a: float
+    c: float
+    x_offset: float
+    """This class computes the exponential annealing curve for a given dataset.
+
+    -a * np.exp(-b * (x - x_offset)) + c
+
+    Args:
+        beta_dict (dict[str, float]): Dictionary containing the beta values for each query method.
+        beta_std_dict (dict[str, float]): Dictionary containing the standard deviation of the beta values for each query method.
+        a (float): The a value of the curve.
+        c (float): The c value of the curve.
+        x_offset (float): The x offset of the curve.
+
+    """
+
+    @staticmethod
+    def function(x, a, b, c, x_offset):
+        # for x = inf -> return c
+        # for x = 0 -> return a + c
+        # for x = x_offset -> return - a + c = mean(df[x == df[x].min()][y])
+        return -a * np.exp(-b * (x - x_offset)) + c
+
+    def compute(self, x, key):
+        return DatasetBeta.function(
+            x, self.a, self.beta_dict[key], self.c, self.x_offset
+        )
+
+    @staticmethod
+    def from_df(
+        df: pd.DataFrame, x: str, y: str, y_max: float, qm_key: str
+    ) -> DatasetBeta:
+        """Initializes the Exponential Annealing class with the given DataFrame and keys for a single Experiment Setting.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing the data.
+            x (str): x-axis key.
+            y (str): y-axis key.
+            y_max (float): y value for entire dataset
+            qm_key (str): key for query method.
+        """
+        c = y_max
+        a = c - np.mean(df[df[x] == df[x].min()][y])
+        x_offset = df[x].min()
+
+        curve_use = lambda x, b: DatasetBeta.function(x, a, b, c, x_offset)
+
+        beta_dict = dict()
+        beta_std_dict = dict()
+        for key, df_g in df.groupby(qm_key):
+            popt, pcov = curve_fit(curve_use, df_g[x], df_g[y])
+            beta_dict[key] = popt[0]
+            beta_std_dict[key] = pcov[0, 0]
+
+        return DatasetBeta(beta_dict, beta_std_dict, a=a, c=c, x_offset=x_offset)
+
+    def to_beta_df(self) -> pd.DataFrame:
+        row_dicts = []
+        for key in self.beta_dict:
+            row_dicts.append(
+                {
+                    "Query Method": key,
+                    "beta": self.beta_dict[key],
+                    "beta_std": self.beta_std_dict[key],
+                }
+            )
+        return pd.DataFrame(row_dicts)
 
 
 @dataclass

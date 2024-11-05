@@ -165,7 +165,7 @@ class Final:
             with open(path, "r") as file:
                 parsed = json.load(file)
         except FileNotFoundError:
-            print(f"No file found for: {path}")
+            # print(f"No file found for: {path}")
             parsed = {}
         return Final(**parsed)
 

@@ -14,6 +14,7 @@ def plot_dataframe(
     palette: dict | None = None,
     x_ticks: Iterable | None = None,
     legend: str | None = "best",
+    style: str | None = None,
 ):
     axs = sns.lineplot(
         data=df,
@@ -21,6 +22,7 @@ def plot_dataframe(
         y=y_name,
         hue=hue_key,
         errorbar="sd",
+        style=style,
         ax=axs,
         markers=True,
         palette=palette,

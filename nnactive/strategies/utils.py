@@ -276,11 +276,11 @@ def query_starting_budget_all_classes(
                 )
                 # check if patch is valid
                 if not does_overlap(patch, selected_patches_image):
+                    additional_overlap_patch = percentage_overlap_array(
+                        patch, additional_label
+                    )
                     if additional_label is not None:
-                        if (
-                            percentage_overlap_array(patch, additional_label)
-                            <= additional_overlap
-                        ):
+                        if additional_overlap_patch <= additional_overlap:
                             for label_rm in label_dict_files:
                                 if sample in label_dict_files[label_rm]:
                                     label_dict_files[label_rm].remove(sample)

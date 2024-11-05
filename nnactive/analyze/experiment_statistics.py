@@ -234,11 +234,39 @@ class SingleExperimentStastistics:
             nested_labels.append(loop_labels)
         return nested_labels
 
+    @cached_property
+    def efficient_nested_patch_labels(self) -> list[list[dict[int, int]]]:
+        files = [
+            patch.file for loop_patches in self.nested_patches for patch in loop_patches
+        ]
+        nested_labels = [
+            [None] * len(loop_patches) for loop_patches in self.nested_patches
+        ]
+        for file in files:
+            label_image = load_label_map(
+                file, self.source_dataset_path / "labelsTr", ""
+            )
+            for i, loop_patches in enumerate(self.nested_patches):
+                for j, patch in enumerate(loop_patches):
+                    if patch.file == file:
+                        patch_access = get_slices_for_file_from_patch(
+                            [patch], patch.file
+                        )[0]
+                        patch_labels = label_image[patch_access]
+                        # fill statistics
+                        unique_cls, counts = np.unique(patch_labels, return_counts=True)
+
+                        nested_labels[i][j] = {
+                            int(unique_cl): int(count)
+                            for unique_cl, count in zip(unique_cls, counts)
+                        }
+        return nested_labels
+
     @property
     def nested_statstics(self) -> list[Statistics]:
         nested_statistics = []
         for loop_labels, loop_patches in zip(
-            self.nested_patch_labels, self.nested_patches
+            self.efficient_nested_patch_labels, self.nested_patches
         ):
             loop_statistics = Statistics(
                 [patch.file for patch in loop_patches],
