@@ -28,12 +28,28 @@ class PowerBALD(BALD):
     This is because the mean score for each voxel aggregated would be always very close to mu(gumbel(0, beta**-1))
     """
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 1
+
     def compute_scores(self, probs, device):
         uncertainty, agg_uncertainty, kernel_size = super().compute_scores(
             probs, device
         )
-        agg_uncertainty = power_noising(agg_uncertainty, beta=1, rng=self.rng)
+        agg_uncertainty = power_noising(agg_uncertainty, beta=self.beta, rng=self.rng)
         return uncertainty, agg_uncertainty, kernel_size
+
+
+class PowerBALD_b5(PowerBALD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 5
+
+
+class PowerBALD_b10(PowerBALD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 10
 
 
 class SoftRankBALD(BALD):

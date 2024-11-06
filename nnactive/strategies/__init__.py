@@ -3,7 +3,13 @@ from typing import Union
 from loguru import logger
 
 from nnactive.config.struct import ActiveConfig
-from nnactive.strategies.bald import BALD, PowerBALD, SoftRankBALD
+from nnactive.strategies.bald import (
+    BALD,
+    PowerBALD,
+    PowerBALD_b5,
+    PowerBALD_b10,
+    SoftRankBALD,
+)
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
@@ -71,6 +77,8 @@ def init_strategy(
 strategydict: dict[str, type[AbstractQueryMethod]] = {
     "mutual_information": BALD,
     "power_bald": PowerBALD,
+    "power_bald_b5": PowerBALD_b5,
+    "power_bald_b10": PowerBALD_b10,
     "softrank_bald": SoftRankBALD,
     "kmeans_bald": KMeansBALD,
     "pred_entropy": PredictiveEntropy,

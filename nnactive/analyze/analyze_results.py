@@ -26,6 +26,8 @@ PALETTE = {
     "random-label": "tab:red",
     "random-label2": "tab:cyan",
     "power_bald": "tab:brown",
+    "power_bald_b5": "tab:olive",
+    "power_bald_b10": "0",
     "power_pe": "tab:gray",
     "softrank_bald": "tab:pink",
     "kmeans_bald": "tab:olive",

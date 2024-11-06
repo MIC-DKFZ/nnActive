@@ -21,6 +21,8 @@ __strategies = [
     "pred_entropy",
     "mutual_information",
     "power_bald",
+    "power_bald_b5",
+    "power_bald_b10",
     "power_pe",
     "softrank_bald",
 ]
@@ -732,10 +734,10 @@ pre_suffix_format = "__patch-{patch_size}__qs-{query_size}__tr-{trainer}"
 full_patch_size = [1000, 1000, 1000]
 
 dataset_list: list[dict] = [
-    {"base_id": 216, "query_size": 15}, # AMOS
-    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0}, # BraTS
-    {"base_id": 135, "query_size": 22}, # KiTS
-    {"base_id": 27, "query_size": 15}, # ACDC
+    {"base_id": 216, "query_size": 15},  # AMOS
+    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0},  # BraTS
+    {"base_id": 135, "query_size": 22},  # KiTS
+    {"base_id": 27, "query_size": 15},  # ACDC
 ]
 
 for dataset in dataset_list:
