@@ -757,6 +757,36 @@ for dataset in dataset_list:
             additional_overlap=additional_overlap,
         )
 
+####### Experiments training 500 epochs on queries from 200 epoch training ######
+pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}__precomputed-queries"
+
+dataset_list: list[dict] = [
+    {"base_id": 216, "query_size": 200},  # AMOS
+    {"base_id": 135, "query_size": 200},  # KiTS
+]
+
+for seed, uncertainty, dataset in product(__seeds, __strategies, dataset_list):
+    register(
+        make_config,
+        base_id=dataset["base_id"],
+        seeds=[seed],
+        uncertainties=[uncertainty],
+        query_size=dataset["query_size"],
+        query_steps=5,
+        patch_size=[20, 20, 20],
+        trainer="nnActiveTrainer_500epochs",
+        pre_suffix_format=pre_suffix_format,
+        additional_overlap=dataset.get("additional_overlap", 0.4),
+        queries_from_experiment=make_config(
+            seed=seed,
+            uncertainty=uncertainty,
+            base_id=dataset["base_id"],
+            query_size=dataset["query_size"],
+            query_steps=5,
+            patch_size=[20, 20, 20],
+        ).name(),
+    )
+
 ################## Prototyping Experiments #########
 register(
     make_amos_prototyping_config,
