@@ -45,7 +45,7 @@ def util_reset_loops(nnActive_results_folder: str, loop: int = 0, npp: int = 4) 
         npp(int, optional): num processes for preprocessing. Defaults to 4.
     """
     nnActive_results_folder: Path = Path(nnActive_results_folder)
-    config = ActiveConfig.from_json(nnActive_results_folder / ActiveConfig.filename)
+    config = ActiveConfig.from_json(nnActive_results_folder / ActiveConfig.filename())
     config.set_nnunet_env()
     dataset_id = int(nnActive_results_folder.name.split("_")[0][-3:])
     reset_loop_nr = loop
@@ -62,7 +62,13 @@ def util_reset_loops(nnActive_results_folder: str, loop: int = 0, npp: int = 4) 
                 print("Deleting file ", str(raw_dataset_path / file))
                 os.remove(raw_dataset_path / file)
 
-    step_update(dataset_id, loop_val=reset_loop_nr, annotated=True, force=True)
+    step_update(
+        config=config,
+        continue_id=dataset_id,
+        loop_val=reset_loop_nr,
+        annotated=True,
+        force=True,
+    )
 
     for loop_file in get_sorted_loop_files(raw_dataset_path)[reset_loop_nr + 1 :]:
         logger.info("Deleting file ", str(raw_dataset_path / loop_file))
