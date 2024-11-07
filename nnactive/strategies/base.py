@@ -180,7 +180,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         num_processes_preprocessing: int = 3,
         additional_label_path: Path | None = None,
         verbose: bool = False,
-        max_ram_pred_query: float | int = 40,
+        max_ram_pred_query: float | int = 20,
         **kwargs,
     ):
         super().__init__(
@@ -472,7 +472,7 @@ class InternalDataHandler:
         self,
         temp_path: Path,
         num_folds: int,
-        max_ram: float = 40.0,
+        max_ram: float = 20,
         save_keys: tuple[str, ...] = ("probs",),
         pass_keys: tuple[str, ...] | None = None,
     ):
