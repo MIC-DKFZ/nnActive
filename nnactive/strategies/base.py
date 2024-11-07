@@ -482,7 +482,7 @@ class InternalDataHandler:
             temp_path (Path): path to save files to.
             num_folds (int): Number of folds.
             max_ram (float, optional): Maximum allowed RAM usage for handled files in GB.
-                When exceeding max_ram, temp files are used. Defaults to 40GB.
+                When exceeding max_ram, temp files are used. Defaults to 25GB.
             save_keys (tuple[str, ...], optional): Defaults to ("probs",).
             pass_keys (tuple[str, ...] | None, optional): Additional keys to pass.
                 Defaults to None.

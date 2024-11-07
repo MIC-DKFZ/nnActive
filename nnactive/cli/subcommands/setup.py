@@ -1,11 +1,16 @@
+import shutil
 import subprocess
+from pathlib import Path
 
 import nnunetv2.paths
+from loguru import logger
 
 from nnactive.cli.registry import register_subcommand
 from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.data.conversion import convert_dataset_to_partannotated
+from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.state import State
+from nnactive.results.utils import get_results_folder
 
 __standard_suffix_format = "__unc-{uncertainty}__seed-{seed}"
 
@@ -56,3 +61,39 @@ def main(
     )
     # Prepare partly annotated dataset for nnUNet training
     prepare_dset(runtime_config, state)
+
+    # If experiment is given in 'queries_from_experiment' config entry:
+    # - get corresponding nnUNet_raw directory
+    # - copy the loop files to current nnUNet_raw/PrecomputedLoops
+    # - replace the current loop_000.json file
+    # - reset the loop (for the case that loop_000.json was different)
+    if config.queries_from_experiment is not None:
+        command = f"""
+            nnactive util_get_experiment_dirs --experiment \
+            {config.queries_from_experiment} | grep "nnUNet_raw: " | \
+            grep -o "'[^']*'" \
+        """
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise ValueError(result.stderr)
+        else:
+            path = Path(result.stdout.strip().strip("'"))
+            loop_files = [f for f in path.iterdir() if f.name.startswith("loop_")]
+            raw_data_path = get_raw_path(state.dataset_id)
+            target_path = raw_data_path / "PrecomputedLoops"
+            target_path.mkdir(exist_ok=True)
+            logger.info(
+                f"Copying the following loop files to {str(target_path)}: "
+                f"{', '.join([str(f.name) for f in loop_files])}"
+            )
+            for loop_file in loop_files:
+                shutil.copy(loop_file, target_path)
+
+        (raw_data_path / "loop_000.json").unlink()
+        shutil.copy(target_path / "loop_000.json", raw_data_path)
+        subprocess.run(
+            f"nnactive util_reset_loops --nnActive_results_folder={str(get_results_folder(state.dataset_id))} --loop=0",
+            shell=True,
+        )
+        if result.returncode != 0:
+            raise ValueError(result.stderr)

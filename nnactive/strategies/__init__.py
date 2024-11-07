@@ -15,6 +15,7 @@ from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PowerPredictiveEntropy, PredictiveEntropy
 from nnactive.strategies.kmeans_bald import KMeansBALD
+from nnactive.strategies.precomputed_query import PrecomputedQuery
 from nnactive.strategies.random import Random, RandomAllClasses
 from nnactive.strategies.randomlabel import RandomLabel, RandomLabelAllClasses
 from nnactive.strategies.randomlabel2 import (
@@ -31,6 +32,10 @@ def get_strategy(
     seed: int,
     **kwargs,
 ) -> AbstractQueryMethod:
+    if config.queries_from_experiment is not None:
+        # If queries_from_experiment is specified, use the pre-computed queries.
+        # NOTE config.uncertainty is not overwritten to ensure correct experiment naming
+        strategy_name = "precomputed-queries"
     strategy = strategydict[strategy_name].init_from_dataset_id(
         config, dataset_id, loop_val=loop_val, seed=seed, **kwargs
     )
@@ -91,4 +96,5 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "random-label-all-classes": RandomLabelAllClasses,
     "random-label2": RandomRandomLabel,
     "random-label2-all-classes": RandomRandomLabelAllClasses,
+    "precomputed-queries": PrecomputedQuery,
 }

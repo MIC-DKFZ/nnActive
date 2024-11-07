@@ -29,6 +29,9 @@ class ActiveConfig:
     uncertainty: str = (
         "random"  # mutual_information TODO: rename this to query_strategy!
     )
+    queries_from_experiment: str | None = (
+        None  # use pre-computed queries from this experiment
+    )
     aggregation: str = "patch"  # patch Currently holds no meaning
     query_size: int = 20  # how many samples are queried
     query_steps: int = 10  # how many query steps are supposed to be made
@@ -45,9 +48,7 @@ class ActiveConfig:
     use_gaussian: bool = True  # use gaussian during query predition
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
     patch_overlap: float = 0  # how much overlap is allowed for patchs
-    additional_overlap: float = (
-        0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
-    )
+    additional_overlap: float = 0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
 
     def __post_init__(self):
         if self.n_patch_per_image is None:
@@ -105,6 +106,8 @@ class ActiveConfig:
                     temp_dict[key] = str(temp_dict[key])
                 elif isinstance(temp_dict[key], Iterable):
                     temp_dict[key] = "_".join(map(lambda x: str(x), temp_dict[key]))
+                elif temp_dict[key] is None:
+                    temp_dict[key] = "None"
                 else:
                     raise NotImplementedError(
                         f"KV {key}:{temp_dict[key]} is of a not supported type."
