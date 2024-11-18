@@ -611,6 +611,8 @@ def make_airway_small_config(
     return config
 
 
+############### Base Experiments (3 label settings) ###############
+
 register(
     make_kits_small_config,
     seeds=__seeds,
@@ -658,21 +660,22 @@ register(
 )
 
 register(
-    make_acdc_config,
+    make_hippocampus_config,
     seeds=__seeds,
     uncertainties=[*__strategies, "kmeans_bald"],
-    query_size=30,
+    query_size=60,
     query_steps=5,
 )
 
-
-register(
-    make_acdc_config,
-    seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald"],
-    query_size=90,
-    query_steps=5,
-)
+_query_sizes = [30, 60, 90]
+for qs in _query_sizes:
+    register(
+        make_acdc_config,
+        seeds=__seeds,
+        uncertainties=[*__strategies, "kmeans_bald"],
+        query_size=qs,
+        query_steps=5,
+    )
 
 register(
     make_acdc_small_config,
@@ -701,6 +704,62 @@ register(
     seeds=__seeds,
     uncertainties=__strategies,
 )
+
+################## Query Size Ablation Experiments ################
+
+dataset_configs: list[dict] = [
+    {
+        "base_id": 216,
+        "starting_budget_size": 500,
+        "query_size": 250,
+        "patch_size": [32, 74, 74],
+    },  # AMOS
+    {
+        "base_id": 216,
+        "starting_budget_size": 40,
+        "query_size": 20,
+        "patch_size": [32, 74, 74],
+    },  # AMOS
+    {
+        "base_id": 135,
+        "starting_budget_size": 500,
+        "query_size": 250,
+        "patch_size": [64, 64, 64],
+    },  # KiTS
+    {
+        "base_id": 135,
+        "starting_budget_size": 40,
+        "query_size": 20,
+        "patch_size": [64, 64, 64],
+    },  # KiTS
+    {
+        "base_id": 27,
+        "starting_budget_size": 90,
+        "query_size": 45,
+        "patch_size": [4, 40, 40],
+    },  # ACDC
+    {
+        "base_id": 27,
+        "starting_budget_size": 30,
+        "query_size": 15,
+        "patch_size": [4, 40, 40],
+    },  # ACDC
+]
+
+for config in dataset_configs:
+    register(
+        make_config,
+        base_id=config["base_id"],
+        seeds=__seeds,
+        uncertainties=__strategies,
+        starting_budget_size=config["starting_budget_size"],
+        query_size=config["query_size"],
+        query_steps=9,  # run 9 loops since we use qs/2
+        patch_size=config["patch_size"],
+        trainer=__standard_trainer,
+        starting_budget=__standard_starting_budget,
+        pre_suffix_format=__standard_pre_suffix_format,
+    )
 
 ################## Training Length Experiments #############
 pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}"
@@ -776,6 +835,8 @@ for seed, uncertainty, dataset in product(__seeds, __strategies, dataset_list):
             patch_size=dataset.get("patch_size", None),
         ).name()
     except RuntimeError:
+        # as in the `register` function, ignore failures, i.e. when the dataset folder
+        # is not present.
         continue
 
     register(
