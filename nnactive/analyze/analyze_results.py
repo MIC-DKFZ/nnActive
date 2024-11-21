@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ProcessPoolExecutor
 from functools import cached_property
 from pathlib import Path
 
@@ -194,16 +195,27 @@ class MultiExperimentAnalysis:
         dataset_statistics: list[SingleExperimentStastistics],
         dataset_results: list[SingleExperimentResults],
         value: str = "Dice",
+        num_processes: int = 6,
     ):
         df_stat_dicts: list[dict] = []
-        for exp in dataset_statistics:
-            df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
-            df_stat_dicts.extend(df_stat_dict)
+
+        with ProcessPoolExecutor(max_workers=num_processes) as executor:
+            futures = [
+                executor.submit(exp.to_df_row_dicts) for exp in dataset_statistics
+            ]
+            for future in futures:
+                df_stat_dict, stat_skip_keys = future.result()
+                df_stat_dicts.extend(df_stat_dict)
 
         df_results_dicts: list[dict] = []
-        for exp in dataset_results:
-            df_exp_dict, exp_skip_keys = exp.to_df_row_dicts(value)
-            df_results_dicts.extend(df_exp_dict)
+
+        with ProcessPoolExecutor(max_workers=num_processes) as executor:
+            futures = [
+                executor.submit(exp.to_df_row_dicts, value) for exp in dataset_results
+            ]
+            for future in futures:
+                df_exp_dict, exp_skip_keys = future.result()
+                df_results_dicts.extend(df_exp_dict)
 
         merged_dicts = merge_dict_lists_on_indices(
             df_results_dicts, df_stat_dicts, self.merge_keys
