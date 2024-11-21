@@ -199,23 +199,33 @@ class MultiExperimentAnalysis:
     ):
         df_stat_dicts: list[dict] = []
 
-        with ProcessPoolExecutor(max_workers=num_processes) as executor:
-            futures = [
-                executor.submit(exp.to_df_row_dicts) for exp in dataset_statistics
-            ]
-            for future in futures:
-                df_stat_dict, stat_skip_keys = future.result()
+        if num_processes == 0:
+            for exp in dataset_statistics:
+                df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
                 df_stat_dicts.extend(df_stat_dict)
+        else:
+            with ProcessPoolExecutor(max_workers=num_processes) as executor:
+                futures = [
+                    executor.submit(exp.to_df_row_dicts) for exp in dataset_statistics
+                ]
+                for future in futures:
+                    df_stat_dict, stat_skip_keys = future.result()
+                    df_stat_dicts.extend(df_stat_dict)
 
         df_results_dicts: list[dict] = []
-
-        with ProcessPoolExecutor(max_workers=num_processes) as executor:
-            futures = [
-                executor.submit(exp.to_df_row_dicts, value) for exp in dataset_results
-            ]
-            for future in futures:
-                df_exp_dict, exp_skip_keys = future.result()
-                df_results_dicts.extend(df_exp_dict)
+        if num_processes == 0:
+            for exp in dataset_results:
+                df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
+                df_stat_dicts.extend(df_stat_dict)
+        else:
+            with ProcessPoolExecutor(max_workers=num_processes) as executor:
+                futures = [
+                    executor.submit(exp.to_df_row_dicts, value)
+                    for exp in dataset_results
+                ]
+                for future in futures:
+                    df_exp_dict, exp_skip_keys = future.result()
+                    df_results_dicts.extend(df_exp_dict)
 
         merged_dicts = merge_dict_lists_on_indices(
             df_results_dicts, df_stat_dicts, self.merge_keys
