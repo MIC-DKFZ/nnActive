@@ -784,6 +784,26 @@ register(
     pre_suffix_format=pre_suffix_format,
 )
 
+register(
+    make_kits_config,
+    seeds=__seeds,
+    uncertainties=[s for s in __strategies if s != "random"],
+    query_size=500,
+    query_steps=5,
+    trainer="nnActiveTrainer_500epochs",
+    pre_suffix_format=pre_suffix_format,
+)
+
+register(
+    make_amos_config,
+    seeds=__seeds,
+    uncertainties=[s for s in __strategies if s != "random"],
+    query_size=500,
+    query_steps=5,
+    trainer="nnActiveTrainer_500epochs",
+    pre_suffix_format=pre_suffix_format,
+)
+
 ################## Dataset Exploration Experiments #########
 #### Entire Dataset 10-50% ####
 # rounded down 10% of training set query size.
