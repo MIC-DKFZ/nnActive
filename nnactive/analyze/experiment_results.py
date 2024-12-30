@@ -142,6 +142,7 @@ class SingleExperimentResults:
             "seed",
             "Loop",
             "uncertainty",
+            "queries_from_experiment",
             "#Patches",
         ]
         return skip_keys

@@ -20,7 +20,7 @@ from nnactive.utils.io import load_json, load_label_map, save_json
 from nnactive.utils.patches import get_slices_for_file_from_patch
 from nnactive.utils.pyutils import get_clean_dataclass_dict
 
-CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches"]
+CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches", "queries_from_experiment"]
 
 
 @dataclass
