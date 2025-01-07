@@ -937,7 +937,7 @@ strategies = [
     "power_bald_b40",
 ]
 
-dataset_list: list[dict] = [
+dataset_configs: list[dict] = [
     {"base_id": 216, "query_size": 40, "patch_size": [32, 74, 74]},  # AMOS
     {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74]},  # AMOS
     {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74]},  # AMOS
