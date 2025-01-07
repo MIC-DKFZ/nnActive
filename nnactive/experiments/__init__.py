@@ -938,9 +938,15 @@ strategies = [
 ]
 
 dataset_list: list[dict] = [
-    {"base_id": 216, "query_size": 15, "patch_size": [32, 74, 74]},  # AMOS
-    {"base_id": 135, "query_size": 22, "patch_size": [64, 64, 64]},  # KiTS
-    {"base_id": 27, "query_size": 15, "patch_size": [4, 40, 40]},  # ACDC
+    {"base_id": 216, "query_size": 40, "patch_size": [32, 74, 74]},  # AMOS
+    {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74]},  # AMOS
+    {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74]},  # AMOS
+    {"base_id": 135, "query_size": 40, "patch_size": [64, 64, 64]},  # KiTS
+    {"base_id": 135, "query_size": 200, "patch_size": [64, 64, 64]},  # KiTS
+    {"base_id": 135, "query_size": 500, "patch_size": [64, 64, 64]},  # KiTS
+    {"base_id": 27, "query_size": 30, "patch_size": [4, 40, 40]},  # ACDC
+    {"base_id": 27, "query_size": 60, "patch_size": [4, 40, 40]},  # ACDC
+    {"base_id": 27, "query_size": 90, "patch_size": [4, 40, 40]},  # ACDC
 ]
 
 for config in dataset_configs:
