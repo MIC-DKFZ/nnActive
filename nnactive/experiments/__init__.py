@@ -929,6 +929,33 @@ for seed, uncertainty, dataset in product(__seeds, __strategies, dataset_list):
         queries_from_experiment=reference_exp_name,
     )
 
+################## Smaller Patch Size Ablation Experiments #########
+dataset_configs: list[dict] = [
+    {"base_id": 216, "query_size": 40, "patch_size": [16, 32, 32]},  # AMOS
+    {"base_id": 216, "query_size": 200, "patch_size": [16, 32, 32]},  # AMOS
+    {"base_id": 216, "query_size": 500, "patch_size": [16, 32, 32]},  # AMOS
+    {"base_id": 135, "query_size": 40, "patch_size": [32, 32, 32]},  # KiTS
+    {"base_id": 135, "query_size": 200, "patch_size": [32, 32, 32]},  # KiTS
+    {"base_id": 135, "query_size": 500, "patch_size": [32, 32, 32]},  # KiTS
+    {"base_id": 27, "query_size": 30, "patch_size": [2, 20, 20]},  # ACDC
+    {"base_id": 27, "query_size": 60, "patch_size": [2, 20, 20]},  # ACDC
+    {"base_id": 27, "query_size": 90, "patch_size": [2, 20, 20]},  # ACDC
+]
+
+for config in dataset_configs:
+    register(
+        make_config,
+        base_id=config["base_id"],
+        seeds=__seeds,
+        uncertainties=__strategies,
+        query_size=config["query_size"],
+        query_steps=5,
+        patch_size=config["patch_size"],
+        trainer=__standard_trainer,
+        starting_budget=__standard_starting_budget,
+        pre_suffix_format=__standard_pre_suffix_format,
+    )
+
 ################## Power Bald Beta Ablation Experiments #########
 strategies = [
     "power_bald_b5",
