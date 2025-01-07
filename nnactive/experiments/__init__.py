@@ -841,7 +841,9 @@ pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__s
 
 dataset_list: list[dict] = [
     {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74]},  # AMOS
+    {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74]},  # AMOS
     {"base_id": 135, "query_size": 200, "patch_size": [64, 64, 64]},  # KiTS
+    {"base_id": 135, "query_size": 500, "patch_size": [64, 64, 64]},  # KiTS
 ]
 
 for seed, uncertainty, dataset in product(__seeds, __strategies, dataset_list):
