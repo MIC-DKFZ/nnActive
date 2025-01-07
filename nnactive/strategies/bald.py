@@ -52,6 +52,18 @@ class PowerBALD_b10(PowerBALD):
         self.beta = 10
 
 
+class PowerBALD_b20(PowerBALD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 20
+
+
+class PowerBALD_b40(PowerBALD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 40
+
+
 class SoftRankBALD(BALD):
     """Compute Softrank Bald with Gumbel Softmax.
     This solely perturbes the rank.

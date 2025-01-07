@@ -8,6 +8,8 @@ from nnactive.strategies.bald import (
     PowerBALD,
     PowerBALD_b5,
     PowerBALD_b10,
+    PowerBALD_b20,
+    PowerBALD_b40,
     SoftRankBALD,
 )
 from nnactive.strategies.base import AbstractQueryMethod
@@ -84,6 +86,8 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "power_bald": PowerBALD,
     "power_bald_b5": PowerBALD_b5,
     "power_bald_b10": PowerBALD_b10,
+    "power_bald_b20": PowerBALD_b20,
+    "power_bald_b40": PowerBALD_b40,
     "softrank_bald": SoftRankBALD,
     "kmeans_bald": KMeansBALD,
     "pred_entropy": PredictiveEntropy,

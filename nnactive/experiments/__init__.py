@@ -21,8 +21,6 @@ __strategies = [
     "pred_entropy",
     "mutual_information",
     "power_bald",
-    "power_bald_b5",
-    "power_bald_b10",
     "power_pe",
     "softrank_bald",
 ]
@@ -929,6 +927,34 @@ for seed, uncertainty, dataset in product(__seeds, __strategies, dataset_list):
         pre_suffix_format=pre_suffix_format,
         additional_overlap=dataset.get("additional_overlap", 0.4),
         queries_from_experiment=reference_exp_name,
+    )
+
+################## Power Bald Beta Ablation Experiments #########
+strategies = [
+    "power_bald_b5",
+    "power_bald_b10",
+    "power_bald_b20",
+    "power_bald_b40",
+]
+
+dataset_list: list[dict] = [
+    {"base_id": 216, "query_size": 15, "patch_size": [32, 74, 74]},  # AMOS
+    {"base_id": 135, "query_size": 22, "patch_size": [64, 64, 64]},  # KiTS
+    {"base_id": 27, "query_size": 15, "patch_size": [4, 40, 40]},  # ACDC
+]
+
+for config in dataset_configs:
+    register(
+        make_config,
+        base_id=config["base_id"],
+        seeds=__seeds,
+        uncertainties=strategies,
+        query_size=config["query_size"],
+        query_steps=5,
+        patch_size=config["patch_size"],
+        trainer=__standard_trainer,
+        starting_budget=__standard_starting_budget,
+        pre_suffix_format=__standard_pre_suffix_format,
     )
 
 ################## Prototyping Experiments #########
