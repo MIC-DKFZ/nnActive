@@ -705,7 +705,7 @@ register(
     uncertainties=__strategies,
 )
 
-################## Query Size Ablation Experiments ################
+################## Smaller Query Size Ablation Experiments ################
 
 dataset_configs: list[dict] = [
     {
@@ -755,6 +755,62 @@ for config in dataset_configs:
         starting_budget_size=config["starting_budget_size"],
         query_size=config["query_size"],
         query_steps=9,  # run 9 loops since we use qs/2
+        patch_size=config["patch_size"],
+        trainer=__standard_trainer,
+        starting_budget=__standard_starting_budget,
+        pre_suffix_format=__standard_pre_suffix_format,
+    )
+
+################## Larger Query Size Ablation Experiments ################
+
+dataset_configs: list[dict] = [
+    {
+        "base_id": 216,
+        "starting_budget_size": 500,
+        "query_size": 1000,
+        "patch_size": [32, 74, 74],
+    },  # AMOS
+    {
+        "base_id": 216,
+        "starting_budget_size": 40,
+        "query_size": 80,
+        "patch_size": [32, 74, 74],
+    },  # AMOS
+    {
+        "base_id": 135,
+        "starting_budget_size": 500,
+        "query_size": 1000,
+        "patch_size": [64, 64, 64],
+    },  # KiTS
+    {
+        "base_id": 135,
+        "starting_budget_size": 40,
+        "query_size": 80,
+        "patch_size": [64, 64, 64],
+    },  # KiTS
+    {
+        "base_id": 27,
+        "starting_budget_size": 90,
+        "query_size": 180,
+        "patch_size": [4, 40, 40],
+    },  # ACDC
+    {
+        "base_id": 27,
+        "starting_budget_size": 30,
+        "query_size": 60,
+        "patch_size": [4, 40, 40],
+    },  # ACDC
+]
+
+for config in dataset_configs:
+    register(
+        make_config,
+        base_id=config["base_id"],
+        seeds=__seeds,
+        uncertainties=__strategies,
+        starting_budget_size=config["starting_budget_size"],
+        query_size=config["query_size"],
+        query_steps=3,  # run 9 loops since we use qs*2
         patch_size=config["patch_size"],
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
