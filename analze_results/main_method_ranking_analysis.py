@@ -6,15 +6,15 @@ import pandas as pd
 
 from nnactive.utils.io import save_df_to_txt
 
-colors = {
-    "mutual information": "#1f77b4",  # Blue
+qm_to_color = {
+    "mutual information": "#bcbd22",  # Yellow-green
     "power bald": "#ff7f0e",  # Orange
     "power pe": "#2ca02c",  # Green
-    "pred entropy": "#d62728",  # Red
-    "random": "#9467bd",  # Purple
-    "random-label": "#8c564b",  # Brown
-    "random-label2": "#e377c2",  # Pink
+    "pred entropy": "#1f77b4",  # Blue
     "softrank bald": "#7f7f7f",  # Gray
+    "random": "#9467bd",  # Purple
+    "random-label": "#e377c2",  # Light Red
+    "random-label2": "#d62728",  # Red
 }
 
 base_path = Path("/home/j211b/experiments/nnactive/analysis/visualization-main")
@@ -111,19 +111,35 @@ for dataset in datasets:
         names=["Setting"],
     )
 
-whole_data = pd.concat(whole_data, axis=1, keys=whole_data.keys(), names=["Dataset"])
+whole_data = pd.concat(
+    whole_data,
+    axis=1,
+    keys=whole_data.keys(),
+    names=["Dataset"],
+)  # .sort_index(axis=1, level=0)
 
 # Remove power bald ablations and kmeans bald
 whole_data = whole_data.drop(["power bald b10", "power bald b5", "kmeans bald"])
 
 
+# Sort by first and second levels, using QS numeric values for the second level
+def sort_key(col):
+    # Extract the numeric part of the second-level column (e.g., 'QS 20' -> 20)
+    first_level, second_level = col
+    second_level_numeric = int(second_level.split(" ")[-1])
+    return (first_level, second_level_numeric)
+
+
 for metric in ["AUBC", "beta", "Final"]:
     # Compute method rankings
     ranks = (
-        whole_data.loc[:, (slice(None), slice(None), "AUBC")]
+        whole_data.loc[:, (slice(None), slice(None), metric)]
         .droplevel(level=2, axis=1)
         .rank(ascending=False, method="min")
     )
+
+    # whole_data = whole_data[sorted(whole_data.columns, key=sort_key)]
+    ranks = ranks[sorted(ranks.columns, key=sort_key)]
 
     # Save ranking table to txt file
     save_df_to_txt(ranks, out_path / f"method_ranking_{metric}.txt")
@@ -132,21 +148,35 @@ for metric in ["AUBC", "beta", "Final"]:
     plt.figure(figsize=(12, 6))
     ax = plt.gcf().gca()
 
-    for i in range(ranks.shape[0]):
+    # for i in range(ranks.shape[0]):
+    for i, method_name in enumerate(qm_to_color):
         ax.plot(
             ranks.iloc[i, :].values,
             marker="o",
-            label=ranks.index[i],
-            color=colors[ranks.index[i]],
+            label=method_name,
+            color=qm_to_color[method_name],
+            ls="--" if "random" in method_name else "-",
         )
 
-    ax.vlines([2.5, 5.5, 8.5], 1, ranks.shape[0], colors="k", linestyles="--", lw=0.5)
+    ax.vlines(
+        [2.5, 5.5, 8.5],
+        1,
+        ranks.shape[0],
+        colors="k",
+        linestyles="--",
+        lw=0.5,
+        zorder=-1,
+    )
 
     plt.xticks(
-        ticks=np.arange(ranks.shape[-1]), labels=ranks.columns, rotation=45, ha="right"
+        ticks=np.arange(ranks.shape[-1]),
+        labels=[
+            (f"{c[1]}\n\n{c[0]}" if i % 3 == 1 else c[1])
+            for i, c in enumerate(ranks.columns)
+        ],
     )
     plt.yticks(ticks=np.arange(ranks.shape[0]) + 1)
-    plt.ylabel("Method Rank (AUBC)")
+    plt.ylabel(f"Method Rank ({metric})")
     plt.legend(loc=(1.02, 0.3))
     plt.tight_layout()
     plt.savefig(out_path / f"method_ranking_{metric}.png")
