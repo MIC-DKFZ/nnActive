@@ -148,10 +148,9 @@ for metric in ["AUBC", "beta", "Final"]:
     plt.figure(figsize=(12, 6))
     ax = plt.gcf().gca()
 
-    # for i in range(ranks.shape[0]):
-    for i, method_name in enumerate(qm_to_color):
+    for method_name in qm_to_color:
         ax.plot(
-            ranks.iloc[i, :].values,
+            ranks.loc[method_name, :].values,
             marker="o",
             label=method_name,
             color=qm_to_color[method_name],
