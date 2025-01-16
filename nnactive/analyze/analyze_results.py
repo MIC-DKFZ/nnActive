@@ -195,7 +195,7 @@ class MultiExperimentAnalysis:
         dataset_statistics: list[SingleExperimentStastistics],
         dataset_results: list[SingleExperimentResults],
         value: str = "Dice",
-        num_processes: int = 6,
+        num_processes: int = 4,
     ):
         df_stat_dicts: list[dict] = []
 

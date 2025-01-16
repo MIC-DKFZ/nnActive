@@ -129,7 +129,7 @@ class PairwiseMatrix:
     def algs(self) -> list[str]:
         return list(self.matrix.keys())
 
-    def detete_alg(self, alg: str):
+    def delete_alg(self, alg: str):
         self.matrix.pop(alg)
         for key in self.matrix:
             self.matrix[key].pop(alg)
@@ -189,12 +189,31 @@ class PairwiseMatrix:
 
         return cls(matrix, alpha=matrices[0].alpha, max_pos_ent=max_pos_ent)
 
+    def custom_order_matrix(self, custom_order: list[str]) -> PairwiseMatrix:
+        """Reorders the matrix according to the custom order of algorithms.
+
+        Args:
+            custom_order (List[str]): Custom order of algorithms.
+
+        Returns:
+            PairwiseMatrix: PairwiseMatrix with reordered algorithms.
+        """
+        matrix = {alg1: {alg2: None for alg2 in custom_order} for alg1 in custom_order}
+        assert set(custom_order) == set(
+            self.algs
+        )  # check if all algorithms are present
+        for alg1 in custom_order:
+            for alg2 in custom_order:
+                matrix[alg1][alg2] = self.matrix[alg1][alg2]
+        return PairwiseMatrix(matrix, alpha=self.alpha, max_pos_ent=self.max_pos_ent)
+
     @staticmethod
     def plot_pairwise_matrix(
         matrix: dict[str, dict[str, float]] | PairwiseMatrix,
         title_tag: str | None = None,
         name_dict: dict[str, str] | None = None,
         max_poss_ent: int | None = 1,
+        norm_val: int | None = None,
         savepath: str = None,
         show: bool = False,
     ):
@@ -204,7 +223,7 @@ class PairwiseMatrix:
 
         Args:
             matrix (Dict[str, Dict[str, float]]): PPM matrix.
-            title_tag (str, optional): Title of Figure. Defaults to "Test".
+            title_tag (str, optional): Title of Figure. Defaults to None.
             name_dict (Dict[str, str], optional): {name_in_matrix: name_in_plot}. Defaults to None.
             max_poss_ent (int, optional): Maximal value obtainable, equal to #AL Settings. Defaults to 1.
             savepath (str, optional): Path to save the plot. Defaults to None.
@@ -218,12 +237,21 @@ class PairwiseMatrix:
             matrix = matrix.matrix
         df_matrix = PairwiseMatrix.creat_vis_df(matrix)
 
-        if max_poss_ent is None:
-            max_poss_ent = df_matrix.max().max()
-
         # Rename columns and index if name_dict is provided
         if name_dict:
             df_matrix.rename(columns=name_dict, index=name_dict, inplace=True)
+
+        if norm_val:
+            df_matrix = df_matrix / norm_val
+
+        if max_poss_ent is None:
+            max_poss_ent = df_matrix.max().max()
+
+        for i in range(df_matrix.shape[1]):
+            df_matrix.iloc[i, i] = np.NaN
+        order = list(df_matrix.index)
+        df_matrix.loc["Delete"] = np.NaN
+        df_matrix = df_matrix.reindex(order[:-1] + ["Delete"] + order[-1:])
 
         # Plot the heatmap
         fig, axs = plt.subplots(figsize=(10, 8))
@@ -231,12 +259,18 @@ class PairwiseMatrix:
             ax=axs,
             data=df_matrix,
             annot=True,
+            # cmap="Oranges",
             cmap="viridis",
             cbar=True,
             vmin=0,
             vmax=max_poss_ent,
         )
         axs.set_title(f"Pairwise Penalty Matrix ({title_tag})")
+        ticks = list(axs.get_yticks())
+        axs.set_yticks(ticks[:-2] + ticks[-1:])
+        axs.set_xticklabels(axs.get_xticklabels(), rotation=30)
+        axs.set_ylabel(r"Algorithm outperforms $\uparrow$")
+        axs.set_xlabel(r"Algorithm outperformed by $\downarrow$")
 
         # Save the plot if savepath is provided
         if savepath:

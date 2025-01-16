@@ -212,7 +212,9 @@ class SettingAnalysis:
         return df_row_dicts
 
     def compute_auc_df(
-        self, performance_vals: str | Iterable[str] | None = None
+        self,
+        performance_vals: str | Iterable[str] | None = None,
+        enforce_full: bool = True,
     ) -> pd.DataFrame:
         """
         Computes the Area Under the Curve (AUC) DataFrame for the given performance values.
@@ -240,7 +242,10 @@ class SettingAnalysis:
         # Ensure that all experiments have the same number of loops (maximum amount)
         assert all(num_loops == self.df[self.max_loops_key].unique())
 
-        df = df[df[self.auc_loops_key] == num_loops]
+        if enforce_full:
+            df = df[df[self.auc_loops_key] == num_loops]
+        else:
+            df = df[df[self.auc_loops_key] == df[self.auc_loops_key].max()]
 
         df_cols = [
             [performance_val + " AUBC", performance_val + " Final"]
