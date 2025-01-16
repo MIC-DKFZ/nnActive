@@ -11,7 +11,7 @@ from loguru import logger
 import nnactive.paths as paths
 from nnactive.cli.registry import register_subcommand
 from nnactive.cli.subcommands.steps import preprocess, step_update
-from nnactive.config.struct import ActiveConfig
+from nnactive.config.struct import ActiveConfig, RuntimeConfig
 from nnactive.experiments import (
     list_experiments,
     list_finished_experiments,
@@ -90,12 +90,10 @@ def util_reset_loops(nnActive_results_folder: str, loop: int = 0, npp: int = 4) 
     # Preprocess with do_all is esp. needed for loop larger 0
     if reset_loop_nr > 0:
         preprocess(
-            [dataset_id],
-            configurations=[config.model_config],
-            num_processes=[npp],
+            config=config,
+            runtime_config=RuntimeConfig(),
             do_all=True,
         )
-
 
 @register_subcommand("util_verify_data")
 def util_verify_data(
