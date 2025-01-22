@@ -135,12 +135,13 @@ class PairwiseMatrix:
             self.matrix[key].pop(alg)
 
     @staticmethod
-    def creat_vis_df(matrix):
+    def creat_vis_df(matrix, round: bool = True) -> pd.DataFrame:
         df_matrix = pd.DataFrame(matrix)
 
         mean_col = df_matrix.sum(axis=0) / (df_matrix.shape[0] - 1)
         df_matrix.loc["Mean"] = mean_col
-        df_matrix.round(2)
+        if round:
+            df_matrix = df_matrix.round(2)
         return df_matrix
 
     def save(self, path: str):
@@ -235,14 +236,15 @@ class PairwiseMatrix:
         # Convert matrix to DataFrame for plotting
         if isinstance(matrix, PairwiseMatrix):
             matrix = matrix.matrix
-        df_matrix = PairwiseMatrix.creat_vis_df(matrix)
+        df_matrix = PairwiseMatrix.creat_vis_df(matrix, round=norm_val is not None)
 
         # Rename columns and index if name_dict is provided
         if name_dict:
             df_matrix.rename(columns=name_dict, index=name_dict, inplace=True)
 
         if norm_val:
-            df_matrix = df_matrix / norm_val
+            df_matrix = df_matrix / norm_val * 100
+            df_matrix = df_matrix.round(1)
 
         if max_poss_ent is None:
             max_poss_ent = df_matrix.max().max()
@@ -348,47 +350,25 @@ class PairwisePenaltyMatrix(PairwiseMatrix):
         )
 
     @staticmethod
-    def _test_samples(exp1: np.ndarray, exp2: np.ndarray, alpha) -> bool:
-        """Performs a t-test on two samples and returns True if mean of exp1 is significantly smaller than that of exp2."""
+    def _test_samples(exp1: np.ndarray, exp2: np.ndarray, alpha: float) -> bool:
+        """Performs a t-test on two samples and returns True if mean of
+        exp1 is significantly smaller than that of exp2.
+
+        Significance level for t-test is alpha/2 since we test in both directions.
+
+        Following:
+        DEEP BATCH ACTIVE LEARNING BY DIVERSE, UNCERTAIN GRADIENT LOWER BOUNDS.
+        Page 8: Pairwise comparisions
+        """
         n1 = len(exp1)
         n2 = len(exp2)
 
         n = min(n1, n2)
         z = exp1[:n] - exp2[:n]
         mu = np.mean(z)
-        # TODO: check if this implementation is correct!
-        # Shouldn't we perform a one-sided test?
-        # e.g.
-        # t, pval = stats.ttest_1samp(z, 0.0, alternative='less')
-        # Jeremias agrees that this test should be one-sided.
-        ######## Correction Term for significance level? ########
-        # Should we correct for multiple testing?
-        #
-        #### Motivation for Not Correcting for Multiple Testing ####
-        # We test multiple tests, but we are interested in relative values.
-        # X is better than Y due to lower values.
-        # But X and Y are both subject to the multiple testing issue.
-        # So does it really matter?
-        #
-        #### Motivation for Correcting for Multiple Testing ####
-        # Ranking is created based on tests.
-        # Question: Do specific algorithms get better/worse results by not correcting for multiple testing?
-        # If so, we should correct for multiple testing.
-        # If not, we can ignore the multiple testing issue.
-        #
-        # Approach: correct along budget axis (e.g.10 loops, therefore correct for 10 tests)
-        # Example: 3 methods X, Y, Z. GT: X better Z=0.03. Y better Z=0.1.
-        # Results: X and Y have equal score against Z. (0.5) due to multiple tests (but X has much lower pval).
-        # Therefore X gets a disadvantage against Y.
-        # --> Correct for multiple tests along budget-axis.
-        #
-        # Approach: correct along algorithm axis (e.g. 4 algorithms, therefore correct for 4 tests)
-        #
-        ##########################################################
+
         # Original Test (two-sided)
-        # t, pval = stats.ttest_1samp(z, 0.0)
-        # Proposed Left-sided Test (one-sided)
-        t, pval = stats.ttest_1samp(z, 0.0, alternative="less")
+        t, pval = stats.ttest_1samp(z, 0.0)
         if mu < 0 and pval < alpha:
             return True
         return False
