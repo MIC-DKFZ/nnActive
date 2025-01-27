@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -52,24 +53,20 @@ paths = [Path(p) for p in paths]
 data_dicts = []
 for path in paths:
     data_dict = {}
-    data_dict["df_auc"] = (
-        pd.read_json(path / "auc.json")[
-            [
-                "('Mean Dice AUBC', 'mean')",
-                "('Mean Dice AUBC', 'std')",
-                "('Mean Dice Final', 'mean')",
-                "('Mean Dice Final', 'std')",
-            ]
+    data_dict["df_auc"] = pd.read_json(path / "auc.json")[
+        [
+            "('Mean Dice AUBC', 'mean')",
+            "('Mean Dice AUBC', 'std')",
+            "('Mean Dice Final', 'mean')",
+            "('Mean Dice Final', 'std')",
         ]
-        .rename(
-            columns={
-                "('Mean Dice AUBC', 'mean')": "AUBC",
-                "('Mean Dice AUBC', 'std')": "AUBC std",
-                "('Mean Dice Final', 'mean')": "Final",
-                "('Mean Dice Final', 'std')": "Final std",
-            }
-        )
-        .apply(lambda x: np.round(x * 100, 2))
+    ].rename(
+        columns={
+            "('Mean Dice AUBC', 'mean')": "AUBC",
+            "('Mean Dice AUBC', 'std')": "AUBC std",
+            "('Mean Dice Final', 'mean')": "Final Dice",
+            "('Mean Dice Final', 'std')": "Final Dice std",
+        }
     )
     data_dict["Dataset"] = (
         path.parent.name.replace("Dataset004_Hippocampus", "Hippocampus")
@@ -84,7 +81,7 @@ for path in paths:
         .apply(lambda x: np.round(x, 2))
     ).rename(columns={"beta_std": "beta std"})
     data_dict["df"] = pd.concat([data_dict["df_auc"], data_dict["df_beta"]], axis=1)[
-        ["AUBC", "AUBC std", "beta", "beta std", "Final", "Final std"]
+        ["AUBC", "AUBC std", "beta", "beta std", "Final Dice", "Final Dice std"]
     ]
     data_dict["df"].reset_index(inplace=True)
     print(data_dict["df"].columns)
@@ -130,7 +127,7 @@ def sort_key(col):
     return (first_level, second_level_numeric)
 
 
-for metric in ["AUBC", "beta", "Final"]:
+for metric in ["AUBC", "beta", "Final Dice"]:
     # Compute method rankings
     ranks = (
         whole_data.loc[:, (slice(None), slice(None), metric)]
@@ -144,41 +141,110 @@ for metric in ["AUBC", "beta", "Final"]:
     # Save ranking table to txt file
     save_df_to_txt(ranks, out_path / f"method_ranking_{metric}.txt")
 
-    # Create ranking line plot
-    plt.figure(figsize=(12, 6))
-    ax = plt.gcf().gca()
+    fig, (ax1, ax2) = plt.subplots(
+        1,
+        2,
+        # sharey=True,
+        figsize=(14, 6),
+        width_ratios=(12, 1),
+        gridspec_kw={
+            "wspace": 0.05,  # 0.03
+        },
+    )
+    # plt.figure(figsize=(12, 6))
+    # ax = plt.gcf().gca()
 
+    # Create ranking line plot
     for method_name in qm_to_color:
-        ax.plot(
+        ax1.plot(
             ranks.loc[method_name, :].values,
             marker="o",
             label=method_name,
             color=qm_to_color[method_name],
             ls="--" if "random" in method_name else "-",
+            lw=2,
+            markerfacecolor="white"
+            if "random" in method_name
+            else qm_to_color[method_name],
         )
 
-    ax.vlines(
-        [2.5, 5.5, 8.5],
-        1,
-        ranks.shape[0],
-        colors="k",
-        linestyles="--",
-        lw=0.5,
-        zorder=-1,
+    ax1.add_patch(
+        patches.Rectangle((-0.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+    )
+    ax1.add_patch(
+        patches.Rectangle((2.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
+    )
+    ax1.add_patch(
+        patches.Rectangle((5.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+    )
+    ax1.add_patch(
+        patches.Rectangle((8.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
     )
 
-    plt.xticks(
+    # ax.vlines(
+    #     [2.5, 5.5, 8.5],
+    #     0.5,
+    #     ranks.shape[0] + 0.5,
+    #     colors="k",
+    #     linestyles="-",
+    #     lw=2,
+    #     alpha=0.2,
+    #     zorder=-1,
+    # )
+    ax1.set_xlim(-0.5, 11.5)
+    ax1.set_ylim(0.5, ranks.shape[0] + 0.5)
+    ax1.grid(axis="y")
+
+    ax1.set_xticks(
         ticks=np.arange(ranks.shape[-1]),
         labels=[
             (f"{c[1]}\n\n{c[0]}" if i % 3 == 1 else c[1])
             for i, c in enumerate(ranks.columns)
         ],
     )
-    plt.yticks(ticks=np.arange(ranks.shape[0]) + 1)
-    plt.ylabel(f"Method Rank ({metric})")
-    plt.legend(loc=(1.02, 0.3))
-    plt.tight_layout()
-    plt.savefig(out_path / f"method_ranking_{metric}.png")
+    ax1.set_yticks(ticks=np.arange(ranks.shape[0]) + 1)
+    ax1.set_ylabel(f"Method Rank ({metric})")
+    ax1.legend(loc=(0.1, -0.25), handlelength=4, ncols=4)
+
+    # Create mean rank plot
+    avg_ranks = ranks.mean(axis=1)
+    std_ranks = ranks.std(axis=1)
+    ranks_sorted = avg_ranks.rank(ascending=True, method="first")
+    # print(avg_ranks)
+    # print(ranks_sorted)
+    for i, method_name in enumerate(qm_to_color):
+        # ax2.add_patch(
+        #     patches.Rectangle(
+        #         (-0.4, avg_ranks[method_name]),
+        #         0.8,
+        #         0.1,
+        #         # linewidth=1,
+        #         facecolor=qm_to_color[method_name],
+        #         alpha=0.3,
+        #     )
+        # )
+        ax2.errorbar(
+            -0.5 + ranks_sorted[method_name] / (len(ranks_sorted) + 1),
+            [avg_ranks[method_name]],
+            yerr=[std_ranks[method_name]],
+            fmt=".",
+            markersize=8,
+            color=qm_to_color[method_name],
+            markerfacecolor="white"
+            if "random" in method_name
+            else qm_to_color[method_name],
+        )
+
+    ax2.set_xlim(-0.5, 0.5)
+    ax2.set_ylim(0.5, ranks.shape[0] + 0.5)
+    ax2.set_xticks(ticks=[0], labels=["Mean Rank"])
+    ax2.set_yticks(ticks=np.arange(ranks.shape[0]) + 1)
+    ax2.tick_params("x", length=0, pad=7)
+    ax2.grid(axis="y")
+
+    # Save figure
+    # plt.tight_layout()
+    plt.savefig(out_path / f"method_ranking_{metric}.png", bbox_inches="tight")
 
 if __name__ == "__main__":
     pass
