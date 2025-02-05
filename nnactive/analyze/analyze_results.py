@@ -12,7 +12,10 @@ from loguru import logger
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
-from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
+from nnactive.analyze.experiment_statistics import (
+    SingleExperimentStastistics,
+    efficient_multistatitistics_nested_labels,
+)
 from nnactive.config.struct import Final
 from nnactive.utils.io import save_df_to_txt
 from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
@@ -32,6 +35,8 @@ PALETTE = {
     "power_pe": "tab:gray",
     "softrank_bald": "tab:pink",
     "kmeans_bald": "tab:olive",
+    "power_bald_b20": "tab:olive",
+    "power_bald_b40": "tab:olive",
 }
 
 # Defuault is Class 1, 2, 3, ....
@@ -197,8 +202,10 @@ class MultiExperimentAnalysis:
         value: str = "Dice",
         num_processes: int = 4,
     ):
+        """Creates a merged dataframe for one unique base experiment."""
         df_stat_dicts: list[dict] = []
 
+        efficient_multistatitistics_nested_labels(dataset_statistics)
         if num_processes == 0:
             for exp in dataset_statistics:
                 df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()

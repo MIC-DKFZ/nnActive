@@ -134,6 +134,13 @@ class PairwiseMatrix:
         for key in self.matrix:
             self.matrix[key].pop(alg)
 
+    def rename_algs(self, name_dict: dict[str, str]):
+        for key in name_dict:
+            if key in self.matrix:
+                self.matrix[name_dict[key]] = self.matrix.pop(key)
+                for key2 in self.matrix:
+                    self.matrix[key2][name_dict[key]] = self.matrix[key2].pop(key)
+
     @staticmethod
     def creat_vis_df(matrix, round: bool = True) -> pd.DataFrame:
         df_matrix = pd.DataFrame(matrix)
