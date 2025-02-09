@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, Union
 import numpy as np
 import psutil
 import torch
+import wandb
 from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
 from loguru import logger
 from nnunetv2.configuration import default_num_processes
@@ -27,7 +28,6 @@ from torch._dynamo import OptimizedModule
 from torch.backends import cudnn
 from tqdm import tqdm
 
-import wandb
 from nnactive.config import ActiveConfig
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
@@ -197,7 +197,10 @@ class BasePredictionQuery(AbstractQueryMethod):
         self.max_ram_pred_query = max_ram_pred_query
 
     def get_n_patch_per_image(self):
-        return self.config.n_patch_per_image
+        n = self.config.n_patch_per_image
+        if n is None:
+            n = self.config.query_size
+        return n
 
     def query_file_from_dict(
         self,
@@ -251,7 +254,7 @@ class BasePredictionQuery(AbstractQueryMethod):
         value_dicts: list[dict[str, Any]],
         annotated_patches: list[Patch],
         label_file: str,
-        n: int,
+        n: int | None = None,
     ) -> list[dict[str, Any]]:
         additional_label = None
         if self.additional_label_path is not None:
@@ -748,10 +751,10 @@ class BaseQueryPredictor(nnUNetPredictor):
             if torch.cuda.is_available():
                 cudnn.benchmark = True
 
-            query_dicts: list[
-                dict[str, Any]
-            ] = self.predict_fold_logits_from_preprocessed_data(
-                data, properties, temp_file_handler=temp_file_handler
+            query_dicts: list[dict[str, Any]] = (
+                self.predict_fold_logits_from_preprocessed_data(
+                    data, properties, temp_file_handler=temp_file_handler
+                )
             )
             temp_file_handler.reset_ram_stats()
 

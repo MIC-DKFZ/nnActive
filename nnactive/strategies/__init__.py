@@ -14,6 +14,10 @@ from nnactive.strategies.bald import (
 )
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.dice_query import ExpectedDiceQuery
+from nnactive.strategies.entropy_balanced import (
+    ClassBalancedEntropy_33FG,
+    ClassBalancedEntropy_66FG,
+)
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PowerPredictiveEntropy, PredictiveEntropy
 from nnactive.strategies.kmeans_bald import KMeansBALD
@@ -101,4 +105,6 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "random-label2": RandomRandomLabel,
     "random-label2-all-classes": RandomRandomLabelAllClasses,
     "precomputed-queries": PrecomputedQuery,
+    "class_pe66": ClassBalancedEntropy_66FG,
+    "class_pe33": ClassBalancedEntropy_33FG,
 }

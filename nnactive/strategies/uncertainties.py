@@ -80,7 +80,9 @@ class Probs:
         reset_cuda_memory_stats(device=device)
 
         try:
-            factor_req_vram = 2 * 1.1
+            # 1 time is enough because data entire data is already
+            # checked.
+            factor_req_vram = 1.1
             compute_val = move_tensor_check_vram(
                 probs.data, device=device, factor_required_vram=factor_req_vram
             )
@@ -103,12 +105,49 @@ class Probs:
 
         return compute_val.to(device)
 
-        # Average across folds
-        probs = deepcopy(probs.data).to(device).mean(dim=0)
-        # Class-wise negative PE
-        probs *= torch.log(probs)
-        # Sum across classes
-        return -probs.nan_to_num().sum(dim=0)
+    @staticmethod
+    def class_pred_entropy(probs: Probs, device: torch.device = DEVICE) -> torch.Tensor:
+        """Compute predictive entropy on list of paths saving npy arrays or a tensor.
+
+        Args:
+            probs (Probs): paths to probability maps for image [C x XYZ] per item
+                in list or [M x C x XYZ].
+            device (torch.device, optional): preferred device for computation. Defaults to DEVICE.
+
+        Returns:
+            torch.Tensor: predictive entropy C+1 x H x W x D (on device)
+        """
+        logger.info("Compute class pred entropy")
+        reset_cuda_memory_stats(device=device)
+
+        try:
+            factor_req_vram = 1.1
+            compute_val = move_tensor_check_vram(
+                probs.data, device=device, factor_required_vram=factor_req_vram
+            )
+            # Average across folds
+            compute_val = compute_val.mean(dim=0)
+            # Class-wise negative PE
+            pred_entropy = compute_val * torch.log(compute_val)
+            # Sum across classes
+            # here we assume that all nans are stemming from -inf after log
+            pred_entropy = -pred_entropy.nan_to_num().sum(dim=0, keepdim=True)
+            compute_val = torch.cat([pred_entropy * compute_val, pred_entropy], dim=0)
+        except RuntimeError as e:
+            logger.debug("Possibly CUDA OOM error, try to obtain pred_entropy on CPU.")
+            try:
+                del compute_val
+            except:
+                pass
+            try:
+                del pred_entropy
+            except:
+                pass
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            compute_val = probs.class_pred_entropy(probs, torch.device("cpu"))
+
+        return compute_val.to(device)
 
     @staticmethod
     def exp_entropy(probs: Probs, device: torch.device = DEVICE) -> torch.Tensor:
@@ -131,6 +170,7 @@ class Probs:
                 probs.data, device=device, factor_required_vram=factor_req_vram
             )
             # Class-wise negative PE
+            # Why is the deepcopy necessary again?
             compute_val = deepcopy(compute_val) * torch.log(compute_val)
             # Sum across classes
             # here we assume that all nans are stemming from -inf after log
@@ -148,14 +188,6 @@ class Probs:
             compute_val = probs.exp_entropy(probs, torch.device("cpu"))
 
         return compute_val.to(device)
-
-        probs = deepcopy(probs.data).to(device)
-        # Class-wise negative PE
-        probs *= torch.log(probs)
-        # Sum across classes
-        probs = probs.nan_to_num().sum(dim=1)
-        # Average across folds
-        return -probs.mean(dim=0)
 
 
 class ProbsFromFiles(Probs):
@@ -249,6 +281,57 @@ class ProbsFromFiles(Probs):
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
             compute_val = probs.pred_entropy(probs, torch.device("cpu"))
+
+        return compute_val.to(device)
+
+    @staticmethod
+    def class_pred_entropy(probs: Probs, device: torch.device = DEVICE) -> torch.Tensor:
+        """Compute predictive entropy on list of paths saving npy arrays or a tensor.
+
+        Args:
+            probs (Probs): paths to probability maps for image [C x XYZ] per item
+                in list or [M x C x XYZ].
+            device (torch.device, optional): preferred device for computation. Defaults to DEVICE.
+
+        Returns:
+            torch.Tensor: predictive entropy C+1 x H x W x D (on device)
+        """
+        logger.info("Compute  class pred entropy")
+        if not isinstance(probs, ProbsFromFiles):
+            logger.warning(
+                "ProbsFromFiles.class_pred_entropy should be called on a 'ProbsFromFiles' "
+                f"object. Received object of type '{type(probs)}'."
+            )
+        reset_cuda_memory_stats(device=device)
+
+        compute_val = ProbsFromFiles.mean_prob(probs, device=device)
+
+        try:
+            factor_req_vram = 2 * 1.1
+            compute_val = move_tensor_check_vram(
+                compute_val, device=device, factor_required_vram=factor_req_vram
+            )
+            # Class-wise negative PE
+            pred_entropy = compute_val * torch.log(compute_val)
+            # Sum across classes
+            # here we assume that all nans are stemming from -inf after log
+            pred_entropy = -pred_entropy.nan_to_num().sum(dim=0, keepdim=True)
+            compute_val = torch.cat([pred_entropy * compute_val, pred_entropy], dim=0)
+        except RuntimeError as e:
+            logger.debug(
+                "Possibly CUDA OOM error, try to obtain class_pred_entropy on CPU."
+            )
+            try:
+                del compute_val
+            except:
+                pass
+            try:
+                del pred_entropy
+            except:
+                pass
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            compute_val = probs.class_pred_entropy(probs, torch.device("cpu"))
 
         return compute_val.to(device)
 

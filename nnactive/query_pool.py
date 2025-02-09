@@ -41,7 +41,8 @@ def query_pool(
 
     top_patches_fn = f"{config.uncertainty}_{num_loop_files:03d}.json"
     if (
-        len(strategy.top_patches) > 0
+        isinstance(strategy.top_patches, list)
+        and len(strategy.top_patches) > 0
         and strategy.top_patches[0].get("repr") is not None
     ):
         repr = torch.empty(

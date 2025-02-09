@@ -686,7 +686,7 @@ for qs in _query_sizes:
     register(
         make_amos_config,
         seeds=__seeds,
-        uncertainties=__strategies,
+        uncertainties=[*__strategies, "pred_pe33", "pred_pe66"],
         query_size=qs,
         query_steps=5,
     )
