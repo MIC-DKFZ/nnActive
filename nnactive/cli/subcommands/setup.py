@@ -28,9 +28,12 @@ def prepare_dset(config: RuntimeConfig, state: State):
     )
 
 
-def setup_al(config: ActiveConfig):
+def setup_al(config: ActiveConfig, exp_id: int = None):
     config.group_dir().mkdir(exist_ok=True)
-    state = State.next_free_state(config)
+    if exp_id is None:
+        state = State.next_free_state(config)
+    else:
+        state = State(name=config.name(), dataset_id=exp_id)
     state.save_state()
     config.save_id(state.dataset_id)
     return state
@@ -40,10 +43,11 @@ def setup_al(config: ActiveConfig):
 def main(
     config: ActiveConfig,
     runtime_config: RuntimeConfig,
+    exp_id: int = None,
 ):
     config.set_nnunet_env()
     # Prepare new experiment state
-    state = setup_al(config)
+    state = setup_al(config, exp_id)
     # Create partly annotated dataset
     convert_dataset_to_partannotated(
         base_id=config.base_id,
