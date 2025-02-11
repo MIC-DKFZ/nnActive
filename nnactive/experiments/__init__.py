@@ -30,6 +30,9 @@ __standard_starting_budget = "random-label2-all-classes"
 
 __standard_pre_suffix_format = "__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}"
 
+# TODO Separate naming for experiments that need to be re-done. Remove this once that all revision are complete.
+__revision_pre_suffix_format = "__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}_revision"
+
 
 def register(
     make_config: Callable[[int, str], ActiveConfig],
@@ -711,36 +714,42 @@ dataset_configs: list[dict] = [
         "starting_budget_size": 500,
         "query_size": 250,
         "patch_size": [32, 74, 74],
+        "agg_stride": 8,
     },  # AMOS
     {
         "base_id": 216,
         "starting_budget_size": 40,
         "query_size": 20,
         "patch_size": [32, 74, 74],
+        "agg_stride": 8,
     },  # AMOS
     {
         "base_id": 135,
         "starting_budget_size": 500,
         "query_size": 250,
         "patch_size": [64, 64, 64],
+        "agg_stride": 8,
     },  # KiTS
     {
         "base_id": 135,
         "starting_budget_size": 40,
         "query_size": 20,
         "patch_size": [64, 64, 64],
+        "agg_stride": 8,
     },  # KiTS
     {
         "base_id": 27,
         "starting_budget_size": 90,
         "query_size": 45,
         "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
     },  # ACDC
     {
         "base_id": 27,
         "starting_budget_size": 30,
         "query_size": 15,
         "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
     },  # ACDC
 ]
 
@@ -754,9 +763,11 @@ for config in dataset_configs:
         query_size=config["query_size"],
         query_steps=9,  # run 9 loops since we use qs/2
         patch_size=config["patch_size"],
+        agg_stride=config["agg_stride"],
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
-        pre_suffix_format=__standard_pre_suffix_format,
+        # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
+        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
     )
 
 ################## Larger Query Size Ablation Experiments ################
@@ -767,36 +778,42 @@ dataset_configs: list[dict] = [
         "starting_budget_size": 500,
         "query_size": 1000,
         "patch_size": [32, 74, 74],
+        "agg_stride": 8,
     },  # AMOS
     {
         "base_id": 216,
         "starting_budget_size": 40,
         "query_size": 80,
         "patch_size": [32, 74, 74],
+        "agg_stride": 8,
     },  # AMOS
     {
         "base_id": 135,
         "starting_budget_size": 500,
         "query_size": 1000,
         "patch_size": [64, 64, 64],
+        "agg_stride": 8,
     },  # KiTS
     {
         "base_id": 135,
         "starting_budget_size": 40,
         "query_size": 80,
         "patch_size": [64, 64, 64],
+        "agg_stride": 8,
     },  # KiTS
     {
         "base_id": 27,
         "starting_budget_size": 90,
         "query_size": 180,
         "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
     },  # ACDC
     {
         "base_id": 27,
         "starting_budget_size": 30,
         "query_size": 60,
         "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
     },  # ACDC
 ]
 
@@ -810,9 +827,11 @@ for config in dataset_configs:
         query_size=config["query_size"],
         query_steps=3,  # run 9 loops since we use qs*2
         patch_size=config["patch_size"],
+        agg_stride=config["agg_stride"],
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
-        pre_suffix_format=__standard_pre_suffix_format,
+        # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
+        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
     )
 
 ################## Training Length Experiments #############
@@ -965,15 +984,15 @@ strategies = [
 ]
 
 dataset_configs: list[dict] = [
-    {"base_id": 216, "query_size": 40, "patch_size": [32, 74, 74]},  # AMOS
-    {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74]},  # AMOS
-    {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74]},  # AMOS
-    {"base_id": 135, "query_size": 40, "patch_size": [64, 64, 64]},  # KiTS
-    {"base_id": 135, "query_size": 200, "patch_size": [64, 64, 64]},  # KiTS
-    {"base_id": 135, "query_size": 500, "patch_size": [64, 64, 64]},  # KiTS
-    {"base_id": 27, "query_size": 30, "patch_size": [4, 40, 40]},  # ACDC
-    {"base_id": 27, "query_size": 60, "patch_size": [4, 40, 40]},  # ACDC
-    {"base_id": 27, "query_size": 90, "patch_size": [4, 40, 40]},  # ACDC
+    {"base_id": 216, "query_size": 40, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
+    {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
+    {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
+    {"base_id": 135, "query_size": 40, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
+    {"base_id": 135, "query_size": 200, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
+    {"base_id": 135, "query_size": 500, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
+    {"base_id": 27, "query_size": 30, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
+    {"base_id": 27, "query_size": 60, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
+    {"base_id": 27, "query_size": 90, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
 ]
 
 for config in dataset_configs:
@@ -985,9 +1004,11 @@ for config in dataset_configs:
         query_size=config["query_size"],
         query_steps=5,
         patch_size=config["patch_size"],
+        agg_stride=config["agg_stride"],
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
-        pre_suffix_format=__standard_pre_suffix_format,
+        # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
+        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
     )
 
 ################## Prototyping Experiments #########
