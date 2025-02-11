@@ -68,9 +68,9 @@ class State:
             # if we are in loop X, we want to have loop_XXX.json
             loop_val = len(get_sorted_loop_files(get_raw_path(self.dataset_id))) - 1
             if self.query:
-                assert loop_val == self.loop + 1
+                assert loop_val == self.loop + 1, f"{loop_val = }, {self.loop + 1 = }"
             else:
-                assert loop_val == self.loop
+                assert loop_val == self.loop, f"{loop_val = }, {self.loop = }"
 
         if self.training:
             assert self.preprocess  # preprocessing before training is required
