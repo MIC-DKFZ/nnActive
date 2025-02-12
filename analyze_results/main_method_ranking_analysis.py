@@ -4,47 +4,50 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from setup import BASEPATH, RENAMING_DICT
 
 from nnactive.utils.io import save_df_to_txt
 
 qm_to_color = {
-    "mutual information": "#bcbd22",  # Yellow-green
-    "power bald": "#ff7f0e",  # Orange
-    "power pe": "#2ca02c",  # Green
-    "pred entropy": "#1f77b4",  # Blue
-    "softrank bald": "#7f7f7f",  # Gray
-    "random": "#9467bd",  # Purple
-    "random-label": "#e377c2",  # Light Red
-    "random-label2": "#d62728",  # Red
+    "BALD": "#bcbd22",  # Yellow-green
+    "PowerBALD": "#ff7f0e",  # Orange
+    "SoftrankBALD": "#7f7f7f",  # Gray
+    "PowerPE": "#2ca02c",  # Green
+    "Predictive Entropy": "#1f77b4",  # Blue
+    "Random": "#9467bd",  # Purple
+    "Random 66% FG": "#e377c2",  # Light Red
+    "Random 33% FG": "#d62728",  # Red
 }
 
-base_path = Path("/home/j211b/experiments/nnactive/analysis/visualization-main")
 out_path = Path("/home/j211b/experiments/nnactive/analysis/output")
+out_path = Path(
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final"
+)
 
 paths = [
-    base_path
+    BASEPATH
     / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
-    base_path
+    BASEPATH
     / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-    base_path
+    BASEPATH
     / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-    base_path
+    BASEPATH
     / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
-    base_path
+    BASEPATH
     / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
-    base_path
+    BASEPATH
     / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
-    base_path
-    / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20",
-    base_path
+    BASEPATH
+    / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
+    BASEPATH
     / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
-    base_path
+    BASEPATH
     / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-    base_path
+    BASEPATH
     / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
-    base_path
+    BASEPATH
     / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    base_path
+    BASEPATH
     / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
 ]
 paths = [Path(p) for p in paths]
@@ -116,7 +119,17 @@ whole_data = pd.concat(
 )  # .sort_index(axis=1, level=0)
 
 # Remove power bald ablations and kmeans bald
-whole_data = whole_data.drop(["power bald b10", "power bald b5", "kmeans bald"])
+whole_data = whole_data.drop(
+    [
+        "power bald b10",
+        "power bald b5",
+        "power bald b20",
+        "power bald b40",
+        "kmeans bald",
+    ],
+    errors="ignore",
+)
+whole_data = whole_data.rename(mapper=RENAMING_DICT)
 
 
 # Sort by first and second levels, using QS numeric values for the second level
@@ -163,9 +176,9 @@ for metric in ["AUBC", "beta", "Final Dice"]:
             color=qm_to_color[method_name],
             ls="--" if "random" in method_name else "-",
             lw=2,
-            markerfacecolor="white"
-            if "random" in method_name
-            else qm_to_color[method_name],
+            markerfacecolor=(
+                "white" if "random" in method_name else qm_to_color[method_name]
+            ),
         )
 
     ax1.add_patch(
@@ -230,9 +243,9 @@ for metric in ["AUBC", "beta", "Final Dice"]:
             fmt=".",
             markersize=8,
             color=qm_to_color[method_name],
-            markerfacecolor="white"
-            if "random" in method_name
-            else qm_to_color[method_name],
+            markerfacecolor=(
+                "white" if "random" in method_name else qm_to_color[method_name]
+            ),
         )
 
     ax2.set_xlim(-0.5, 0.5)

@@ -2,7 +2,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import kendalltau, spearmanr, ttest_ind, wilcoxon
+from scipy.stats import (
+    alexandergovern,
+    f_oneway,
+    kendalltau,
+    spearmanr,
+    ttest_ind,
+    wilcoxon,
+)
+from setup import RENAMING_DICT
 
 from nnactive.analyze.analysis import SettingAnalysis
 
@@ -16,43 +24,67 @@ savepath = Path(
 
 # 2nd value is always value which is expected to be better than the first. E.g. smaller QS is expected to be better.
 settings = {
+    # "AMOS Training Length 500 epochs": [
+    #     "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+    #     "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    # ],
     "AMOS Training Length": [
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
     ],
-    "AMOS Small Label": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-20",
-    ],
-    "AMOS Large Label": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-250",
-    ],
-    # Doublecheck here the effect!
+    # "AMOS Small Label": [
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-20",
+    # ],
+    # "AMOS Small_2 Label": [
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-80",
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
+    # ],
+    # "AMOS Large Label": [
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-250",
+    # ],
+    # "AMOS Large Label": [
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-1000",
+    #     "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    # ],
+    # # Doublecheck here the effect!
     "KiTS Training Length": [
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
     ],
-    "KiTS  Small Label": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
-    ],
-    "KiTS  Small_2 Label": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-80",
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
-    ],
-    "KiTS  Large Label": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-250",
-    ],
-    "ACDC Small Label": [
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-15",
-    ],
-    "ACDC Large Label": [
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-45",
-    ],
+    # "KiTS  Small Label": [
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
+    # ],
+    # "KiTS  Small_2 Label": [
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-80",
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
+    # ],
+    # "KiTS  Large Label": [
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-250",
+    # ],
+    # "KiTS  Large_2 Label": [
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-1000",
+    #     "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+    # ],
+    # "ACDC Small Label": [
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-15",
+    # ],
+    # "ACDC Small_2 Label": [
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-60",
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
+    # ],
+    # "ACDC Large Label": [
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-45",
+    # ],
+    # "ACDC Large_2 Label": [
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-180",
+    #     "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
+    # ],
 }
 
 CUSTOM_ORDER = [
@@ -61,7 +93,7 @@ CUSTOM_ORDER = [
     "softrank_bald",
     "pred_entropy",
     "power_pe",
-    "random",
+    # "random", # disable for Training Length ablations
     "random-label",
     "random-label2",
 ]
@@ -71,7 +103,11 @@ CUSTOM_ORDER = [
 def compute_difference(two_dfs: list[pd.DataFrame], mean_key, std_key):
     df_diff = two_dfs[1][mean_key] - two_dfs[0][mean_key]
     df_std = np.sqrt((two_dfs[0][std_key] ** 2 + two_dfs[1][std_key] ** 2))
-    df_diff = pd.concat([df_diff, df_std], axis=1)
+    df_diff = pd.concat(
+        [df_diff, df_std],
+        axis=1,
+        keys=[(mean_key[0], "mean"), (std_key[0], "mean std")],
+    )
     return df_diff
 
 
@@ -94,6 +130,8 @@ def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float =
     return results_df
 
 
+final_signifiances = pd.DataFrame()
+auc_significances = pd.DataFrame()
 for name in settings:
     print("-" * 10)
     print(name)
@@ -129,6 +167,9 @@ for name in settings:
 
     auc_diff = compute_difference(auc_list, mean_key, std_key)
 
+    auc_diff[(metric, "mean1")] = auc_list[0][mean_key]
+    auc_diff[(metric, "mean2")] = auc_list[1][mean_key]
+
     auc_diff = auc_diff[~auc_diff[mean_key].isna()]
     #
     auc_diff[(metric, "ranking QS big")] = (
@@ -147,6 +188,7 @@ for name in settings:
     results_df.columns = pd.MultiIndex.from_product([["t-test"], results_df.columns])
     merged_df = pd.merge(auc_diff, results_df, left_index=True, right_index=True)
     merged_df = merged_df.reindex(CUSTOM_ORDER)
+    merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
     print(merged_df)
     spearman, p_value_spearman = spearmanr(
         merged_df[(metric, "ranking QS big")],
@@ -163,12 +205,15 @@ for name in settings:
     print(
         f"Wilcoxon Test Statistics: {wilcoxon_stat:.2f}, p-value: {wilcoxon_p_value:.4f}"
     )
+    auc_significances[name] = merged_df[("t-test", "significance")]
 
     score = "Final"
     metric = f"{main_metric} {score}"
     mean_key = (metric, "mean")
     std_key = ("Mean Dice Final", "std")
     final_diff = compute_difference(auc_list, mean_key, std_key)
+    final_diff[(metric, "mean1")] = auc_list[0][mean_key]
+    final_diff[(metric, "mean2")] = auc_list[1][mean_key]
     final_diff = final_diff[~final_diff[mean_key].isna()]
     final_diff[(metric, "ranking QS big")] = (
         auc_list[0].loc[final_diff.index][mean_key].rank(ascending=False)
@@ -181,6 +226,7 @@ for name in settings:
     results_df.columns = pd.MultiIndex.from_product([["t-test"], results_df.columns])
     merged_df = pd.merge(final_diff, results_df, left_index=True, right_index=True)
     merged_df = merged_df.reindex(CUSTOM_ORDER)
+    merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
     print(merged_df)
     spearman, p_value_spearman = spearmanr(
         merged_df[(metric, "ranking QS big")],
@@ -194,3 +240,10 @@ for name in settings:
     )
     print(f"Spearman's Correlation: {spearman:.2f}, p-value: {p_value_spearman:.4f}")
     print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
+    final_signifiances[name] = merged_df[("t-test", "significance")]
+print("\n" * 2)
+print("Final Significances")
+print(final_signifiances)
+print("\n" * 2)
+print("AUBC Significances")
+print(auc_significances)

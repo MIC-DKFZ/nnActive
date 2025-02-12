@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from setup import BASEPATH, RENAMING_DICT
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -24,22 +25,79 @@ SETTINGS = {
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
     ],
     "Hippocampus": [
-        "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20",
+        "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
         "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
     ],
+    "AMOS_500epochs": [
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "AMOS_500epochs_precomp": [
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+    ],
+    "AMOS_small-QS": [
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-20",
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-80",
+    ],
+    "AMOS_large-QS": [
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-250",
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-1000",
+    ],
+    "KiTS_500epochs": [
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "KiTS_500epochs__precomp": [
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+    ],
+    "KiTS_small-QS": [
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-80",
+    ],
+    "KiTS_large-QS": [
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-250",
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-1000",
+    ],
+    "ACDC_small-QS": [
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-15_revision",
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-60_revision",
+    ],
+    "ACDC_large-QS": [
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-45_revision",
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
+        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-180_revision",
+    ],
+    "AMOS_smallpatch": [
+        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
+        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "KiTS_smallpatch": [
+        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
+        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "ACDC_smallpatch": [
+        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-30__qs-30",
+        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
+        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-90__qs-90",
+    ],
 }
 
-intermediate_path = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync/"
-)
-
 savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync/"
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
 )
 
 for name in SETTINGS:
-    SETTINGS[name] = [intermediate_path / p for p in SETTINGS[name]]
+    SETTINGS[name] = [BASEPATH / p for p in SETTINGS[name]]
 
 CUSTOM_ORDER = [
     "mutual information",
@@ -143,10 +201,14 @@ for name, paths in SETTINGS.items():
         )
         d_folder = dataset.replace(" ", "_")
         save_df_to_txt(whole_data[dataset], savepath / d_folder / f"{fn}.txt")
+    if len(whole_data) == 0:
+        print(f"Skipping {fn}")
+        continue
     whole_data = pd.concat(
         whole_data, axis=1, keys=whole_data.keys(), names=["Dataset"]
     )
     whole_data = whole_data.reindex(CUSTOM_ORDER, level=0)
+    whole_data = whole_data.rename(RENAMING_DICT, axis=0)
     save_df_to_txt(whole_data, savepath / f"{fn}.txt")
 
     with open(savepath / f"{fn}.md", "w") as f:
@@ -157,6 +219,8 @@ for name, paths in SETTINGS.items():
     subset = [col for col in whole_data.columns if col[-1] in higher_is_better]
 
     print_data = whole_data.copy(deep=True)
+    for n in print_data.index:
+        print_data.rename(index={n: n.replace("%", "\%")}, inplace=True)
     gmap = _compute_gmap(print_data[subset], invert=True)
     for col in subset:
         std_col = tuple(list(col[:-1]) + [col[-1] + " std"])
@@ -201,63 +265,41 @@ for name, paths in SETTINGS.items():
 
     # entire_data.append(aubc_vals)
 
-whole_data = pd.concat(entire_data, axis=1)
-aubc_cols = [col for col in whole_data.columns if col[-1] == "AUBC"]
-aubc_std_cols = [col for col in whole_data.columns if col[-1] == "AUBC std"]
-aubc_vals = whole_data[aubc_cols]
-aubc_std_vals = whole_data[aubc_std_cols]
-rank_cols = [(*col[:-1], "AUBC rank") for col in aubc_vals]
-for col in aubc_vals:
-    aubc_vals[(*col[:-1], "AUBC rank")] = aubc_vals[col].rank(ascending=False)
+# whole_data = pd.concat(entire_data, axis=1)
+# aubc_cols = [col for col in whole_data.columns if col[-1] == "AUBC"]
+# aubc_std_cols = [col for col in whole_data.columns if col[-1] == "AUBC std"]
+# aubc_vals = whole_data[aubc_cols]
+# aubc_std_vals = whole_data[aubc_std_cols]
+# rank_cols = [(*col[:-1], "AUBC rank") for col in aubc_vals]
+# for col in aubc_vals:
+#     aubc_vals[(*col[:-1], "AUBC rank")] = aubc_vals[col].rank(ascending=False)
 
 
-mean_rank = aubc_vals[rank_cols].mean(axis=1).sort_values()
-meadian_rank = aubc_vals[rank_cols].median(axis=1).sort_values()
-mean_aubc = whole_data[aubc_cols].mean(axis=1).sort_values()
-mean_aubc_rank = mean_aubc.rank(ascending=False)
+# mean_rank = aubc_vals[rank_cols].mean(axis=1).sort_values()
+# meadian_rank = aubc_vals[rank_cols].median(axis=1).sort_values()
+# mean_aubc = whole_data[aubc_cols].mean(axis=1).sort_values()
+# mean_aubc_rank = mean_aubc.rank(ascending=False)
 
-aggregated_rankings_aubc = pd.concat(
-    [mean_rank, meadian_rank, mean_aubc_rank, mean_aubc],
-    axis=1,
-    keys=["Mean Rank (AUBC)", "Median Rank (AUBC)", "Rank (Mean AUBC)", "Mean AUBC"],
-)
-aggregated_rankings_aubc = aggregated_rankings_aubc.reindex(CUSTOM_ORDER)
+# aggregated_rankings_aubc = pd.concat(
+#     [mean_rank, meadian_rank, mean_aubc_rank, mean_aubc],
+#     axis=1,
+#     keys=["Mean Rank (AUBC)", "Median Rank (AUBC)", "Rank (Mean AUBC)", "Mean AUBC"],
+# )
+# aggregated_rankings_aubc = aggregated_rankings_aubc.reindex(CUSTOM_ORDER)
 
-print(aggregated_rankings_aubc)
-
-
-print("Analysing for best QM")
-# best_qm = "power bald"
-best_qm = "softrank bald"
-rbs = ["random-label", "random-label2", "random"]
-print(best_qm)
-print("\n")
-
-aubc_gain = aubc_vals.loc[best_qm] - aubc_vals.loc[rbs]
-aubc_gain = aubc_gain[aubc_cols]
-
-mean_gain = aubc_gain.mean(axis=1)
-print("Mean Gain")
-print(mean_gain)
-aubc_gain_pos = aubc_gain > 0
-percentage_gain = aubc_gain_pos.mean(axis=1)
-print("Gain Scenarios")
-print(percentage_gain)
+# print(aggregated_rankings_aubc)
 
 
-# print("Only Medium and Large Label Regimes")
+# print("Analysing for best QM")
+# # best_qm = "power bald"
+# best_qm = "softrank bald"
+# rbs = ["random-label", "random-label2", "random"]
+# print(best_qm)
+# print("\n")
+
 # aubc_gain = aubc_vals.loc[best_qm] - aubc_vals.loc[rbs]
-# low_label_cols = [
-#     ("Dataset216 AMOS2022 task1", "Query Size 40"),
-#     ("Dataset135 KiTS2021", "Query Size 200"),
-#     ("Dataset027 ACDC", "Query Size 30"),
-#     ("Dataset004 Hippocampus", "Query Size 20"),
-# ]
-# keep_cols = [col for col in aubc_cols if col[:-1] not in low_label_cols]
-# aubc_gain = aubc_gain[keep_cols]
-# aubc_gain = aubc_vals.loc[best_qm] - aubc_vals.loc[rbs]
-# aubc_gain = aubc_gain[[col for col in aubc_gain if col[-1] == "AUBC"]]
-# print(aubc_gain)
+# aubc_gain = aubc_gain[aubc_cols]
+
 # mean_gain = aubc_gain.mean(axis=1)
 # print("Mean Gain")
 # print(mean_gain)
@@ -267,6 +309,28 @@ print(percentage_gain)
 # print(percentage_gain)
 
 
-import IPython
+# # print("Only Medium and Large Label Regimes")
+# # aubc_gain = aubc_vals.loc[best_qm] - aubc_vals.loc[rbs]
+# # low_label_cols = [
+# #     ("Dataset216 AMOS2022 task1", "Query Size 40"),
+# #     ("Dataset135 KiTS2021", "Query Size 200"),
+# #     ("Dataset027 ACDC", "Query Size 30"),
+# #     ("Dataset004 Hippocampus", "Query Size 20"),
+# # ]
+# # keep_cols = [col for col in aubc_cols if col[:-1] not in low_label_cols]
+# # aubc_gain = aubc_gain[keep_cols]
+# # aubc_gain = aubc_vals.loc[best_qm] - aubc_vals.loc[rbs]
+# # aubc_gain = aubc_gain[[col for col in aubc_gain if col[-1] == "AUBC"]]
+# # print(aubc_gain)
+# # mean_gain = aubc_gain.mean(axis=1)
+# # print("Mean Gain")
+# # print(mean_gain)
+# # aubc_gain_pos = aubc_gain > 0
+# # percentage_gain = aubc_gain_pos.mean(axis=1)
+# # print("Gain Scenarios")
+# # print(percentage_gain)
 
-IPython.embed()
+
+# import IPython
+
+# IPython.embed()
