@@ -61,7 +61,7 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
                 agg_uncertainty_cls[cls], kernel_size = self.aggregation.forward(
                     uncertainty[cls]
                 )
-        return uncertainty, agg_uncertainty_cls[cls], kernel_size
+        return uncertainty, agg_uncertainty_cls, kernel_size
 
     def query_file_from_dict(
         self,
@@ -238,10 +238,10 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
         n_cls = int(self.config.query_size * self.ratio_fg)
         n_full = self.config.query_size - n_cls
         classes = [cls for cls in self.top_patches if cls != -1]
-        # reduce number by one due to class unspecific -1 key
-        select_per_cls = {cls: n_cls // (len(self.top_patches) - 1) for cls in classes}
+        n_classes = len(classes)
+        select_per_cls = {cls: n_cls // n_classes for cls in classes}
         select_per_cls[-1] = n_full
-        rand_per_cls = n_cls % len(self.top_patches)
+        rand_per_cls = n_cls % n_classes
         self.rng.shuffle(classes)
         for cls in classes[:rand_per_cls]:
             select_per_cls[cls] += 1
@@ -259,6 +259,8 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
                     for patch in sorted_top_patches[cls]
                 ]
             )
+        assert len(patches) == self.config.query_size
+
         return patches
 
 
