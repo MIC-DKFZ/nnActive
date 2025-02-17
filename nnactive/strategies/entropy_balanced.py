@@ -137,7 +137,7 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
             out_list_per_cls[cls] = [
                 {
                     "coords": self.aggregation.backward_index(
-                        index, agg_scores_per_cls.shape
+                        index, agg_scores_per_cls[cls].shape
                     ),
                     "size": patch_size,
                     "score": score,
