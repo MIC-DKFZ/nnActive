@@ -4,20 +4,9 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from setup import BASEPATH, RENAMING_DICT
+from setup import BASEPATH, QM_TO_COLOR, RENAMING_DICT
 
 from nnactive.utils.io import save_df_to_txt
-
-qm_to_color = {
-    "BALD": "#bcbd22",  # Yellow-green
-    "PowerBALD": "#ff7f0e",  # Orange
-    "SoftrankBALD": "#7f7f7f",  # Gray
-    "PowerPE": "#2ca02c",  # Green
-    "Predictive Entropy": "#1f77b4",  # Blue
-    "Random": "#9467bd",  # Purple
-    "Random 66% FG": "#e377c2",  # Light Red
-    "Random 33% FG": "#d62728",  # Red
-}
 
 out_path = Path("/home/j211b/experiments/nnactive/analysis/output")
 out_path = Path(
@@ -168,16 +157,16 @@ for metric in ["AUBC", "beta", "Final Dice"]:
     # ax = plt.gcf().gca()
 
     # Create ranking line plot
-    for method_name in qm_to_color:
+    for method_name in QM_TO_COLOR:
         ax1.plot(
             ranks.loc[method_name, :].values,
             marker="o",
             label=method_name,
-            color=qm_to_color[method_name],
+            color=QM_TO_COLOR[method_name],
             ls="--" if "random" in method_name else "-",
             lw=2,
             markerfacecolor=(
-                "white" if "random" in method_name else qm_to_color[method_name]
+                "white" if "random" in method_name else QM_TO_COLOR[method_name]
             ),
         )
 
@@ -225,7 +214,7 @@ for metric in ["AUBC", "beta", "Final Dice"]:
     ranks_sorted = avg_ranks.rank(ascending=True, method="first")
     # print(avg_ranks)
     # print(ranks_sorted)
-    for i, method_name in enumerate(qm_to_color):
+    for i, method_name in enumerate(QM_TO_COLOR):
         # ax2.add_patch(
         #     patches.Rectangle(
         #         (-0.4, avg_ranks[method_name]),
@@ -242,9 +231,9 @@ for metric in ["AUBC", "beta", "Final Dice"]:
             yerr=[std_ranks[method_name]],
             fmt=".",
             markersize=8,
-            color=qm_to_color[method_name],
+            color=QM_TO_COLOR[method_name],
             markerfacecolor=(
-                "white" if "random" in method_name else qm_to_color[method_name]
+                "white" if "random" in method_name else QM_TO_COLOR[method_name]
             ),
         )
 

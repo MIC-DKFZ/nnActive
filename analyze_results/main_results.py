@@ -8,6 +8,7 @@ from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
+STANDARD_COLNAMES = ["Low", "Medium", "High"]
 SETTINGS = {
     "AMOS": [
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
@@ -42,7 +43,7 @@ SETTINGS = {
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-80",
     ],
-    "AMOS_large-QS": [
+    "AMOS_high-QS": [
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-250",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-1000",
@@ -60,7 +61,7 @@ SETTINGS = {
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-80",
     ],
-    "KiTS_large-QS": [
+    "KiTS_high-QS": [
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-250",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-1000",
@@ -70,27 +71,52 @@ SETTINGS = {
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-60_revision",
     ],
-    "ACDC_large-QS": [
+    "ACDC_high-QS": [
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-45_revision",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-180_revision",
     ],
-    "AMOS_smallpatch": [
+    "AMOS_patchablation": [
         "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
         "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
-    "KiTS_smallpatch": [
+    "KiTS_patchablation": [
         "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
         "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
-    "ACDC_smallpatch": [
+    "ACDC_patchablation": [
         "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-30__qs-30",
         "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
         "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-90__qs-90",
     ],
 }
+
+for name in SETTINGS:
+    vals = []
+    for path in SETTINGS[name]:
+        fn = SETTINGS[name].split("/")[-1]
+        qs = fn.split("qs-")[1].split("__")[0]
+        sbs = fn.split("sbs-")[1].split("__")[0]
+        vals.append({"fn": fn, "qs": qs, "sbs": sbs})
+
+    if "small" in name:
+        colnames = [f"Low ({v['qs']})" for v in vals]
+    elif "high" in name:
+        colnames = [f"High ({v['qs']})" for v in vals]
+    elif "500epochs" in name:
+        # small query size is not ablated atm
+        colnames = STANDARD_COLNAMES[1:]
+    elif "patchablation" in name:
+        colnames = STANDARD_COLNAMES
+    else:
+        colnames = STANDARD_COLNAMES
+
+    SETTINGS[name] = {
+        "paths": [BASEPATH / p for p in SETTINGS[name]],
+        "colnames": colnames,
+    }
 
 savepath = Path(
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
@@ -163,7 +189,13 @@ for name, paths in SETTINGS.items():
                 )
                 .apply(lambda x: np.round(x * 100, 2))
             )
-            data_dict["Dataset"] = path.parent.name.replace("_", " ")
+            analysis = SettingAnalysis.load(path / "analysis.pkl")
+            query_size = path.name.split("qs-")[1].split("__")[0]
+            starting_budget = path.name.split("sbs-")[1].split("__")[0]
+
+            # data_dict["Dataset"] = path.parent.name.replace("_", " ")
+            data_dict["Dataset"] = name
+
             data_dict["Setting"] = (
                 "Query Size " + path.name.split("qs-")[1].split("__")[0]
             )

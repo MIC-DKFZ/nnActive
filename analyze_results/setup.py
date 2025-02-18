@@ -25,6 +25,17 @@ for key in keys:
     RENAMING_DICT[key] = small_dict[key]
     RENAMING_DICT[key.replace(" ", "_")] = small_dict[key]
 
+QM_TO_COLOR = {
+    "BALD": "#bcbd22",  # Yellow-green
+    "PowerBALD": "#ff7f0e",  # Orange
+    "SoftrankBALD": "#7f7f7f",  # Gray
+    "PowerPE": "#2ca02c",  # Green
+    "Predictive Entropy": "#1f77b4",  # Blue
+    "Random": "#9467bd",  # Purple
+    "Random 66% FG": "#e377c2",  # Light Red
+    "Random 33% FG": "#d62728",  # Red
+}
+
 BASEPATH = Path(
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
 )
