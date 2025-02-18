@@ -10,7 +10,7 @@ from scipy.stats import (
     ttest_ind,
     wilcoxon,
 )
-from setup import BASEPATH, RENAMING_DICT
+from setup import BASEPATH, RENAMING_DICT, df_to_multicol
 
 from nnactive.analyze.analysis import SettingAnalysis
 
@@ -24,7 +24,7 @@ settings = {
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
     ],
-    "AMOS Large Training Length": [
+    "AMOS High Training Length": [
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
@@ -33,7 +33,7 @@ settings = {
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
     ],
-    "KiTS Large Training Length": [
+    "KiTS High Training Length": [
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
@@ -46,8 +46,16 @@ CUSTOM_ORDER = [
     "pred_entropy",
     "power_pe",
     # "random", # disable for Training Length ablations
-    # "random-label",
-    # "random-label2",
+    "random-label",
+    "random-label2",
+]
+
+QUERYMETHODS = [
+    "BALD",
+    "PowerBALD",
+    "SoftrankBALD",
+    "Predictive Entropy",
+    "PowerPE",
 ]
 
 
@@ -82,8 +90,14 @@ def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float =
     return results_df
 
 
+final_diffs = pd.DataFrame()
+aubc_diffs = pd.DataFrame()
 final_significances = pd.DataFrame()
 aubc_significances = pd.DataFrame()
+final_corrs = pd.DataFrame()
+aubc_corrs = pd.DataFrame()
+final_corr_pval = pd.DataFrame()
+aubc_corr_pval = pd.DataFrame()
 for name in settings:
     print("-" * 10)
     print(name)
@@ -157,7 +171,11 @@ for name in settings:
     print(
         f"Wilcoxon Test Statistics: {wilcoxon_stat:.2f}, p-value: {wilcoxon_p_value:.4f}"
     )
+    merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
     aubc_significances[name] = merged_df[("t-test", "significance")]
+    aubc_diffs[name] = merged_df[(metric, "mean")]
+    aubc_corrs[name] = np.array([rho])
+    aubc_corr_pval[name] = np.array([p_value_kendall])
 
     score = "Final"
     metric = f"{main_metric} {score}"
@@ -192,27 +210,51 @@ for name in settings:
     )
     print(f"Spearman's Correlation: {spearman:.2f}, p-value: {p_value_spearman:.4f}")
     print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
+    merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
     final_significances[name] = merged_df[("t-test", "significance")]
+    final_diffs[name] = merged_df[(metric, "mean")]
+    final_corrs[name] = np.array([rho])
+    final_corr_pval[name] = np.array([p_value_kendall])
 print("\n" * 2)
 print("Final Significances")
-column_map = {}
-for col in final_significances.columns:
-    s_col = col.split(" ")
-    column_map[col] = (s_col[0], " ".join(s_col[1:2]))
-final_significances.columns = pd.MultiIndex.from_tuples(
-    [column_map[col] for col in final_significances.columns]
+
+
+df_to_multicol(final_significances)
+df_to_multicol(final_diffs)
+df_to_multicol(final_corrs)
+df_to_multicol(final_corr_pval)
+final_diffs = final_diffs.apply(lambda x: np.round(x * 100, 2))
+styled: pd.DataFrame = final_diffs.copy(deep=True)
+styled = styled.applymap(lambda x: f"{x:.2f}")
+styled[final_significances == True] = styled[final_significances == True].applymap(
+    lambda x: f"\\textbf{{{x}}}"
 )
+styled.to_latex(savepath / "ablation-training-final_diffs.tex")
 print(final_significances)
 final_significances.to_latex(savepath / "ablation-training-final_significances.tex")
+final_corrs.to_latex(savepath / "ablation-training-final_corrs.tex")
+print(final_diffs)
+print(final_corrs)
+print(final_corr_pval)
+
 
 print("\n" * 2)
 print("AUBC Significances")
-column_map = {}
-for col in aubc_significances.columns:
-    s_col = col.split(" ")
-    column_map[col] = (s_col[0], " ".join(s_col[1:2]))
-aubc_significances.columns = pd.MultiIndex.from_tuples(
-    [column_map[col] for col in aubc_significances.columns]
+df_to_multicol(aubc_significances)
+df_to_multicol(aubc_diffs)
+df_to_multicol(aubc_corrs)
+df_to_multicol(aubc_corr_pval)
+aubc_diffs = aubc_diffs.apply(lambda x: np.round(x * 100, 2))
+styled: pd.DataFrame = aubc_diffs.copy(deep=True)
+styled = styled.applymap(lambda x: f"{x:.2f}")
+styled[aubc_significances == True] = styled[aubc_significances == True].applymap(
+    lambda x: f"\\textbf{{{x}}}"
 )
+styled.to_latex(savepath / "ablation-training-aubc_diffs.tex")
 print(aubc_significances)
+print(aubc_diffs)
 aubc_significances.to_latex(savepath / "ablation-training-aubc_significances.tex")
+
+print(aubc_corrs)
+aubc_corrs.to_latex(savepath / "ablation-training-aubc_corrs.tex")
+print(aubc_corr_pval)

@@ -37,6 +37,8 @@ PALETTE = {
     "kmeans_bald": "tab:olive",
     "power_bald_b20": "tab:olive",
     "power_bald_b40": "tab:olive",
+    "class_pe66": "tab:olive",
+    "class_pe33": "tab:purple",
 }
 
 # Defuault is Class 1, 2, 3, ....

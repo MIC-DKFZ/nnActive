@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 from scipy.stats import (
@@ -10,7 +11,7 @@ from scipy.stats import (
     ttest_ind,
     wilcoxon,
 )
-from setup import BASEPATH, RENAMING_DICT
+from setup import BASEPATH, RENAMING_DICT, apply_latex_coloring, df_to_multicol
 
 from nnactive.analyze.analysis import SettingAnalysis
 
@@ -77,6 +78,29 @@ def compute_difference(two_dfs: list[pd.DataFrame], mean_key, std_key):
     return df_diff
 
 
+def compute_correlation_from_dfs(
+    dfs: list[pd.DataFrame], qms, metric, significance: float = 0.10
+):
+    results = []
+    for qm in qms:
+        values = []
+        compare_ranking = []
+        for i, df in enumerate(dfs):
+            df_sub = df[df["Query Method"] == qm]
+            values.extend([v for v in df_sub[metric]])
+            compare_ranking.extend([i] * len(df_sub[metric]))
+        corr, pval = kendalltau(values, compare_ranking)
+        results.append(
+            {
+                "Query Method": qm,
+                "corr": corr,
+                "pval": pval,
+                "significance": pval < significance,
+            }
+        )
+    return pd.DataFrame(results).set_index("Query Method")
+
+
 def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float = 0.05):
     test_groups = []
     for aucval in aucval_list:
@@ -109,8 +133,33 @@ def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float =
     return results_df
 
 
+VALMAP = {
+    -2: "#FF0000",  # red
+    -1: "#F08080",  # lightcoral
+    0: "#FFFFFF",  # white
+    1: "#90EE90",  # light green
+    2: "#008000",  # green
+}
+
+
+def _get_cmap(
+    values: np.ndarray, significances: np.ndarray, colormapping: dict[int, str] = VALMAP
+):
+    vmap = np.zeros(values.shape, dtype=np.int8)
+    vmap[values > 0] = 1
+    vmap[values < 0] = -1
+    vmap[significances] = vmap[significances] * 2
+    cmap = np.array([[colormapping[v] for v in row] for row in vmap])
+    return cmap
+
+
 final_significances = pd.DataFrame()
 aubc_siginificances = pd.DataFrame()
+final_corrs = pd.DataFrame()
+aubc_corrs = pd.DataFrame()
+aubc_corr_pval = pd.DataFrame()
+final_corr_pval = pd.DataFrame()
+
 for name in settings:
     print("-" * 10)
     print(name)
@@ -157,6 +206,8 @@ for name in settings:
         )
 
     results_df = compute_ttest(aucval_list, metric)
+    auc_corr = compute_correlation_from_dfs(aucval_list, CUSTOM_ORDER, metric)
+    auc_corr.rename(RENAMING_DICT, axis=0, inplace=True)
 
     results_df.columns = pd.MultiIndex.from_product([["t-test"], results_df.columns])
     merged_df = pd.merge(auc_diff, results_df, left_index=True, right_index=True)
@@ -204,31 +255,45 @@ for name in settings:
 
     print(merged_df[("t-test", "full-significance")])
     final_significances[name] = merged_df[("t-test", "full-significance")]
+    final_corr = compute_correlation_from_dfs(aucval_list, CUSTOM_ORDER, metric)
+    final_corr.rename(RENAMING_DICT, axis=0, inplace=True)
+    final_corrs[name] = final_corr["corr"]
+    aubc_corrs[name] = auc_corr["corr"]
+    final_corr_pval[name] = final_corr["significance"]
+    aubc_corr_pval[name] = auc_corr["significance"]
 
 
 print("Final AUBC Significances")
-column_map = {}
-for col in aubc_siginificances.columns:
-    s_col = col.split(" ")
-    column_map[col] = (s_col[0], " ".join(s_col[1:2]))
-aubc_siginificances.columns = pd.MultiIndex.from_tuples(
-    [column_map[col] for col in aubc_siginificances.columns]
-)
+df_to_multicol(aubc_siginificances)
+df_to_multicol(aubc_corrs)
+df_to_multicol(aubc_corr_pval)
 aubc_siginificances["Mean"] = aubc_siginificances.mean(axis=1).round(2)
 print(aubc_siginificances)
+styled_corrs = aubc_corrs.copy(deep=True)
+styled_corrs = styled_corrs.applymap(lambda x: f"{x:.4f}")
+cmap = _get_cmap(aubc_corrs.values, aubc_corr_pval.values)
+styled_corrs = apply_latex_coloring(styled_corrs, cmap)
+styled_corrs.to_latex(savepath / "ablation-query_aubc_corrs.tex")
+print(aubc_corrs)
+print(aubc_corr_pval)
 
 
 aubc_siginificances.to_latex(savepath / "ablation-query_aubc_significances.tex")
 
 
 print("Final Mean DICE Significances")
-column_map = {}
-for col in final_significances.columns:
-    s_col = col.split(" ")
-    column_map[col] = (s_col[0], " ".join(s_col[1:2]))
-final_significances.columns = pd.MultiIndex.from_tuples(
-    [column_map[col] for col in final_significances.columns]
-)
+df_to_multicol(final_significances)
+df_to_multicol(final_corrs)
+df_to_multicol(final_corr_pval)
 final_significances["Mean"] = final_significances.mean(axis=1).round(2)
 print(final_significances)
+print(final_corrs)
+print(final_corr_pval)
+
+styled_corrs = final_corrs.copy(deep=True)
+styled_corrs = styled_corrs.applymap(lambda x: f"{x:.4f}")
+cmap = _get_cmap(final_corrs.values, final_corr_pval.values)
+styled_corrs = apply_latex_coloring(styled_corrs, cmap)
+
 final_significances.to_latex(savepath / "ablation-query_final_significances.tex")
+styled_corrs.to_latex(savepath / "ablation-query_final_corrs.tex")

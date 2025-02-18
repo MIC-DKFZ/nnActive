@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import pandas as pd
 from loguru import logger
 
@@ -39,6 +40,29 @@ QM_TO_COLOR = {
 BASEPATH = Path(
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
 )
+
+
+def df_to_multicol(df):
+    """Inplace conversion of DataFrame columns to MultiIndex"""
+    column_map = {}
+    for col in df.columns:
+        s_col = col.split(" ")
+        column_map[col] = (s_col[0], " ".join(s_col[1:2]))
+    df.columns = pd.MultiIndex.from_tuples([column_map[col] for col in df.columns])
+
+
+def html_to_latex_color(hex_color):
+    rgb = mcolors.hex2color(hex_color)  # Convert to (R, G, B) tuple (0-1 scale)
+    return f"{{rgb,1:red,{rgb[0]:.2f};green,{rgb[1]:.2f};blue,{rgb[2]:.2f}}}"
+
+
+def apply_latex_coloring(df, color_array):
+    styled = df.copy().astype(str)
+    for i in range(df.shape[0]):
+        for j in range(df.shape[1]):
+            color = html_to_latex_color(color_array[i, j])
+            styled.iloc[i, j] = f"\\cellcolor{color} {df.iloc[i, j]}"
+    return styled
 
 
 #################### Fixing Hippocampus Experiments automatically ####################
