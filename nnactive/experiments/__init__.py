@@ -625,7 +625,7 @@ for qs in _query_sizes:
     register(
         make_kits_config,
         seeds=__seeds,
-        uncertainties=__strategies,
+        uncertainties=[*__strategies, "class_pe33", "class_pe66"],
         query_size=qs,
         query_steps=5,
     )
@@ -647,7 +647,7 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald"],
+    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66"],
     query_size=20,
     query_steps=10,
 )
@@ -655,7 +655,7 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald"],
+    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66"],
     query_size=40,
     query_steps=5,
 )
@@ -663,7 +663,7 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald"],
+    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66"],
     query_size=60,
     query_steps=5,
 )
@@ -673,7 +673,7 @@ for qs in _query_sizes:
     register(
         make_acdc_config,
         seeds=__seeds,
-        uncertainties=[*__strategies, "kmeans_bald"],
+        uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66"],
         query_size=qs,
         query_steps=5,
     )
@@ -850,7 +850,7 @@ register(
 register(
     make_amos_config,
     seeds=__seeds,
-    uncertainties=[s for s in __strategies if s != "random"],
+    uncertainties=[s for s in [*__strategies, "class_pe33", "class_pe66"] if s != "random"],
     query_size=200,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -870,7 +870,7 @@ register(
 register(
     make_amos_config,
     seeds=__seeds,
-    uncertainties=[s for s in __strategies if s != "random"],
+    uncertainties=[s for s in [*__strategies, "class_pe33", "class_pe66"] if s != "random"],
     query_size=500,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
