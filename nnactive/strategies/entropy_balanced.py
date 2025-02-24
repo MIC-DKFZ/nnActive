@@ -18,6 +18,7 @@ from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
 from nnactive.strategies.uncertainties import Probs
+from nnactive.strategies.utils import power_noising, exponential_schedule, sigmoid_schedule
 
 
 class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
@@ -265,6 +266,108 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
 
 
 class ClassBalancedEntropy_33FG(ClassBalancedEntropy_66FG):
+    def __post_init__(self):
+        super().__post_init__()
+        self.ratio_fg = 0.33
+
+
+class ClassBalancedPowerEntropy_66FG(ClassBalancedEntropy_66FG):
+    """Class balanced Power Entropy with beta=1 (66% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta = 1
+
+    def compute_scores_per_cls(
+        self, probs: np.ndarray | list[Path], device: torch.device
+    ):
+        with torch.no_grad():
+            logger.debug("Compute uncertaintes...")
+            uncertainty = self.get_uncertainty(probs, device=device)
+            # uncertainties are (C+1 x H x W x D)
+            # last channel is standard uncertainty (not class specific)
+            # first C channels are class specific uncertainties
+            logger.debug("Aggregate uncertainties...")
+            agg_uncertainty_cls = {}
+            for cls in self.top_patches:
+                agg_uncertainty_cls[cls], kernel_size = self.aggregation.forward(
+                    uncertainty[cls]
+                )
+        
+        # Apply power noising to the aggregated uncertainties
+        for c in self.top_patches:
+            agg_uncertainty_cls[c] = power_noising(
+                agg_uncertainty_cls[c], beta=self.beta, rng=self.rng
+            )
+        return uncertainty, agg_uncertainty_cls, kernel_size
+
+
+class ClassBalancedPowerEntropy_33FG(ClassBalancedPowerEntropy_66FG):
+    """Class balanced Power Entropy with beta=1 (33% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.ratio_fg = 0.33
+
+
+class ClassBalancedExpScheduledPowerEntropy_66FG(ClassBalancedEntropy_66FG):
+    """Class balanced Power Entropy with exponential beta schedule (66% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta_values = exponential_schedule(self.config.query_steps, 1, 100)
+
+    def compute_scores_per_cls(
+        self, probs: np.ndarray | list[Path], device: torch.device
+    ):
+        with torch.no_grad():
+            logger.debug("Compute uncertaintes...")
+            uncertainty = self.get_uncertainty(probs, device=device)
+            # uncertainties are (C+1 x H x W x D)
+            # last channel is standard uncertainty (not class specific)
+            # first C channels are class specific uncertainties
+            logger.debug("Aggregate uncertainties...")
+            agg_uncertainty_cls = {}
+            for cls in self.top_patches:
+                agg_uncertainty_cls[cls], kernel_size = self.aggregation.forward(
+                    uncertainty[cls]
+                )
+        
+        # Apply power noising to the aggregated uncertainties
+        for c in self.top_patches:
+            agg_uncertainty_cls[c] = power_noising(
+                agg_uncertainty_cls[c], beta=self.beta_values[self.loop_val], rng=self.rng
+            )
+        return uncertainty, agg_uncertainty_cls, kernel_size
+
+
+class ClassBalancedExpScheduledPowerEntropy_33FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+    """Class balanced Power Entropy with exponential beta schedule (33% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.ratio_fg = 0.33
+
+
+class ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+    """Class balanced Power Entropy with smooth sigmoid beta schedule (66% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=2)
+
+
+class ClassBalancedSmoothSigmoidScheduledPowerEntropy_33FG(ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG):
+    """Class balanced Power Entropy with smooth sigmoid beta schedule (22% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.ratio_fg = 0.33
+
+
+class ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+    """Class balanced Power Entropy with sharp sigmoid beta schedule (66% FG)"""
+    def __post_init__(self):
+        super().__post_init__()
+        self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=2)
+
+
+class ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG(ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG):
+    """Class balanced Power Entropy with sharp sigmoid beta schedule (22% FG)"""
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33

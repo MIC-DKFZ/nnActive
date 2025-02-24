@@ -17,6 +17,12 @@ from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_balanced import (
     ClassBalancedEntropy_33FG,
     ClassBalancedEntropy_66FG,
+    ClassBalancedExpScheduledPowerEntropy_66FG,
+    ClassBalancedExpScheduledPowerEntropy_33FG,
+    ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG,
+    ClassBalancedSmoothSigmoidScheduledPowerEntropy_33FG,
+    ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG,
+    ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG,
 )
 from nnactive.strategies.entropy_exp import ExpectedEntropy
 from nnactive.strategies.entropy_pred import PowerPredictiveEntropy, PredictiveEntropy
@@ -107,4 +113,10 @@ strategydict: dict[str, type[AbstractQueryMethod]] = {
     "precomputed-queries": PrecomputedQuery,
     "class_pe66": ClassBalancedEntropy_66FG,
     "class_pe33": ClassBalancedEntropy_33FG,
+    "class_power_pe66_exp": ClassBalancedExpScheduledPowerEntropy_66FG,
+    "class_power_pe33_exp": ClassBalancedExpScheduledPowerEntropy_33FG,
+    "class_power_pe66_smooth_sigmoid": ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG,
+    "class_power_pe33_smooth_sigmoid": ClassBalancedSmoothSigmoidScheduledPowerEntropy_33FG,
+    "class_power_pe66_sharp_sigmoid": ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG,
+    "class_power_pe33_sharp_sigmoid": ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG,
 }

@@ -1014,6 +1014,24 @@ for config in dataset_configs:
         pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
     )
 
+################## Noise Schedule Ablation for Class-balanced Power PE ###############
+_query_sizes = [40, 200, 500]
+for qs in _query_sizes:
+    register(
+        make_amos_config,
+        seeds=[12345],
+        uncertainties=[
+            "class_power_pe66_exp",
+            "class_power_pe33_exp",
+            "class_power_pe66_smooth_sigmoid",
+            "class_power_pe33_smooth_sigmoid",
+            "class_power_pe66_sharp_sigmoid",
+            "class_power_pe33_sharp_sigmoid",
+        ],
+        query_size=qs,
+        query_steps=5,
+    )
+
 ################## Prototyping Experiments #########
 register(
     make_amos_prototyping_config,

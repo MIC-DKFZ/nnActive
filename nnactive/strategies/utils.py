@@ -182,6 +182,21 @@ def power_noising(
     return power_s
 
 
+def exponential_schedule(n_steps, a, b):
+    """Exponential noise schedule from a to b"""
+    return a * (b / a) ** np.linspace(0, 1, n_steps)
+
+
+def sigmoid_schedule(n_steps, a, b, T):
+    """Sigmoid noise schedule from a to b with temperature T (higher T = smoother)"""
+    # Scaled for full transition
+    x = np.linspace(-6, 6, n_steps)
+    # Apply temperature scaling
+    sigmoid = 1 / (1 + np.exp(-x / T))
+    # Normalize to [a, b]
+    return a + (b - a) * (sigmoid - sigmoid.min()) / (sigmoid.max() - sigmoid.min())
+
+
 def query_starting_budget_all_classes(
     raw_labels_path: Path,
     file_ending: str,
