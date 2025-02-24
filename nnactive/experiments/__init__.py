@@ -959,6 +959,9 @@ dataset_configs: list[dict] = [
     {"base_id": 27, "query_size": 30, "patch_size": [2, 20, 20]},  # ACDC
     {"base_id": 27, "query_size": 60, "patch_size": [2, 20, 20]},  # ACDC
     {"base_id": 27, "query_size": 90, "patch_size": [2, 20, 20]},  # ACDC
+    {"base_id": 4, "query_size": 20, "patch_size": [10, 10, 10]},  # Hippocampus
+    {"base_id": 4, "query_size": 40, "patch_size": [10, 10, 10]},  # Hippocampus
+    {"base_id": 4, "query_size": 60, "patch_size": [10, 10, 10]},  # Hippocampus
 ]
 
 for config in dataset_configs:
