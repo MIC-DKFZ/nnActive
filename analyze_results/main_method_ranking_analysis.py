@@ -13,75 +13,86 @@ out_path = Path(
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final"
 )
 
-paths = [
-    BASEPATH
-    / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
-    BASEPATH
-    / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-    BASEPATH
-    / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-    BASEPATH
-    / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
-    BASEPATH
-    / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
-    BASEPATH
-    / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
-    BASEPATH
-    / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
-    BASEPATH
-    / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
-    BASEPATH
-    / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-    BASEPATH
-    / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
-    BASEPATH
-    / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    BASEPATH
-    / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-]
-paths = [Path(p) for p in paths]
+COLNAMES = ["Low", "Medium", "High"]
+NAME = "main_method_ranking"
+SETTINGS = {
+    "KiTS": [
+        BASEPATH
+        / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
+        BASEPATH
+        / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+        BASEPATH
+        / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "ACDC": [
+        BASEPATH
+        / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
+        BASEPATH
+        / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
+        BASEPATH
+        / "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
+    ],
+    "Hippocampus": [
+        BASEPATH
+        / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
+        BASEPATH
+        / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
+        BASEPATH
+        / "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
+    ],
+    "AMOS": [
+        BASEPATH
+        / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
+        BASEPATH
+        / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
+        BASEPATH
+        / "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+}
+
+for name in SETTINGS:
+    SETTINGS[name] = [Path(p) for p in SETTINGS[name]]
 
 
 data_dicts = []
-for path in paths:
-    data_dict = {}
-    data_dict["df_auc"] = pd.read_json(path / "auc.json")[
-        [
-            "('Mean Dice AUBC', 'mean')",
-            "('Mean Dice AUBC', 'std')",
-            "('Mean Dice Final', 'mean')",
-            "('Mean Dice Final', 'std')",
-        ]
-    ].rename(
-        columns={
-            "('Mean Dice AUBC', 'mean')": "AUBC",
-            "('Mean Dice AUBC', 'std')": "AUBC std",
-            "('Mean Dice Final', 'mean')": "Final Dice",
-            "('Mean Dice Final', 'std')": "Final Dice std",
-        }
-    )
-    data_dict["Dataset"] = (
-        path.parent.name.replace("Dataset004_Hippocampus", "Hippocampus")
-        .replace("Dataset216_AMOS2022_task1", "AMOS")
-        .replace("Dataset027_ACDC", "ACDC")
-        .replace("Dataset135_KiTS2021", "KiTS")
-    )
-    data_dict["Setting"] = "QS " + path.name.split("qs-")[1].split("__")[0]
-    data_dict["df_beta"] = (
-        pd.read_json(path / "beta.json")
-        .set_index("Query Method")
-        .apply(lambda x: np.round(x, 2))
-    ).rename(columns={"beta_std": "beta std"})
-    data_dict["df"] = pd.concat([data_dict["df_auc"], data_dict["df_beta"]], axis=1)[
-        ["AUBC", "AUBC std", "beta", "beta std", "Final Dice", "Final Dice std"]
-    ]
-    data_dict["df"].reset_index(inplace=True)
-    print(data_dict["df"].columns)
-    data_dict["df"]["index"] = data_dict["df"]["index"].map(
-        lambda x: x.replace("_", " ")
-    )
-    data_dict["df"] = data_dict["df"].set_index("index")
-    data_dicts.append(data_dict)
+for name in SETTINGS:
+    paths = SETTINGS[name]
+    for i, path in enumerate(paths):
+        data_dict = {}
+        data_dict["df_auc"] = pd.read_json(path / "auc.json")[
+            [
+                "('Mean Dice AUBC', 'mean')",
+                "('Mean Dice AUBC', 'std')",
+                "('Mean Dice Final', 'mean')",
+                "('Mean Dice Final', 'std')",
+            ]
+        ].rename(
+            columns={
+                "('Mean Dice AUBC', 'mean')": "AUBC",
+                "('Mean Dice AUBC', 'std')": "AUBC std",
+                "('Mean Dice Final', 'mean')": "Final Dice",
+                "('Mean Dice Final', 'std')": "Final Dice std",
+            }
+        )
+        data_dict["Dataset"] = name
+        # data_dict["Setting"] = "QS " + path.name.split("qs-")[1].split("__")[0]
+        data_dict["Setting"] = COLNAMES[i]
+
+        data_dict["df_beta"] = (
+            pd.read_json(path / "beta.json")
+            .set_index("Query Method")
+            .apply(lambda x: np.round(x, 2))
+        ).rename(columns={"beta_std": "beta std"})
+        data_dict["df"] = pd.concat(
+            [data_dict["df_auc"], data_dict["df_beta"]], axis=1
+        )[["AUBC", "AUBC std", "beta", "beta std", "Final Dice", "Final Dice std"]]
+        data_dict["df"].reset_index(inplace=True)
+        print(data_dict["df"].columns)
+        data_dict["df"]["index"] = data_dict["df"]["index"].map(
+            lambda x: x.replace("_", " ")
+        )
+        data_dict["df"] = data_dict["df"].set_index("index")
+        data_dicts.append(data_dict)
 
 order = ["Dataset", "Setting", "df"]
 
@@ -138,10 +149,10 @@ for metric in ["AUBC", "beta", "Final Dice"]:
     )
 
     # whole_data = whole_data[sorted(whole_data.columns, key=sort_key)]
-    ranks = ranks[sorted(ranks.columns, key=sort_key)]
+    # ranks = ranks[sorted(ranks.columns, key=sort_key)]
 
     # Save ranking table to txt file
-    save_df_to_txt(ranks, out_path / f"method_ranking_{metric}.txt")
+    # save_df_to_txt(ranks, out_path / f"method_ranking_{metric}.txt")
 
     fig, (ax1, ax2) = plt.subplots(
         1,
@@ -246,7 +257,7 @@ for metric in ["AUBC", "beta", "Final Dice"]:
 
     # Save figure
     # plt.tight_layout()
-    plt.savefig(out_path / f"method_ranking_{metric}.png", bbox_inches="tight")
+    plt.savefig(out_path / f"{name}_{metric}.png", bbox_inches="tight")
 
 if __name__ == "__main__":
     pass

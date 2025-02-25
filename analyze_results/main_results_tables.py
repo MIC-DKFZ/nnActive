@@ -9,6 +9,7 @@ from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
+COMPUTE_COLNAMES = ["200 Epochs", "Precomputed 500 Epochs", "500 Epochs"]
 SETTINGS = {
     "AMOS": [
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
@@ -38,12 +39,22 @@ SETTINGS = {
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
     ],
-    "AMOS_small-QS": [
+    "AMOS_Medium-training": [
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
+    ],
+    "AMOS_High-training": [
+        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "AMOS_Low-QS": [
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-20",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-80",
     ],
-    "AMOS_high-QS": [
+    "AMOS_High-QS": [
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-250",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-1000",
@@ -56,22 +67,32 @@ SETTINGS = {
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
         "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
     ],
-    "KiTS_small-QS": [
+    "KiTS_Medium-training": [
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+    ],
+    "KiTS_High-training": [
+        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
+    ],
+    "KiTS_Low-QS": [
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-20",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-80",
     ],
-    "KiTS_high-QS": [
+    "KiTS_High-QS": [
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-250",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
         "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-1000",
     ],
-    "ACDC_small-QS": [
+    "ACDC_Low-QS": [
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-15_revision",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-60_revision",
     ],
-    "ACDC_high-QS": [
+    "ACDC_High-QS": [
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-45_revision",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
         "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-180_revision",
@@ -96,15 +117,18 @@ SETTINGS = {
 for name in SETTINGS:
     vals = []
     for path in SETTINGS[name]:
-        fn = SETTINGS[name].split("/")[-1]
-        qs = fn.split("qs-")[1].split("__")[0]
-        sbs = fn.split("sbs-")[1].split("__")[0]
+        fn = path.split("/")[-1]
+        qs = fn.split("qs-")[1].split("_")[0]
+        sbs = fn.split("sbs-")[1].split("_")[0]
         vals.append({"fn": fn, "qs": qs, "sbs": sbs})
 
-    if "small" in name:
+    if "low" in name and "QS" in name:
         colnames = [f"Low ({v['qs']})" for v in vals]
-    elif "high" in name:
+    elif "high" in name and "QS" in name:
         colnames = [f"High ({v['qs']})" for v in vals]
+    elif "training" in name:
+        budget = name.split("-")[0].split("_")[-1]
+        colnames = [f"{budget} ({v})" for v in COMPUTE_COLNAMES]
     elif "500epochs" in name:
         # small query size is not ablated atm
         colnames = STANDARD_COLNAMES[1:]
@@ -123,7 +147,7 @@ savepath = Path(
 )
 
 for name in SETTINGS:
-    SETTINGS[name] = [BASEPATH / p for p in SETTINGS[name]]
+    SETTINGS[name]["paths"] = [BASEPATH / p for p in SETTINGS[name]["paths"]]
 
 CUSTOM_ORDER = [
     "mutual information",
@@ -138,7 +162,9 @@ CUSTOM_ORDER = [
 
 entire_data = []
 
-for name, paths in SETTINGS.items():
+for name in SETTINGS:
+    paths = SETTINGS[name]["paths"]
+    colnames = SETTINGS[name]["colnames"]
 
     fn = name
 
@@ -167,7 +193,7 @@ for name, paths in SETTINGS.items():
         return gmap
 
     data_dicts = []
-    for path in paths:
+    for path, colname in zip(paths, colnames):
         if path.is_dir():
             data_dict = {}
             data_dict["df_auc"] = (
@@ -194,11 +220,9 @@ for name, paths in SETTINGS.items():
             starting_budget = path.name.split("sbs-")[1].split("__")[0]
 
             # data_dict["Dataset"] = path.parent.name.replace("_", " ")
-            data_dict["Dataset"] = name
+            data_dict["Dataset"] = name.split("_")[0]
 
-            data_dict["Setting"] = (
-                "Query Size " + path.name.split("qs-")[1].split("__")[0]
-            )
+            data_dict["Setting"] = colname
             data_dict["df_beta"] = (
                 pd.read_json(path / "beta.json")
                 .set_index("Query Method")
@@ -232,7 +256,7 @@ for name, paths in SETTINGS.items():
             names=["Setting"],
         )
         d_folder = dataset.replace(" ", "_")
-        save_df_to_txt(whole_data[dataset], savepath / d_folder / f"{fn}.txt")
+        # save_df_to_txt(whole_data[dataset], savepath / d_folder / f"{fn}.txt")
     if len(whole_data) == 0:
         print(f"Skipping {fn}")
         continue
