@@ -4,9 +4,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
+from loguru import logger
 
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_nested_patches_from_loop_files
+from nnactive.nnunet.utils import get_raw_path
 from nnactive.utils.io import load_json
 from nnactive.utils.patches import create_patch_mask_for_image
 from nnactive.utils.pyutils import rescale_pad_to_square, stitch_images
@@ -23,6 +25,16 @@ def visualize_query_trajectory(raw_folder: Path, output_folder: Path):
     file_ending = load_json(raw_folder / "dataset.json")["file_ending"]
     save_folder = output_folder
     loop_patches = get_nested_patches_from_loop_files(raw_folder)
+
+    if (raw_folder / "labelsTr").is_dir() is False:
+        annotated_id = load_json(raw_folder / "dataset.json")["annotated_id"]
+        logger.info(
+            "Try Using dataset from annotated_id in nnUNet_raw default: {}".format(
+                annotated_id
+            )
+        )
+
+        raw_folder = get_raw_path(annotated_id)
     img_names = [
         f.name
         for f in (raw_folder / "labelsTr").iterdir()
@@ -59,11 +71,18 @@ def plot_query_trajectory(
 
     file_ending = load_json(raw_folder / "dataset.json")["file_ending"]
     loop_patches = get_nested_patches_from_loop_files(raw_folder)
-    img_names = [
-        f.name
-        for f in (raw_folder / "labelsTr").iterdir()
-        if f.name.endswith(file_ending)
-    ]
+    if img_folder is not None:
+        img_names = [
+            "_".join(f.name.split("_")[:-1]) + file_ending
+            for f in (img_folder).iterdir()
+            if f.name.endswith(file_ending)
+        ]
+    else:
+        img_names = [
+            f.name
+            for f in (raw_folder / "labelsTr").iterdir()
+            if f.name.endswith(file_ending)
+        ]
 
     for i in range(len(loop_patches)):
         os.makedirs(save_folder / f"loop_{i:03d}", exist_ok=True)

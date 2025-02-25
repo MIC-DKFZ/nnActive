@@ -303,12 +303,18 @@ class MultiExperimentAnalysis:
             df["agg_stride"] = df["agg_stride"].apply(
                 lambda x: tuple([x] * 3) if isinstance(x, int) else x
             )
+        output_dirs = []
         for key, df_g in df.groupby(vals, as_index=False):
-            pre_suffix = df_g["pre_suffix"].iloc[0]
             identifier = create_string_identifier(key, ignore_ident=remove_ind)
             logger.info(f"Creating plots for Identifier: {identifier}")
             # create plots for each unique setting of the respective dataset
+            pre_suffix = df_g["pre_suffix"].iloc[0]
             setting_dir: Path = output_dir / (pre_suffix[2:])
+            i = 0
+            while setting_dir in output_dirs:
+                setting_dir = setting_dir.parent / (setting_dir.name + f"_v{i}")
+                i += 1
+            output_dirs.append(setting_dir)
             if not setting_dir.is_dir():
                 os.makedirs(setting_dir)
 
