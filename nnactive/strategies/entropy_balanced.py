@@ -363,7 +363,7 @@ class ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG(ClassBalancedExpSchedu
     """Class balanced Power Entropy with sharp sigmoid beta schedule (66% FG)"""
     def __post_init__(self):
         super().__post_init__()
-        self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=2)
+        self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=0.5)
 
 
 class ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG(ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG):
