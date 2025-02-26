@@ -5,6 +5,7 @@ import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 from loguru import logger
+from scipy.stats import kendalltau
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -27,6 +28,14 @@ for key in keys:
     RENAMING_DICT[key] = small_dict[key]
     RENAMING_DICT[key.replace(" ", "_")] = small_dict[key]
 
+VALUE_TO_COLOR_MAP = {
+    -2: "#FF0000",  # red
+    -1: "#F08080",  # lightcoral
+    0: "#FFFFFF",  # white
+    1: "#90EE90",  # light green
+    2: "#008000",  # green
+}
+
 QM_TO_COLOR = {
     "BALD": "#bcbd22",  # Yellow-green
     "PowerBALD": "#ff7f0e",  # Orange
@@ -43,8 +52,11 @@ BASEPATH = Path(
 )
 
 SAVEPATH = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_eval/"
 )
+if not SAVEPATH.exists():
+    print("Creating Savepath: ", SAVEPATH)
+    os.makedirs(SAVEPATH)
 
 
 def df_to_multicol(df):
@@ -59,6 +71,58 @@ def df_to_multicol(df):
 def html_to_latex_color(hex_color):
     rgb = mcolors.hex2color(hex_color)  # Convert to (R, G, B) tuple (0-1 scale)
     return f"{{rgb,1:red,{rgb[0]:.2f};green,{rgb[1]:.2f};blue,{rgb[2]:.2f}}}"
+
+
+def get_ranking_cmap(
+    values: np.ndarray,
+    significances: np.ndarray,
+    colormapping: dict[int, str] = VALUE_TO_COLOR_MAP,
+):
+    vmap = np.zeros(values.shape, dtype=np.int8)
+    vmap[values > 0] = 1
+    vmap[values < 0] = -1
+    vmap[significances] = vmap[significances] * 2
+    cmap = np.array([[colormapping[v] for v in row] for row in vmap])
+    return cmap
+
+
+def calculate_difference_with_std(
+    df_pos: pd.DataFrame,
+    df_neg: pd.DataFrame,
+    mean_key: tuple[str, str],
+    std_key: tuple[str, str],
+):
+    df_diff = df_pos[mean_key] - df_neg[mean_key]
+    df_std = np.sqrt((df_pos[std_key] ** 2 + df_neg[std_key] ** 2))
+    df_diff = pd.concat(
+        [df_diff, df_std],
+        axis=1,
+        keys=[(mean_key[0], "mean"), (std_key[0], "mean std")],
+    )
+    return df_diff
+
+
+def compute_kendalltau_correlation_from_dfs(
+    dfs: list[pd.DataFrame], qms: list[str], metric: str, significance: float = 0.10
+):
+    results = []
+    for qm in qms:
+        values = []
+        compare_ranking = []
+        for i, df in enumerate(dfs):
+            df_sub = df[df["Query Method"] == qm]
+            values.extend([v for v in df_sub[metric]])
+            compare_ranking.extend([i] * len(df_sub[metric]))
+        corr, pval = kendalltau(values, compare_ranking)
+        results.append(
+            {
+                "Query Method": qm,
+                "corr": corr,
+                "pval": pval,
+                "significance": pval < significance,
+            }
+        )
+    return pd.DataFrame(results).set_index("Query Method")
 
 
 def apply_latex_coloring(df: pd.DataFrame, color_array: np.ndarray) -> pd.DataFrame:

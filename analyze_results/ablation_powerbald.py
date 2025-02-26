@@ -8,6 +8,10 @@ from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
+# Creation of these plots is so brutally hacky...
+# I'm sorry for the mess, but it works and I don't want to touch it anymore
+# This is due to mutiple issues in the code it is built upon
+
 basepath = BASEPATH.parent / (BASEPATH.name + "_test_pbald_ablation")
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
 SETTINGS = {
@@ -124,12 +128,12 @@ CUSTOM_ORDER = [
 ]
 
 RENAMING_DICT = {
-    "power bald": "Power BALD (b=1)",
-    "power bald b5": "Power BALD (b=5)",
-    "power bald b10": "Power BALD (b=10)",
-    "power bald b20": "Power BALD (b=20)",
-    "power bald b40": "Power BALD (b=40)",
-    "mutual information": "Power BALD (b=$\\infty$)",
+    "power bald": "PowerBALD (b=1)",
+    "power bald b5": "PowerBALD (b=5)",
+    "power bald b10": "PowerBALD (b=10)",
+    "power bald b20": "PowerBALD (b=20)",
+    "power bald b40": "PowerBALD (b=40)",
+    "mutual information": "PowerBALD (b=$\\infty$)",
 }
 
 entire_data = []
@@ -199,67 +203,6 @@ for dataset_name in SETTINGS:
         )
         data_dict["df"] = data_dict["df"].set_index("index")
         data_dicts.append(data_dict)
-
-    # paths = SETTINGS[dataset_name]["paths"]
-    # colnames = SETTINGS[dataset_name]["colnames"]
-
-    # dataset_name = dataset_name
-
-    # data_dicts = []
-    # for path, path_add, col_name in zip(paths, paths_add, colnames):
-    #     if path.is_dir():
-    #         data_dict = {}
-    #         df_auc = _load_and_format_auc_df(path)
-    #         data_dict["df_auc"] = df_auc
-    #         df_auc_add = (
-    #             pd.read_json(path_add / "auc.json")[
-    #                 [
-    #                     "('Mean Dice AUBC', 'mean')",
-    #                     "('Mean Dice AUBC', 'std')",
-    #                     "('Mean Dice Final', 'mean')",
-    #                     "('Mean Dice Final', 'std')",
-    #                 ]
-    #             ]
-    #             .rename(
-    #                 columns={
-    #                     "('Mean Dice AUBC', 'mean')": "AUBC",
-    #                     "('Mean Dice AUBC', 'std')": "AUBC std",
-    #                     "('Mean Dice Final', 'mean')": "Final",
-    #                     "('Mean Dice Final', 'std')": "Final std",
-    #                 }
-    #             )
-    #             .apply(lambda x: np.round(x * 100, 2))
-    #         )
-
-    #         data_dict["df_auc"].loc["power_bald"] = df_auc_add.loc["power_bald"]
-
-    #         query_size = path.name.split("qs-")[1].split("__")[0]
-    #         starting_budget = path.name.split("sbs-")[1].split("__")[0]
-
-    #         # data_dict["Dataset"] = path.parent.name.replace("_", " ")
-    #         data_dict["Dataset"] = dataset_name.split("_")[0]
-
-    #         data_dict["Setting"] = col_name
-    #         data_dict["df_beta"]
-    #         beta = _load_and_format_beta_df(path)
-    #         df_beta_add = (
-    #             pd.read_json(path_add / "beta.json")
-    #             .set_index("Query Method")
-    #             .apply(lambda x: np.round(x, 2))
-    #         ).rename(columns={"beta_std": "beta std"})
-    #         data_dict["df_beta"] = beta
-    #         data_dict["df_beta"].loc["power_bald"] = df_beta_add.loc["power_bald"]
-
-    #         data_dict["df"] = pd.concat(
-    #             [data_dict["df_auc"], data_dict["df_beta"]], axis=1
-    #         )[["AUBC", "AUBC std", "beta", "beta std", "Final", "Final std"]]
-    #         data_dict["df"].reset_index(inplace=True)
-    #         print(data_dict["df"].columns)
-    #         data_dict["df"]["index"] = data_dict["df"]["index"].map(
-    #             lambda x: x.replace("_", " ")
-    #         )
-    #         data_dict["df"] = data_dict["df"].set_index("index")
-    #         data_dicts.append(data_dict)
 
     order = ["Dataset", "Setting", "df"]
 

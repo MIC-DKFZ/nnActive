@@ -1,7 +1,13 @@
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
+from evaluator import (
+    get_settings_for_combination,
+    load_settings,
+    rename_settings_in_analysis,
+)
 from scipy.stats import (
     alexandergovern,
     f_oneway,
@@ -10,71 +16,33 @@ from scipy.stats import (
     ttest_ind,
     wilcoxon,
 )
-from setup import BASEPATH, RENAMING_DICT, df_to_multicol
+from setup import (
+    BASEPATH,
+    RENAMING_DICT,
+    SAVEPATH,
+    apply_latex_coloring,
+    calculate_difference_with_std,
+    df_to_multicol,
+    get_ranking_cmap,
+    save_styled_to_latex,
+)
 
 from nnactive.analyze.analysis import SettingAnalysis
 
-savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
-)
-
-# 2nd value is always value which is expected to be better than the first. E.g. smaller QS is expected to be better.
-SETTINGS = {
-    "AMOS Medium Training Length": [
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "AMOS High Training Length": [
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
-    "KiTS Medium Training Length": [
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "KiTS High Training Length": [
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
+COMPARATIVE = False
+# second values is always expected to have better performance then the first
+USE_SETTINGS_LIST = [
+    ["Precomputed", "500 Epochs"],
+    ["Main", "500 Epochs"],
+    ["Main", "Precomputed"],
+]
+RENAME_SETTINGS = {
+    "Main": "200 Epochs",
 }
+COPY_VALUES_LIST = [["random", "random-label", "random-label2"], None, None]
+SIGNIFICANCE = 0.1
+ALTERNATIVE = "two-sided"
 
-SETTING_COMPARE_PREC_200 = {
-    "AMOS Medium Training Length": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
-    ],
-    "AMOS High Training Length": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
-    ],
-    "KiTS Medium Training Length": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
-    ],
-    "KiTS High Training Length": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
-    ],
-}
-
-SETTING_COMPARE_500_200 = {
-    "AMOS Medium Training Length": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "AMOS High Training Length": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
-    "KiTS Medium Training Length": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "KiTS High Training Length": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
-}
 
 CUSTOM_ORDER = [
     "mutual_information",
@@ -82,12 +50,14 @@ CUSTOM_ORDER = [
     "softrank_bald",
     "pred_entropy",
     "power_pe",
-    # "random",  # disable for Training Length ablations
+    "random",
     "random-label",
     "random-label2",
 ]
 
 COPY_VALUES = ["random", "random-label", "random-label2"]
+SCORES = ["Final", "AUBC"]
+MAIN_METRIC = "Mean Dice"
 
 QUERYMETHODS = [
     "BALD",
@@ -98,27 +68,21 @@ QUERYMETHODS = [
 ]
 
 
-# Training Lenth Ablations
-def compute_difference(two_dfs: list[pd.DataFrame], mean_key, std_key):
-    df_diff = two_dfs[1][mean_key] - two_dfs[0][mean_key]
-    df_std = np.sqrt((two_dfs[0][std_key] ** 2 + two_dfs[1][std_key] ** 2))
-    df_diff = pd.concat(
-        [df_diff, df_std],
-        axis=1,
-        keys=[(mean_key[0], "mean"), (std_key[0], "mean std")],
-    )
-    return df_diff
-
-
-def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float = 0.05):
-    g1 = aucval_list[0].groupby("Query Method")[metric]
-    g2 = aucval_list[1].groupby("Query Method")[metric]
+def compute_ttest(
+    df1: pd.DataFrame,
+    df2: pd.DataFrame,
+    metric: str,
+    significance: float = 0.05,
+    alternative="greater",
+):
+    g1 = df1.groupby("Query Method")[metric]
+    g2 = df2.groupby("Query Method")[metric]
     results = {"Query Method": [], "t-statistic": [], "p-value": [], "significance": []}
 
     for method in g1.groups.keys():
         if method in g2.groups:
             t_stat, p_value = ttest_ind(
-                g2.get_group(method), g1.get_group(method), alternative="greater"
+                g1.get_group(method), g2.get_group(method), alternative=alternative
             )
             results["Query Method"].append(method)
             results["t-statistic"].append(t_stat)
@@ -129,196 +93,173 @@ def compute_ttest(aucval_list: list[pd.DataFrame], metric, significance: float =
     return results_df
 
 
-def main(settings: dict[str, list[str]], save: bool = True):
-    final_diffs = pd.DataFrame()
-    aubc_diffs = pd.DataFrame()
-    final_significances = pd.DataFrame()
-    aubc_significances = pd.DataFrame()
-    final_corrs = pd.DataFrame()
-    aubc_corrs = pd.DataFrame()
-    final_corr_pval = pd.DataFrame()
-    aubc_corr_pval = pd.DataFrame()
-    for name in settings:
-        print("-" * 10)
-        print(name)
-        analysis_list: list[SettingAnalysis] = []
-        unique_budget_list = []
-        auc_list = []
-        aucval_list = []
+def analyze_settings(
+    setting_analyses: dict[str, dict[str, dict[str, SettingAnalysis]]],
+    savename: str | None = None,
+    copy_values: Iterable[str] | None = None,
+):
+    diffs_dict: dict[str, pd.DataFrame] = {score: pd.DataFrame() for score in SCORES}
+    significances_dict: dict[str, pd.DataFrame] = {
+        score: pd.DataFrame() for score in SCORES
+    }
+    corrs_dict: dict[str, pd.DataFrame] = {score: pd.DataFrame() for score in SCORES}
+    corr_pval_dict: dict[str, pd.DataFrame] = {
+        score: pd.DataFrame() for score in SCORES
+    }
+    for dataset_name in setting_analyses:
+        for budget in setting_analyses[dataset_name]:
+            name = f"{dataset_name} {budget}"
+            print(name)
 
-        assert len(settings[name]) == 2
-        for path in settings[name]:
-            path = BASEPATH / path
-            analysis = SettingAnalysis.load(path / "analysis.pkl")
-            analysis_list.append(analysis)
-            unique_budget_list.append(analysis.df[analysis.budget_key].unique())
+            assert len(setting_analyses[dataset_name][budget]) == 2
+            auc_dicts = {}
+            aucval_dicts = {}
+            for exp_row in setting_analyses[dataset_name][budget]:
+                analysis = setting_analyses[dataset_name][budget][exp_row]
+                auc = analysis.compute_auc_df(enforce_full=not COMPARATIVE)
+                auc_dicts[exp_row] = auc
+                aucval_dicts[exp_row] = pd.DataFrame(
+                    analysis._compute_auc_row_dicts([MAIN_METRIC])
+                )
 
-        overlapping_budgets = list(set.intersection(*map(set, unique_budget_list)))
+            for score in SCORES:
+                metric, merged_df, rho, p_value_kendall = calculate_auc_statistics(
+                    auc_dicts, aucval_dicts, MAIN_METRIC, score, copy_values
+                )
 
-        main_metric = "Mean Dice"
-        for analysis in analysis_list:
-            orig_size = len(analysis.df)
-            analysis.df = analysis.df[
-                analysis.df[analysis.budget_key].isin(overlapping_budgets)
-            ]
-            enforce_full_loops = len(analysis.df) == orig_size
-            auc = analysis.compute_auc_df(enforce_full=enforce_full_loops)
-            auc_list.append(auc)
-            aucval_list.append(
-                pd.DataFrame(analysis._compute_auc_row_dicts([main_metric]))
+                significances_dict[score][name] = merged_df[("t-test", "significance")]
+                diffs_dict[score][name] = merged_df[(metric, "mean")]
+                corrs_dict[score][name] = np.array([rho])
+                corr_pval_dict[score][name] = np.array([p_value_kendall])
+
+    for score in SCORES:
+        print("\n" * 2)
+        print("Results for score: ", score)
+        df_to_multicol(significances_dict[score])
+        df_to_multicol(diffs_dict[score])
+        df_to_multicol(corrs_dict[score])
+        df_to_multicol(corr_pval_dict[score])
+        diffs_dict[score] = diffs_dict[score].map(lambda x: np.round(x * 100, 2))
+        styled: pd.DataFrame = diffs_dict[score].copy(deep=True)
+        styled = styled.map(lambda x: f"{x:.2f}")
+        styled[significances_dict[score] == True] = styled[
+            significances_dict[score] == True
+        ].map(lambda x: f"\\textbf{{{x}}}")
+        print(diffs_dict[score])
+        if savename is not None:
+            basename = f"ablation-training-{savename}"
+            print("Saving to: ", SAVEPATH / basename)
+
+            styled.to_latex(SAVEPATH / f"{basename}-{score.lower()}_diffs.tex")
+            significances_dict[score].to_latex(
+                SAVEPATH / f"{basename}-{score.lower()}_significances.tex"
             )
+            corrs_dict[score].to_latex(
+                SAVEPATH / f"{basename}-{score.lower()}_corrs.tex"
+            )
+    return diffs_dict, significances_dict, corrs_dict, corr_pval_dict
 
-        score = "AUBC"
-        metric = f"{main_metric} {score}"
-        mean_key = (metric, "mean")
-        std_key = (metric, "std")
 
-        auc_diff = compute_difference(auc_list, mean_key, std_key)
+def calculate_auc_statistics(
+    auc_dict: dict[str, pd.DataFrame],
+    aucval_dict: dict[str, pd.DataFrame],
+    main_metric: str,
+    score: str,
+    copy_values: Iterable[str] | None = None,
+):
+    metric = f"{main_metric} {score}"
+    mean_key = (metric, "mean")
+    std_key = (metric, "std")
+    exp_row_names = list(auc_dict.keys())
 
-        for method in COPY_VALUES:
-            auc_list[1].loc[method] = auc_list[0].loc[method]
+    # This is only done for the ranking analysis
+    # This is a hack to copy the values of the random methods to the other methods
+    # Only works if all values are identical across these methods
+    # So e.g. for different training length this is not a valid approach
+    if copy_values is not None:
+        for method in copy_values:
+            auc_dict[exp_row_names[1]].loc[method] = auc_dict[exp_row_names[0]].loc[
+                method
+            ]
 
-        auc_diff[(metric, "mean1")] = auc_list[0][mean_key]
-        auc_diff[(metric, "mean2")] = auc_list[1][mean_key]
+    for exp_row in exp_row_names:
+        auc_dict[exp_row] = auc_dict[exp_row].reindex(CUSTOM_ORDER)
 
-        auc_diff = auc_diff[~auc_diff[mean_key].isna()]
-        #
-        auc_diff[(metric, "ranking 200 epoch Queries")] = (
-            auc_list[0].loc[auc_diff.index][mean_key].rank(ascending=False)
-        )
-        auc_diff[(metric, "ranking 500 epoch Queries")] = (
-            auc_list[1].loc[auc_diff.index][mean_key].rank(ascending=False)
-        )
-        wilcoxon_stat, wilcoxon_p_value = wilcoxon(
-            auc_list[0].loc[auc_diff.index][mean_key],
-            auc_list[1].loc[auc_diff.index][mean_key],
-        )
-
-        results_df = compute_ttest(aucval_list, metric)
-
-        results_df.columns = pd.MultiIndex.from_product(
-            [["t-test"], results_df.columns]
-        )
-        merged_df = pd.merge(auc_diff, results_df, left_index=True, right_index=True)
-        merged_df = merged_df.reindex(CUSTOM_ORDER)
-        merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
-        print(merged_df)
-        spearman, p_value_spearman = spearmanr(
-            merged_df[(metric, "ranking 200 epoch Queries")],
-            merged_df[(metric, "ranking 500 epoch Queries")],
-            alternative="greater",
-        )
-        rho, p_value_kendall = kendalltau(
-            merged_df[(metric, "ranking 200 epoch Queries")],
-            merged_df[(metric, "ranking 500 epoch Queries")],
-            alternative="greater",
-        )
-        print(
-            f"Spearman's Correlation: {spearman:.2f}, p-value: {p_value_spearman:.4f}"
-        )
-        print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
-        print(
-            f"Wilcoxon Test Statistics: {wilcoxon_stat:.2f}, p-value: {wilcoxon_p_value:.4f}"
-        )
-        merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
-        aubc_significances[name] = merged_df[("t-test", "significance")]
-        aubc_diffs[name] = merged_df[(metric, "mean")]
-        aubc_corrs[name] = np.array([rho])
-        aubc_corr_pval[name] = np.array([p_value_kendall])
-
-        score = "Final"
-        metric = f"{main_metric} {score}"
-        mean_key = (metric, "mean")
-        std_key = ("Mean Dice Final", "std")
-        final_diff = compute_difference(auc_list, mean_key, std_key)
-        final_diff[(metric, "mean1")] = auc_list[0][mean_key]
-        final_diff[(metric, "mean2")] = auc_list[1][mean_key]
-        final_diff = final_diff[~final_diff[mean_key].isna()]
-        final_diff[(metric, "ranking 200 epoch Queries")] = (
-            auc_list[0].loc[final_diff.index][mean_key].rank(ascending=False)
-        )
-        final_diff[(metric, "ranking 500 epoch Queries")] = (
-            auc_list[1].loc[final_diff.index][mean_key].rank(ascending=False)
-        )
-
-        results_df = compute_ttest(aucval_list, metric)
-        results_df.columns = pd.MultiIndex.from_product(
-            [["t-test"], results_df.columns]
-        )
-        merged_df = pd.merge(final_diff, results_df, left_index=True, right_index=True)
-        merged_df = merged_df.reindex(CUSTOM_ORDER)
-        merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
-        print(merged_df)
-        spearman, p_value_spearman = spearmanr(
-            merged_df[(metric, "ranking 200 epoch Queries")],
-            merged_df[(metric, "ranking 500 epoch Queries")],
-            alternative="greater",
-        )
-        rho, p_value_kendall = kendalltau(
-            merged_df[(metric, "ranking 200 epoch Queries")],
-            merged_df[(metric, "ranking 500 epoch Queries")],
-            alternative="greater",
-        )
-        print(
-            f"Spearman's Correlation: {spearman:.2f}, p-value: {p_value_spearman:.4f}"
-        )
-        print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
-        merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
-        final_significances[name] = merged_df[("t-test", "significance")]
-        final_diffs[name] = merged_df[(metric, "mean")]
-        final_corrs[name] = np.array([rho])
-        final_corr_pval[name] = np.array([p_value_kendall])
-    print("\n" * 2)
-    print("Final Significances")
-
-    df_to_multicol(final_significances)
-    df_to_multicol(final_diffs)
-    df_to_multicol(final_corrs)
-    df_to_multicol(final_corr_pval)
-    final_diffs = final_diffs.apply(lambda x: np.round(x * 100, 2))
-    styled: pd.DataFrame = final_diffs.copy(deep=True)
-    styled = styled.applymap(lambda x: f"{x:.2f}")
-    styled[final_significances == True] = styled[final_significances == True].applymap(
-        lambda x: f"\\textbf{{{x}}}"
+    auc_diff = calculate_difference_with_std(
+        auc_dict[exp_row_names[1]], auc_dict[exp_row_names[0]], mean_key, std_key
     )
-    print(final_significances)
 
-    if save:
-        styled.to_latex(savepath / "ablation-training-final_diffs.tex")
-        final_significances.to_latex(
-            savepath / "ablation-training-final_significances.tex"
+    for exp_row in exp_row_names:
+        auc_diff[(metric, exp_row)] = auc_dict[exp_row][mean_key]
+
+    for exp_row in exp_row_names:
+        auc_diff[(metric, "ranking " + exp_row)] = (
+            auc_dict[exp_row].loc[auc_diff.index][mean_key].rank(ascending=False)
         )
-        final_corrs.to_latex(savepath / "ablation-training-final_corrs.tex")
-    print(final_diffs)
-    print(final_corrs)
-    print(final_corr_pval)
 
-    print("\n" * 2)
-    print("AUBC Significances")
-    df_to_multicol(aubc_significances)
-    df_to_multicol(aubc_diffs)
-    df_to_multicol(aubc_corrs)
-    df_to_multicol(aubc_corr_pval)
-    aubc_diffs = aubc_diffs.apply(lambda x: np.round(x * 100, 2))
-    styled: pd.DataFrame = aubc_diffs.copy(deep=True)
-    styled = styled.applymap(lambda x: f"{x:.2f}")
-    styled[aubc_significances == True] = styled[aubc_significances == True].applymap(
-        lambda x: f"\\textbf{{{x}}}"
+    results_df = compute_ttest(
+        aucval_dict[exp_row_names[1]],
+        aucval_dict[exp_row_names[0]],
+        metric,
+        SIGNIFICANCE,
+        ALTERNATIVE,
     )
-    print(aubc_significances)
-    print(aubc_diffs)
 
-    print(aubc_corrs)
-    print(aubc_corr_pval)
-    if save:
-        styled.to_latex(savepath / "ablation-training-aubc_diffs.tex")
-        aubc_significances.to_latex(
-            savepath / "ablation-training-aubc_significances.tex"
-        )
-        aubc_corrs.to_latex(savepath / "ablation-training-aubc_corrs.tex")
+    results_df.columns = pd.MultiIndex.from_product([["t-test"], results_df.columns])
+    merged_df = pd.merge(auc_diff, results_df, left_index=True, right_index=True)
+    merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
+    print(merged_df)
+    rho, p_value_kendall = kendalltau(
+        merged_df[(metric, "ranking " + exp_row_names[1])],
+        merged_df[(metric, "ranking " + exp_row_names[0])],
+        alternative=ALTERNATIVE,
+    )
+    print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
+    merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
+    return metric, merged_df, rho, p_value_kendall
+
+
+def concatenate_results(corrs_settings_dict):
+    df_list = []
+    for outer_key, inner_dict in corrs_settings_dict.items():
+        for inner_key, df in inner_dict.items():
+            df = df.copy()
+            df.index = pd.MultiIndex.from_product(
+                [[outer_key], [inner_key]], names=["Setting", "Metric"]
+            )
+            df_list.append(df)
+
+    # Concatenate everything
+    final_df = pd.concat(df_list)
+    return final_df
 
 
 if __name__ == "__main__":
-    main(SETTINGS)
-    main(SETTING_COMPARE_PREC_200, save=False)
-    main(SETTING_COMPARE_500_200, save=False)
+
+    corrs_settings_dict = {}
+    corrs_pval_settings_dict = {}
+    for i, (use_settings, copy_values) in enumerate(
+        zip(USE_SETTINGS_LIST, COPY_VALUES_LIST)
+    ):
+        print("Compare: ", use_settings)
+        dictname = " \\& ".join([RENAMING_DICT.get(s, s) for s in use_settings])
+        savename = "-".join(use_settings)
+        savename = savename.replace(" ", "")
+        savename = savename.lower()
+        settings = get_settings_for_combination(use_settings)
+        setting_analyses = load_settings(settings, comparative=COMPARATIVE)
+        rename_settings_in_analysis(setting_analyses, RENAME_SETTINGS)
+        diffs_dict, significances_dict, corrs_dict, corr_pval_dict = analyze_settings(
+            setting_analyses, savename=savename, copy_values=copy_values
+        )
+        corrs_settings_dict[dictname] = corrs_dict
+        corrs_pval_settings_dict[dictname] = corr_pval_dict
+
+    corrs_pval_settings_df = concatenate_results(corrs_pval_settings_dict)
+    corrs_sig_settings_df = corrs_pval_settings_df < SIGNIFICANCE
+    corrs_settings_df = concatenate_results(corrs_settings_dict)
+    cmap = get_ranking_cmap(corrs_settings_df.values, corrs_sig_settings_df.values)
+
+    corrs_settings_df = corrs_settings_df.round(3).map(lambda x: f"{x:.3f}")
+    corrs_settings_df = apply_latex_coloring(corrs_settings_df, cmap)
+    save_styled_to_latex(corrs_settings_df, SAVEPATH / "ablation-training-corrs.tex")

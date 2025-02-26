@@ -2,15 +2,27 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from evaluator import (
+    get_settings_for_combination,
+    load_settings,
+    rename_settings_in_analysis,
+)
 from scipy.stats import kendalltau, spearmanr, ttest_ind, wilcoxon
-from setup import BASEPATH, RENAMING_DICT, apply_latex_coloring, df_to_multicol
+from setup import (
+    BASEPATH,
+    RENAMING_DICT,
+    SAVEPATH,
+    VALUE_TO_COLOR_MAP,
+    apply_latex_coloring,
+    calculate_difference_with_std,
+    df_to_multicol,
+    get_ranking_cmap,
+)
 
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
-savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
-)
+savepath = SAVEPATH
 
 CUSTOM_ORDER = [
     "mutual_information",
@@ -33,69 +45,25 @@ QUERYMETHODS = [
     "Random 66% FG",
     "Random 33% FG",
 ]
-SETTINGS = {
-    "AMOS Low": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
-    ],
-    "AMOS Medium": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "AMOS High": [
-        "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
-    "KiTS Low": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
-        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
-    ],
-    "KiTS Medium": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
-    ],
-    "KiTS High": [
-        "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-        "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
-    "ACDC Low": [
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
-        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-30__qs-30",
-    ],
-    "ACDC Medium": [
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
-        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-    ],
-    "ACDC High": [
-        "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
-        "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-    ],
+
+COMPARATIVE = False
+USE_SETTINGS = ["Main", "Patchx1/2"]
+
+RENAME_SETTINGS = {
+    "Main": "Patchx1",
 }
+
+settings = get_settings_for_combination(USE_SETTINGS)
+settings_analyses = load_settings(settings, comparative=COMPARATIVE)
+rename_settings_in_analysis(settings_analyses, RENAME_SETTINGS)
+
+MAIN_METRIC = "Mean Dice"
+
 
 SAVENAME = "patch_ablation"
 # Two sided test
 SIGNIFICANCE = 0.1
 TESTING = "two-sided"
-
-
-VALMAP = {
-    -2: "#FF0000",  # red
-    -1: "#F08080",  # lightcoral
-    0: "#FFFFFF",  # white
-    1: "#90EE90",  # light green
-    2: "#008000",  # green
-}
-
-
-def _get_cmap(
-    values: np.ndarray, significances: np.ndarray, colormapping: dict[int, str] = VALMAP
-):
-    vmap = np.zeros(values.shape, dtype=np.int8)
-    vmap[values > 0] = 1
-    vmap[values < 0] = -1
-    vmap[significances] = vmap[significances] * 2
-    cmap = np.array([[colormapping[v] for v in row] for row in vmap])
-    return cmap
 
 
 def compute_difference(two_dfs: list[pd.DataFrame], mean_key, std_key):
@@ -174,109 +142,101 @@ def compute_statistical_tests(merged_df, metric):
     )
 
 
-def main(settings: dict[str, list[str]], save: bool = True):
-    final_diffs, aubc_diffs = pd.DataFrame(), pd.DataFrame()
-    final_significances, aubc_significances = pd.DataFrame(), pd.DataFrame()
-    final_corrs, aubc_corrs = pd.DataFrame(), pd.DataFrame()
-    final_corr_pval, aubc_corr_pval = pd.DataFrame(), pd.DataFrame()
+def main(
+    setting_analyses: dict[str, dict[str, dict[str, SettingAnalysis]]],
+    save: bool = True,
+):
     merged_dfs = {}
 
-    metric_list = ["AUBC", "Final"]
-    metric_format = "Mean Dice {score}"
+    SCORES = ["AUBC", "Final"]
 
-    for name, setting_paths in settings.items():
-        print(f"Processing: {name}")
-        auc_list, aucval_list = process_analysis_pair(setting_paths)
-        merged_dfs[name] = {}
+    for dataset_name in setting_analyses:
+        for budget in setting_analyses[dataset_name]:
+            name = f"{dataset_name} {budget}"
+            merged_dfs[name] = {}
 
-        for score in metric_list:
-            metric = metric_format.format(score=score)
-            mean_key, std_key = (metric, "mean"), (metric, "std")
-            diff_df = compute_difference(auc_list, mean_key, std_key)
-            results_df = compute_ttest(aucval_list, metric)
-            results_df.columns = pd.MultiIndex.from_product(
-                [["t-test"], results_df.columns]
-            )
+            print(f"Processing: {name}")
+            auc_dicts = {}
+            aucval_dicts = {}
+            for exp_row in setting_analyses[dataset_name][budget]:
+                analysis = setting_analyses[dataset_name][budget][exp_row]
+                auc = analysis.compute_auc_df(enforce_full=not COMPARATIVE)
+                auc_dicts[exp_row] = auc
+                aucval_dicts[exp_row] = pd.DataFrame(
+                    analysis._compute_auc_row_dicts([MAIN_METRIC])
+                )
 
-            merged_df = pd.merge(diff_df, results_df, left_index=True, right_index=True)
-            merged_df = merged_df.reindex(CUSTOM_ORDER)
-            merged_df[(metric, "mean Small Patch")] = auc_list[0][mean_key]
-            merged_df[(metric, "mean Large Patch")] = auc_list[1][mean_key]
-            merged_df[(metric, "ranking Small Patch")] = auc_list[0][mean_key].rank(
-                ascending=False
-            )
-            merged_df[(metric, "ranking Large Patch")] = auc_list[1][mean_key].rank(
-                ascending=False
-            )
+            for score in SCORES:
+                metric = f"{MAIN_METRIC} {score}"
+                mean_key, std_key = (metric, "mean"), (metric, "std")
+                exp_row_names = list(auc_dicts.keys())
+                print(exp_row_names)
+                diff_df = calculate_difference_with_std(
+                    auc_dicts[exp_row_names[1]],
+                    auc_dicts[exp_row_names[0]],
+                    mean_key,
+                    std_key,
+                )
 
-            merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
+                ## just try this out
+                merged_df = diff_df.copy()
+                for exp_row in exp_row_names:
+                    merged_df[(metric, "mean " + exp_row)] = auc_dicts[exp_row][
+                        mean_key
+                    ]
+                    # doublecheck whether we already threw out unnecessary values
+                    # for ranking this however does not matter super much
+                    merged_df[(metric, "ranking " + exp_row)] = auc_dicts[exp_row][
+                        mean_key
+                    ].rank(ascending=False)
 
-            (
-                spearman,
-                p_value_spearman,
-                rho,
-                p_value_kendall,
-                wilcoxon_stat,
-                wilcoxon_p_value,
-            ) = compute_statistical_tests(merged_df, metric)
+                # results_df = compute_ttest(aucval_list, metric)
+                # results_df.columns = pd.MultiIndex.from_product(
+                #     [["t-test"], results_df.columns]
+                # )
 
-            print(
-                f"Spearman's Correlation: {spearman:.2f}, p-value: {p_value_spearman:.4f}"
-            )
-            print(f"Kendall's Correlation: {rho:.2f}, p-value: {p_value_kendall:.4f}")
-            print(
-                f"Wilcoxon Test Statistics: {wilcoxon_stat:.2f}, p-value: {wilcoxon_p_value:.4f}"
-            )
+                # merged_df = pd.merge(
+                #     diff_df, results_df, left_index=True, right_index=True
+                # )
+                # merged_df = merged_df.reindex(CUSTOM_ORDER)
+                # merged_df[(metric, "mean Small Patch")] = auc_list[0][mean_key]
+                # merged_df[(metric, "mean Large Patch")] = auc_list[1][mean_key]
+                # merged_df[(metric, "ranking Small Patch")] = auc_list[0][mean_key].rank(
+                #     ascending=False
+                # )
+                # merged_df[(metric, "ranking Large Patch")] = auc_list[1][mean_key].rank(
+                #     ascending=False
+                # )
 
-            merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
-            merged_dfs[name][score] = merged_df
+                merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
 
-            if score == "AUBC":
-                aubc_significances[name] = merged_df[("t-test", "significance")]
-                aubc_diffs[name] = merged_df[(metric, "mean diff")]
-                aubc_corrs[name] = np.array([rho])
-                aubc_corr_pval[name] = np.array([p_value_kendall])
-            else:
-                final_significances[name] = merged_df[("t-test", "significance")]
-                final_diffs[name] = merged_df[(metric, "mean diff")]
-                final_corrs[name] = np.array([rho])
-                final_corr_pval[name] = np.array([p_value_kendall])
+                # (
+                #     spearman,
+                #     p_value_spearman,
+                #     rho,
+                #     p_value_kendall,
+                #     wilcoxon_stat,
+                #     wilcoxon_p_value,
+                # ) = compute_statistical_tests(merged_df, metric)
 
-    print("Final Analysis Completed")
-    if save:
-        final_diffs.to_latex(savepath / f"{SAVENAME}_final_diffs.tex")
-        final_significances.to_latex(savepath / f"{SAVENAME}_final_significances.tex")
-        final_corrs.to_latex(savepath / f"{SAVENAME}_final_corrs.tex")
-        aubc_diffs.to_latex(savepath / f"{SAVENAME}_aubc_diffs.tex")
-        aubc_significances.to_latex(savepath / f"{SAVENAME}_aubc_significances.tex")
-        aubc_corrs.to_latex(savepath / f"{SAVENAME}_aubc_corrs.tex")
+                merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
+                merged_dfs[name][score] = merged_df
 
-    print(
-        final_diffs,
-        final_corrs,
-        final_corr_pval,
-        aubc_diffs,
-        aubc_corrs,
-        aubc_corr_pval,
-    )
+    for score in SCORES:
+        metric = f"{MAIN_METRIC} {score}"
 
-    for score in metric_list:
-        score_name = metric_format.format(score=score)
         rankings: dict[str, pd.DataFrame] = {
-            "ranking Small Patch": pd.DataFrame(),
-            "ranking Large Patch": pd.DataFrame(),
+            "ranking " + RENAME_SETTINGS.get(x, x): pd.DataFrame() for x in USE_SETTINGS
         }
         for setting in merged_dfs:
             for r_name in rankings:
-                rankings[r_name][setting] = merged_dfs[setting][score][
-                    (score_name, r_name)
-                ]
+                rankings[r_name][setting] = merged_dfs[setting][score][(metric, r_name)]
         for r_name in rankings:
             df_to_multicol(rankings[r_name])
 
         mean_rank_key = "Mean"
         mean_rank_keys = [mean_rank_key]
-        d_sets = rankings["ranking Small Patch"].columns.levels[0]
+        d_sets = list(rankings.values())[0].columns.levels[0]
         for r_name in rankings:
             rankings[r_name][mean_rank_key] = rankings[r_name].mean(axis=1)
         for d_set in d_sets:
@@ -292,21 +252,28 @@ def main(settings: dict[str, list[str]], save: bool = True):
             print(r_name)
             print(rankings[r_name])
 
+        compare_rank_keys = list(rankings.keys())
+        assert (
+            len(compare_rank_keys) == 2
+        )  # these tests currently only allow to compare two rankings
+        comp_i = compare_rank_keys[0]
+        comp_j = compare_rank_keys[1]
+
         correlations = pd.DataFrame()
         for mean_rank_key in mean_rank_keys:
             spearman, p_value_spearman = spearmanr(
-                rankings["ranking Small Patch"][mean_rank_key],
-                rankings["ranking Large Patch"][mean_rank_key],
+                rankings[comp_i][mean_rank_key],
+                rankings[comp_j][mean_rank_key],
                 alternative=TESTING,
             )
             rho, p_value_kendall = kendalltau(
-                rankings["ranking Small Patch"][mean_rank_key],
-                rankings["ranking Large Patch"][mean_rank_key],
+                rankings[comp_i][mean_rank_key],
+                rankings[comp_j][mean_rank_key],
                 alternative=TESTING,
             )
             wilcoxon_stat, wilcoxon_p_value = wilcoxon(
-                rankings["ranking Small Patch"][mean_rank_key],
-                rankings["ranking Large Patch"][mean_rank_key],
+                rankings[comp_i][mean_rank_key],
+                rankings[comp_j][mean_rank_key],
             )
             final_key = (
                 mean_rank_key[0] if isinstance(mean_rank_key, tuple) else mean_rank_key
@@ -325,7 +292,7 @@ def main(settings: dict[str, list[str]], save: bool = True):
             savepath / f"{SAVENAME}_{score}_rank_correlations.txt",
         )
 
-        cmap = _get_cmap(
+        cmap = get_ranking_cmap(
             correlations.loc["rho":"rho"].values,
             correlations.loc["p_value_kendall":"p_value_kendall"].values < SIGNIFICANCE,
         )
@@ -335,4 +302,4 @@ def main(settings: dict[str, list[str]], save: bool = True):
 
 
 if __name__ == "__main__":
-    main(SETTINGS, save=False)
+    main(settings_analyses, save=False)
