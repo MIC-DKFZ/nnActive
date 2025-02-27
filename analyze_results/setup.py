@@ -11,6 +11,17 @@ from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
+CUSTOM_ORDER = [
+    "mutual_information",
+    "power_bald",
+    "softrank_bald",
+    "pred_entropy",
+    "power_pe",
+    "random",
+    "random-label",
+    "random-label2",
+]
+
 small_dict = {
     "mutual information": "BALD",
     "power bald": "PowerBALD",
@@ -84,6 +95,74 @@ def get_ranking_cmap(
     vmap[significances] = vmap[significances] * 2
     cmap = np.array([[colormapping[v] for v in row] for row in vmap])
     return cmap
+
+
+def compute_column_normalized_gmap(data: pd.DataFrame, invert: bool):
+
+    # NOTE: Manually compute gradient map because Normalize returns 0 if vmax - vmin == 0, but we
+    # NOTE:   want it to be 1 in that case
+
+    gmap = data.to_numpy(float)
+    gmap_min = np.nanmin(gmap, axis=0)
+    gmap_max = np.nanmax(gmap, axis=0)
+
+    for col in range(gmap.shape[1]):
+        vmin = gmap_min[col] - (0.0001 if invert else 0)
+        vmax = gmap_max[col] + (0 if invert else 0.0001)
+        gmap_use = gmap
+        if invert:
+            vmin_0 = vmin
+            vmin = -vmax
+            vmax = -vmin_0
+            gmap_use = -gmap
+
+        gmap[:, col] = mcolors.Normalize(vmin, vmax)(gmap_use[:, col])
+
+    return gmap
+
+
+def load_setting_data_to_df(
+    CUSTOM_ORDER: list[str],
+    FINAL_COLUMNS: list[dict],
+    setting_paths: dict[str, dict[str, dict[str, Path]]],
+    setting_analyses: dict[str, dict[str, dict[str, SettingAnalysis]]],
+) -> dict[str, dict[str, dict[str, pd.DataFrame]]]:
+    """Load the data from the setting paths and analyses into a dictionary of DataFrames
+
+    Args:
+        CUSTOM_ORDER (list[str]): List of query methods to load in the order they should be displayed
+        FINAL_COLUMNS (list[dict]): List of dictionaries with the columns to load and their names
+        setting_paths (dict[str, dict[str, dict[str, Path]]]): from evalutor
+        setting_analyses (dict[str, dict[str, dict[str, SettingAnalysis]]]): from evalutor
+
+    Returns:
+        dict[str, dict[str, dict[str, pd.DataFrame]]]: combined pandas DataFrames in nested dict.
+    """
+    data_dict = {}
+    # Loading all data and preprocessing
+    for dataset in setting_analyses:
+        data_dict[dataset] = {}
+        for budget in setting_analyses[dataset]:
+            data_dict[dataset][budget] = {}
+            for sett in setting_analyses[dataset][budget]:
+                analysis = setting_analyses[dataset][budget][sett]
+                auc = pd.read_json(setting_paths[dataset][budget][sett] / "auc.json")
+                auc.index.name = "Query Method"
+                auc = auc.map(lambda x: np.round(x * 100, 2))
+                beta = pd.read_json(setting_paths[dataset][budget][sett] / "beta.json")
+                beta.set_index("Query Method", inplace=True)
+                beta = beta.round(2)
+                combined_df = pd.concat([auc, beta], axis=1)
+                combined_df = combined_df.reindex(CUSTOM_ORDER, level=0)
+                combined_df = combined_df.rename(RENAMING_DICT, axis=0)
+                combined_df = combined_df[[c["ReadCol"] for c in FINAL_COLUMNS]]
+                combined_df.rename(
+                    columns={c["ReadCol"]: c["PrintCol"] for c in FINAL_COLUMNS},
+                    inplace=True,
+                )
+
+                data_dict[dataset][budget][sett] = combined_df
+    return data_dict
 
 
 def calculate_difference_with_std(
