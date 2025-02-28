@@ -22,6 +22,7 @@ from nnactive.utils.io import save_df_to_txt
 
 savepath = SAVEPATH / "figures"
 savepath.mkdir(exist_ok=True, parents=True)
+filetype = "pdf"
 
 NAME = "main_method_ranking"
 COLLEVELANMES = ["Dataset", "Budget", "Metric"]
@@ -191,7 +192,7 @@ if __name__ == "__main__":
                 # plt.tight_layout()
                 metric_name = metric.lower().replace(" ", "")
                 plt.savefig(
-                    savepath / f"method_ranking--{name}--{metric_name}.png",
+                    savepath / f"method_ranking--{name}--{metric_name}.{filetype}",
                     bbox_inches="tight",
                 )
 

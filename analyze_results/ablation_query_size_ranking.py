@@ -76,7 +76,7 @@ def compute_difference(two_dfs: list[pd.DataFrame], mean_key, std_key):
 
 
 BUDGET_ORDER = {"Low": 0, "Medium": 1, "High": 2}
-MEANROW = "kendall-tau mean"
+MEANROW = "Mean"
 
 
 rankings = []
@@ -109,8 +109,6 @@ for dataset_name in setting_analyses:
                     ascending=False
                 )
 
-            exp_identifiers = ["x0.5", "x1", "x2"]
-
             count = 0
             ranking[MEANROW] = 0
             ranking["kendall-tau pvals"] = []
@@ -121,8 +119,8 @@ for dataset_name in setting_analyses:
                 tau, alpha = kendalltau(
                     auc_dict[i_name][mean_key], auc_dict[j_name][mean_key]
                 )
-                ranking[f"kendall-tau {i_name} vs {j_name}"] = tau
-                ranking[f"kendall-tau {i_name} vs {j_name} pval"] = alpha
+                ranking[f"{i_name} vs {j_name}"] = tau
+                ranking[f"{i_name} vs {j_name} pval"] = alpha
                 ranking[MEANROW] += tau
                 ranking["kendall-tau pvals"] += [alpha]
                 count += 1
@@ -175,6 +173,7 @@ for score in scores:
 
     styled = tex_ranking_df.copy(deep=True)
     cmap = get_ranking_cmap(tex_ranking_df.values, significance_df.values)
+    styled.index.name = "Setting"
     styled.round(3)
     styled: pd.DataFrame = styled.map(lambda x: f"{x:.3f}")
     styled = apply_latex_coloring(styled, cmap)

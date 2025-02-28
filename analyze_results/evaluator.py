@@ -84,10 +84,10 @@ FULL_SETTINGS = {
             "Precomputed": None,
         },
         "High": {
-            "Main": "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
+            "Main": "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
             "QSx1/2": None,
             "QSx2": None,
-            "Patchx1/2": "Dataset004_Hippocampus/patch-10_10_10__sb-random-label2-all-classes__sbs-40__qs-40",
+            "Patchx1/2": "Dataset004_Hippocampus/patch-10_10_10__sb-random-label2-all-classes__sbs-60__qs-60",
             "PowerBALD_beta": None,
             "500 Epochs": None,
             "Precomputed": None,
@@ -137,6 +137,7 @@ def load_settings(
     settings: dict[str, dict[str, dict[str, Path | None]]], comparative: bool = False
 ) -> dict[str, dict[str, dict[str, SettingAnalysis]]]:
     out_settings: dict[str, dict[str, dict[str, SettingAnalysis]]] = {}
+    remove_dsets = []
     for D in settings:
         out_settings[D] = {}
         for S in settings[D]:
@@ -158,6 +159,11 @@ def load_settings(
 
             for M in remove_budgets:
                 del out_settings[D][S]
+        if len(out_settings[D]) == 0:
+            remove_dsets.append(D)
+
+    for D in remove_dsets:
+        del out_settings[D]
 
     if comparative:
         ensure_overlap(out_settings)

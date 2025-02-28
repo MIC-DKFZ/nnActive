@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from evaluator import (
@@ -20,12 +20,15 @@ from nnactive.utils.io import save_df_to_txt
 # Increase font size or reduce figure size to make text readable in paper!
 # matplotlib.rcParams["text.usetex"] = True
 # matplotlib.rcParams["font.family"] = "Computer Modern"
+plt.style.use("default")
 
 MAIN_ORDER = CUSTOM_ORDER
 
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
 savepath = SAVEPATH / "figures"
+savepath.mkdir(exist_ok=True, parents=True)
+filetype = "pdf"
 
 COMPARATIVE = False
 
@@ -33,7 +36,7 @@ USE_SETTINGS_LIST = [
     {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
     {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
-    {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
+    # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
 ]
 
@@ -75,7 +78,7 @@ for setting in USE_SETTINGS_LIST:
         )
         PairwisePenaltyMatrix.plot_pairwise_matrix(
             merged_matrix,
-            savepath=savepath / f"{save_setting}_{dataset}_ppm.png",
+            savepath=savepath / f"{save_setting}_{dataset}_ppm.{filetype}",
             max_poss_ent=None,
             title_tag=f"{print_setting} {dataset} [%]",
             norm_val=merged_matrix.max_pos_ent,
@@ -90,7 +93,7 @@ for setting in USE_SETTINGS_LIST:
     )
     PairwisePenaltyMatrix.plot_pairwise_matrix(
         merged_matrix,
-        savepath=savepath / f"{save_setting}_ppm.png",
+        savepath=savepath / f"{save_setting}_ppm.{filetype}",
         max_poss_ent=None,
         title_tag=f"{print_setting} [%]",
         norm_val=merged_matrix.max_pos_ent,

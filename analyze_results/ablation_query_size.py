@@ -26,6 +26,7 @@ from setup import (
     compute_kendalltau_correlation_from_dfs,
     df_to_multicol,
     get_ranking_cmap,
+    save_styled_to_latex,
 )
 
 USE_SETTINGS = ["QSx2", "Main", "QSx1/2"]
@@ -35,6 +36,7 @@ setting_analyses = load_settings(settings, comparative=COMPARATIVE)
 RENAME_SETTINGS = {
     "Main": "QSx1",
 }
+COLLEVELNAMES = ["Dataset", "Budget"]
 
 rename_settings_in_analysis(setting_analyses, RENAME_SETTINGS)
 
@@ -230,12 +232,20 @@ def store_results(
         aubc_corr_pval[name] = auc_corr["significance"]
 
 
-def print_and_save_results(significances, corrs, corr_pval, savepath, prefix):
+def print_and_save_results(
+    significances: pd.DataFrame,
+    corrs: pd.DataFrame,
+    corr_pval: pd.DataFrame,
+    savepath: Path,
+    prefix: str,
+):
     """Prints and saves significance and correlation results to LaTeX."""
     print(f"Final {prefix} Significances")
     df_to_multicol(significances)
     df_to_multicol(corrs)
     df_to_multicol(corr_pval)
+    corrs.columns.names = COLLEVELNAMES
+    significances.columns.names = COLLEVELNAMES
     significances["Mean"] = significances.mean(axis=1).round(2)
     print(significances)
     print(corrs)
@@ -246,10 +256,12 @@ def print_and_save_results(significances, corrs, corr_pval, savepath, prefix):
     cmap = get_ranking_cmap(corrs.values, corr_pval.values)
     styled_corrs = apply_latex_coloring(styled_corrs, cmap)
 
-    significances.to_latex(
-        savepath / f"ablation-query_{prefix.lower()}_significances.tex"
+    save_styled_to_latex(
+        significances, savepath / f"ablation-query_{prefix.lower()}_significances.tex"
     )
-    styled_corrs.to_latex(savepath / f"ablation-query_{prefix.lower()}_corrs.tex")
+    save_styled_to_latex(
+        styled_corrs, savepath / f"ablation-query_{prefix.lower()}_corrs.tex"
+    )
 
 
 if __name__ == "__main__":
