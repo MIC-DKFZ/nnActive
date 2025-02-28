@@ -29,6 +29,9 @@ from setup import (
 
 from nnactive.analyze.analysis import SettingAnalysis
 
+savepath = SAVEPATH / "tex" / "ablation_training"
+savepath.mkdir(parents=True, exist_ok=True)
+
 COMPARATIVE = False
 # second values is always expected to have better performance then the first
 USE_SETTINGS_LIST = [
@@ -148,14 +151,14 @@ def analyze_settings(
         print(diffs_dict[score])
         if savename is not None:
             basename = f"ablation-training-{savename}"
-            print("Saving to: ", SAVEPATH / basename)
+            print("Saving to: ", savepath / basename)
 
-            styled.to_latex(SAVEPATH / f"{basename}-{score.lower()}_diffs.tex")
+            styled.to_latex(savepath / f"{basename}-{score.lower()}_diffs.tex")
             significances_dict[score].to_latex(
-                SAVEPATH / f"{basename}-{score.lower()}_significances.tex"
+                savepath / f"{basename}-{score.lower()}_significances.tex"
             )
             corrs_dict[score].to_latex(
-                SAVEPATH / f"{basename}-{score.lower()}_corrs.tex"
+                savepath / f"{basename}-{score.lower()}_corrs.tex"
             )
     return diffs_dict, significances_dict, corrs_dict, corr_pval_dict
 
@@ -262,4 +265,4 @@ if __name__ == "__main__":
 
     corrs_settings_df = corrs_settings_df.round(3).map(lambda x: f"{x:.3f}")
     corrs_settings_df = apply_latex_coloring(corrs_settings_df, cmap)
-    save_styled_to_latex(corrs_settings_df, SAVEPATH / "ablation-training-corrs.tex")
+    save_styled_to_latex(corrs_settings_df, savepath / "ablation-training-corrs.tex")

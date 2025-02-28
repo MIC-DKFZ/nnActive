@@ -51,7 +51,8 @@ CUSTOM_ORDER = [
     # "random-label2",
 ]
 
-savepath = SAVEPATH
+savepath = SAVEPATH / "tex" / "ablation_query_size"
+savepath.mkdir(parents=True, exist_ok=True)
 MAIN_METRIC = "Mean Dice"
 SCORES = ["AUBC", "Final"]
 
@@ -240,7 +241,8 @@ def print_and_save_results(significances, corrs, corr_pval, savepath, prefix):
     print(corrs)
     print(corr_pval)
 
-    styled_corrs = corrs.copy().applymap(lambda x: f"{x:.4f}")
+    corrs.round(3)
+    styled_corrs = corrs.copy().map(lambda x: f"{x:.3f}")
     cmap = get_ranking_cmap(corrs.values, corr_pval.values)
     styled_corrs = apply_latex_coloring(styled_corrs, cmap)
 

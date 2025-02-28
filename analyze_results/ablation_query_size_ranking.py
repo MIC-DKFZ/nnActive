@@ -19,6 +19,7 @@ from scipy.stats import (
 from setup import (
     BASEPATH,
     RENAMING_DICT,
+    SAVEPATH,
     VALUE_TO_COLOR_MAP,
     apply_latex_coloring,
     calculate_difference_with_std,
@@ -29,9 +30,8 @@ from setup import (
 
 from nnactive.analyze.analysis import SettingAnalysis
 
-savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
-)
+savepath = SAVEPATH / "tex" / "ablation_query_size"
+savepath.mkdir(parents=True, exist_ok=True)
 
 # 2nd value is always value which is expected to be better than the first. E.g. smaller QS is expected to be better.
 # TODO: enable this for all settings!

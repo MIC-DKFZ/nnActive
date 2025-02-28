@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from setup import BASEPATH, RENAMING_DICT
+from setup import BASEPATH, RENAMING_DICT, SAVEPATH
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -12,8 +12,12 @@ from nnactive.utils.io import save_df_to_txt
 # I'm sorry for the mess, but it works and I don't want to touch it anymore
 # This is due to mutiple issues in the code it is built upon
 
+savepath = SAVEPATH / "tex" / "ablation_powerbald"
+savepath.mkdir(parents=True, exist_ok=True)
+print("Savepath:", savepath)
+
 basepath = BASEPATH.parent / (BASEPATH.name + "_test_pbald_ablation")
-STANDARD_COLNAMES = ["Low", "Medium", "High"]
+COLLEVELNAMES = ["Dataset", "Budget", "Metric"]
 SETTINGS = {
     "ACDC": {
         "Low": [
@@ -88,9 +92,6 @@ SETTINGS = {
         ],
     },
 }
-
-
-savepath = basepath
 
 
 def _compute_gmap(data: pd.DataFrame, invert: bool):
@@ -178,7 +179,6 @@ for dataset_name in SETTINGS:
         df_auc = []
         df_beta = []
         for path in SETTINGS[dataset_name][col_name]:
-
             if not path.is_dir():
                 print(f"Skipping {path}")
                 continue
@@ -218,22 +218,18 @@ for dataset_name in SETTINGS:
             whole_data[dataset],
             axis=1,
             keys=whole_data[dataset].keys(),
-            names=["Setting"],
+            names=COLLEVELNAMES[1:],
         )
         d_folder = dataset.replace(" ", "_")
-        # save_df_to_txt(whole_data[dataset], savepath / d_folder / f"{dataset_name}.txt")
     if len(whole_data) == 0:
         print(f"Skipping {dataset_name}")
         continue
     whole_data = pd.concat(
-        whole_data, axis=1, keys=whole_data.keys(), names=["Dataset"]
+        whole_data, axis=1, keys=whole_data.keys(), names=COLLEVELNAMES
     )
     whole_data = whole_data.reindex(CUSTOM_ORDER, level=0)
     whole_data = whole_data.rename(RENAMING_DICT, axis=0)
-    save_df_to_txt(whole_data, savepath / f"{dataset_name}.txt")
-
-    with open(savepath / f"{dataset_name}.md", "w") as f:
-        f.write(whole_data.to_markdown())
+    whole_data.index.name = "Query Method"
 
     cmap = "Oranges"
     higher_is_better = ["AUBC", "Final", "beta"]
@@ -267,7 +263,7 @@ for dataset_name in SETTINGS:
     styled = print_data.style.background_gradient(
         "Oranges", axis=None, subset=subset, gmap=gmap
     )
-    tex_fn = savepath / f"{dataset_name}.tex"
+    tex_fn = savepath / f"pbald_{dataset_name}.tex"
     styled.to_latex(
         tex_fn,
         convert_css=True,

@@ -22,6 +22,9 @@ from nnactive.utils.io import save_df_to_txt
 
 COMPARATIVE = False
 CMAP = "Oranges"
+COLLEVELNAMES = ["Dataset", "Budget", "Setting", "Metric"]
+
+savepath = SAVEPATH
 
 USE_SETTINGS_LIST = [
     ["Main"],
@@ -29,8 +32,10 @@ USE_SETTINGS_LIST = [
     ["Precomputed"],
     ["QSx2"],
     ["QSx1/2"],
+    # ["Patchx1/2"], Curently broken
     ["Main", "Precomputed", "500 Epochs"],
     ["QSx1/2", "Main", "QSx2"],
+    # ["Patchx1/2", "Main"], Currently broken
 ]
 
 RENAME_SETTINGS_LIST = [
@@ -41,6 +46,8 @@ RENAME_SETTINGS_LIST = [
     None,
     {"Main": "200 Epochs"},
     {"Main": "QSx1"},
+    None,
+    # {"Main": "Patchx1"},
 ]
 
 
@@ -115,23 +122,45 @@ if __name__ == "__main__":
         if isinstance(setting, (list, tuple)) and len(setting) == 1:
             setting = setting[0]
         if isinstance(setting, str):
+            collevelnames = COLLEVELNAMES.copy()
+            collevelnames.remove("Setting")
             for dataset in data_dict:
                 whole_data = []
                 for budget in data_dict[dataset]:
                     whole_data.append(data_dict[dataset][budget][setting])
                 whole_data = pd.concat(
-                    whole_data, axis=1, keys=data_dict[dataset].keys()
+                    whole_data,
+                    axis=1,
+                    keys=data_dict[dataset].keys(),
+                    names=collevelnames[1:],
+                )
+                whole_data = pd.concat(
+                    [whole_data],
+                    axis=1,
+                    keys=[dataset],
+                    names=collevelnames,
                 )
                 print_tables[dataset] = whole_data
 
         else:
+            collevelnames = COLLEVELNAMES.copy()
+            collevelnames.remove("Budget")
             for datset in data_dict:
                 for budget in data_dict[dataset]:
                     whole_data = []
                     for sett in data_dict[dataset][budget]:
                         whole_data.append(data_dict[dataset][budget][sett])
                     whole_data = pd.concat(
-                        whole_data, axis=1, keys=data_dict[dataset][budget].keys()
+                        whole_data,
+                        axis=1,
+                        keys=data_dict[dataset].keys(),
+                        names=collevelnames[1:],
+                    )
+                    whole_data = pd.concat(
+                        [whole_data],
+                        axis=1,
+                        keys=[dataset],
+                        names=collevelnames,
                     )
                     print_tables[f"{dataset}_{budget}"] = whole_data
 

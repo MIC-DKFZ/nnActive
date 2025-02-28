@@ -3,7 +3,12 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from setup import BASEPATH, RENAMING_DICT
+from evaluator import (
+    get_settings_for_combination,
+    load_settings,
+    rename_settings_in_analysis,
+)
+from setup import BASEPATH, CUSTOM_ORDER, RENAMING_DICT, SAVEPATH
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -16,136 +21,77 @@ from nnactive.utils.io import save_df_to_txt
 # matplotlib.rcParams["text.usetex"] = True
 # matplotlib.rcParams["font.family"] = "Computer Modern"
 
-MAIN_ORDER = [
-    "mutual information",
-    "power bald",
-    "softrank bald",
-    "pred entropy",
-    "power pe",
-    "random",
-    "random-label",
-    "random-label2",
+MAIN_ORDER = CUSTOM_ORDER
+
+NORANDOM_ORDER = MAIN_ORDER.copy()
+NORANDOM_ORDER.remove("random")
+savepath = SAVEPATH / "figures"
+
+COMPARATIVE = False
+
+USE_SETTINGS_LIST = [
+    {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
+    {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
+    {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
+    {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
 ]
 
-NORANDOM_ORDER = [
-    "mutual information",
-    "power bald",
-    "softrank bald",
-    "pred entropy",
-    "power pe",
-    "random-label",
-    "random-label2",
-]
-
-SETTING = {
-    "Main": {
-        "comparisons": {
-            "AMOS": [
-                "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
-                "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-            "KiTS": [
-                "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40",
-                "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-            "ACDC": [
-                "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30",
-                "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-60__qs-60",
-                "Dataset027_ACDC/patch-4_40_40__sb-random-label2-all-classes__sbs-90__qs-90",
-            ],
-            "Hippocampus": [
-                "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
-                "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40",
-                "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-            ],
-        },
-        "custom_order": MAIN_ORDER,
-    },
-    "Long-Training": {
-        "comparisons": {
-            "AMOS": [
-                "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-            "KiTS": [
-                "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-        },
-        "custom_order": NORANDOM_ORDER,
-    },
-    "patch-ablation": {
-        "comparisons": {
-            "AMOS": [
-                "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
-                "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-            "KiTS": [
-                "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
-                "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
-                "Dataset135_KiTS2021/patch-32_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
-            ],
-            "ACDC": [
-                "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-30__qs-30",
-                "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-60__qs-60",
-                "Dataset027_ACDC/patch-2_20_20__sb-random-label2-all-classes__sbs-90__qs-90",
-            ],
-        },
-        "custom_order": MAIN_ORDER,
-    },
-}
+RENAME_SETTINGS = None
 
 
-savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
-)
+for setting in USE_SETTINGS_LIST:
+    setting_names = setting["setting_names"]
+    custom_order = setting["custom_order"]
+    setting_paths = get_settings_for_combination(setting_names)
+    setting_data = load_settings(setting_paths)
+    if RENAME_SETTINGS is not None:
+        rename_settings_in_analysis(setting_data)
+    save_setting = "_".join(setting_names).replace(" ", "").replace("/", "-").lower()
+    print_setting = " & ".join(setting_names)
 
-for comparison_name in SETTING:
-    comparison_setting = SETTING[comparison_name]
-    comparison = comparison_setting["comparisons"]
-    for name in comparison:
-        comparison[name] = [BASEPATH / p for p in comparison[name]]
+    all_matrices = {}
+    for dataset in setting_data:
+        all_matrices[dataset] = {}
+        for budget in setting_data[dataset]:
+            all_matrices[dataset][budget] = {}
+            for subsetting in setting_data[dataset][budget]:
+                analysis = setting_data[dataset][budget][subsetting]
+                matrix = analysis.compute_pairwise_penalty()
+                del_algs = [a for a in matrix.algs if a not in custom_order]
+                for a in del_algs:
+                    matrix.delete_alg(a)
+                matrix = matrix.custom_order_matrix(custom_order)
+                matrix.rename_algs(RENAMING_DICT)
+                all_matrices[dataset][budget][subsetting] = matrix
 
-    custom_order = comparison_setting["custom_order"]
-
-    for i in range(len(custom_order)):
-        custom_order[i] = custom_order[i].replace(" ", "_")
-
-    all_matrices = []
-    for name, paths in comparison.items():
-
-        matrices: list[PairwisePenaltyMatrix] = []
-        for path in paths:
-            matrix = PairwisePenaltyMatrix.load(BASEPATH / path / "ppm.json")
-
-            del_algs = [a for a in matrix.algs if a not in custom_order]
-            for a in del_algs:
-                matrix.delete_alg(a)
-            ex_name = path.name
-            save_name = f"{name}_{ex_name}_ppm.txt"
-            matrices.append(matrix)
-            all_matrices.append(matrix)
-
-        full_matrix = PairwisePenaltyMatrix.create_merged_matrix(matrices)
-        full_matrix = full_matrix.custom_order_matrix(custom_order)
-        full_matrix.rename_algs(RENAMING_DICT)
-        full_matrix.plot_pairwise_matrix(
-            full_matrix,
-            savepath=savepath / f"{comparison_name.lower()}_{name}_ppm.png",
-            max_poss_ent=None,
-            title_tag=f"{comparison_name} " + name + " [%]",
-            norm_val=full_matrix.max_pos_ent,
+    for dataset in all_matrices:
+        merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
+            [
+                mat[subsetting]
+                for subsetting in setting_names
+                for mat in all_matrices[dataset].values()
+            ]
         )
-    full_matrix = PairwisePenaltyMatrix.create_merged_matrix(all_matrices)
-    full_matrix = full_matrix.custom_order_matrix(custom_order)
-    full_matrix.rename_algs(RENAMING_DICT)
-    full_matrix.plot_pairwise_matrix(
-        full_matrix,
-        savepath=savepath / f"{comparison_name.lower()}_ppm.png",
+        PairwisePenaltyMatrix.plot_pairwise_matrix(
+            merged_matrix,
+            savepath=savepath / f"{save_setting}_{dataset}_ppm.png",
+            max_poss_ent=None,
+            title_tag=f"{print_setting} {dataset} [%]",
+            norm_val=merged_matrix.max_pos_ent,
+        )
+    merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
+        [
+            all_matrices[d][b][s]
+            for d in all_matrices
+            for b in all_matrices[d]
+            for s in all_matrices[d][b]
+        ]
+    )
+    PairwisePenaltyMatrix.plot_pairwise_matrix(
+        merged_matrix,
+        savepath=savepath / f"{save_setting}_ppm.png",
         max_poss_ent=None,
-        title_tag=f"{comparison_name} Experiments [%]",
-        norm_val=full_matrix.max_pos_ent,
+        title_tag=f"{print_setting} [%]",
+        norm_val=merged_matrix.max_pos_ent,
     )

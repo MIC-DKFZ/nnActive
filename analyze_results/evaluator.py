@@ -134,7 +134,7 @@ for S in FULL_SETTINGS:
 
 
 def load_settings(
-    settings: dict[str, dict[str, dict[str, Path | None]]], comparative: bool = True
+    settings: dict[str, dict[str, dict[str, Path | None]]], comparative: bool = False
 ) -> dict[str, dict[str, dict[str, SettingAnalysis]]]:
     out_settings: dict[str, dict[str, dict[str, SettingAnalysis]]] = {}
     for D in settings:
