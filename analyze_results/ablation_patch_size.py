@@ -10,6 +10,7 @@ from evaluator import (
 from scipy.stats import kendalltau, spearmanr, ttest_ind, wilcoxon
 from setup import (
     BASEPATH,
+    CUSTOM_ORDER,
     RENAMING_DICT,
     SAVEPATH,
     VALUE_TO_COLOR_MAP,
@@ -22,7 +23,8 @@ from setup import (
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
-savepath = SAVEPATH
+savepath = SAVEPATH / "tex" / "ablation_patch_size"
+savepath.mkdir(parents=True, exist_ok=True)
 
 CUSTOM_ORDER = [
     "mutual_information",
@@ -35,16 +37,6 @@ CUSTOM_ORDER = [
     "random-label2",
 ]
 
-QUERYMETHODS = [
-    "BALD",
-    "PowerBALD",
-    "SoftrankBALD",
-    "Predictive Entropy",
-    "PowerPE",
-    "Random",
-    "Random 66% FG",
-    "Random 33% FG",
-]
 
 COMPARATIVE = False
 USE_SETTINGS = ["Main", "Patchx1/2"]
@@ -190,36 +182,9 @@ def main(
                         mean_key
                     ].rank(ascending=False)
 
-                # results_df = compute_ttest(aucval_list, metric)
-                # results_df.columns = pd.MultiIndex.from_product(
-                #     [["t-test"], results_df.columns]
-                # )
-
-                # merged_df = pd.merge(
-                #     diff_df, results_df, left_index=True, right_index=True
-                # )
-                # merged_df = merged_df.reindex(CUSTOM_ORDER)
-                # merged_df[(metric, "mean Small Patch")] = auc_list[0][mean_key]
-                # merged_df[(metric, "mean Large Patch")] = auc_list[1][mean_key]
-                # merged_df[(metric, "ranking Small Patch")] = auc_list[0][mean_key].rank(
-                #     ascending=False
-                # )
-                # merged_df[(metric, "ranking Large Patch")] = auc_list[1][mean_key].rank(
-                #     ascending=False
-                # )
-
+                merged_df = merged_df.reindex(CUSTOM_ORDER, axis=0)
                 merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
 
-                # (
-                #     spearman,
-                #     p_value_spearman,
-                #     rho,
-                #     p_value_kendall,
-                #     wilcoxon_stat,
-                #     wilcoxon_p_value,
-                # ) = compute_statistical_tests(merged_df, metric)
-
-                merged_df = merged_df.reindex(QUERYMETHODS, axis=0)
                 merged_dfs[name][score] = merged_df
 
     for score in SCORES:

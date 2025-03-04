@@ -32,10 +32,10 @@ USE_SETTINGS_LIST = [
     ["Precomputed"],
     ["QSx2"],
     ["QSx1/2"],
-    # ["Patchx1/2"], Curently broken
+    ["Patchx1/2"],  # Curently broken
     ["Main", "Precomputed", "500 Epochs"],
     ["QSx1/2", "Main", "QSx2"],
-    # ["Patchx1/2", "Main"], Currently broken
+    ["Patchx1/2", "Main"],  # Currently broken
 ]
 
 RENAME_SETTINGS_LIST = [
@@ -44,10 +44,10 @@ RENAME_SETTINGS_LIST = [
     None,
     None,
     None,
+    None,
     {"Main": "200 Epochs"},
     {"Main": "QSx1"},
-    None,
-    # {"Main": "Patchx1"},
+    {"Main": "Patchx1"},
 ]
 
 
@@ -128,6 +128,10 @@ if __name__ == "__main__":
                 whole_data = []
                 for budget in data_dict[dataset]:
                     whole_data.append(data_dict[dataset][budget][setting])
+                if len(whole_data) == 0:
+                    import IPython
+
+                    IPython.embed()
                 whole_data = pd.concat(
                     whole_data,
                     axis=1,
@@ -145,7 +149,7 @@ if __name__ == "__main__":
         else:
             collevelnames = COLLEVELNAMES.copy()
             collevelnames.remove("Budget")
-            for datset in data_dict:
+            for dataset in data_dict:
                 for budget in data_dict[dataset]:
                     whole_data = []
                     for sett in data_dict[dataset][budget]:
@@ -153,7 +157,7 @@ if __name__ == "__main__":
                     whole_data = pd.concat(
                         whole_data,
                         axis=1,
-                        keys=data_dict[dataset].keys(),
+                        keys=data_dict[dataset][budget].keys(),
                         names=collevelnames[1:],
                     )
                     whole_data = pd.concat(
@@ -169,9 +173,6 @@ if __name__ == "__main__":
             tex_folder = savepath / "tex" / f"tables-{print_setting}".lower()
             txt_folder.mkdir(exist_ok=True, parents=True)
             tex_folder.mkdir(exist_ok=True, parents=True)
-            if len(setting) == 2:
-                savepath = SAVEPATH / f"tables-{print_setting}"
-                savepath.mkdir(exist_ok=True, parents=True)
             whole_data = print_tables[print_table]
             fn = f"{print_setting}--{print_table}".lower()
             tex_fn = tex_folder / f"{fn}.tex"

@@ -170,7 +170,7 @@ def calculate_difference_with_std(
     df_neg: pd.DataFrame,
     mean_key: tuple[str, str],
     std_key: tuple[str, str],
-):
+) -> pd.DataFrame:
     df_diff = df_pos[mean_key] - df_neg[mean_key]
     df_std = np.sqrt((df_pos[std_key] ** 2 + df_neg[std_key] ** 2))
     df_diff = pd.concat(

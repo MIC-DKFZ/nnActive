@@ -61,6 +61,7 @@ CUSTOM_ORDER = [
 COPY_VALUES = ["random", "random-label", "random-label2"]
 SCORES = ["Final", "AUBC"]
 MAIN_METRIC = "Mean Dice"
+COLLEVELNAMES = ["Dataset", "Budget"]
 
 QUERYMETHODS = [
     "BALD",
@@ -143,23 +144,36 @@ def analyze_settings(
         df_to_multicol(corrs_dict[score])
         df_to_multicol(corr_pval_dict[score])
         diffs_dict[score] = diffs_dict[score].map(lambda x: np.round(x * 100, 2))
-        styled: pd.DataFrame = diffs_dict[score].copy(deep=True)
-        styled = styled.map(lambda x: f"{x:.2f}")
-        styled[significances_dict[score] == True] = styled[
-            significances_dict[score] == True
-        ].map(lambda x: f"\\textbf{{{x}}}")
         print(diffs_dict[score])
         if savename is not None:
             basename = f"ablation-training-{savename}"
             print("Saving to: ", savepath / basename)
-
-            styled.to_latex(savepath / f"{basename}-{score.lower()}_diffs.tex")
-            significances_dict[score].to_latex(
-                savepath / f"{basename}-{score.lower()}_significances.tex"
+            significances_dict[score].columns.names = COLLEVELNAMES
+            corrs_dict[score].columns.names = COLLEVELNAMES
+            diffs_dict[score].columns.names = COLLEVELNAMES
+            styled: pd.DataFrame = diffs_dict[score].copy(deep=True)
+            styled = styled.map(lambda x: f"{x:.2f}")
+            ##### Significant values are bold
+            # styled[significances_dict[score] == True] = styled[
+            #     significances_dict[score] == True
+            # ].map(lambda x: f"\\textbf{{{x}}}")
+            ##### Colorbased significance
+            cmap = get_ranking_cmap(
+                diffs_dict[score].values, significances_dict[score].values
             )
-            corrs_dict[score].to_latex(
-                savepath / f"{basename}-{score.lower()}_corrs.tex"
+            styled = apply_latex_coloring(styled, cmap)
+            save_styled_to_latex(
+                styled, savepath / f"{basename}-{score.lower()}_diffs.tex"
             )
+            # significances_dict[score].columns.names = COLLEVELNAMES
+            # corrs_dict[score].columns.names = COLLEVELNAMES
+            # save_styled_to_latex(
+            #     significances_dict[score],
+            #     savepath / f"{basename}-{score.lower()}_significances.tex",
+            # )
+            # save_styled_to_latex(
+            #     corrs_dict[score], savepath / f"{basename}-{score.lower()}_corrs.tex"
+            # )
     return diffs_dict, significances_dict, corrs_dict, corr_pval_dict
 
 
@@ -263,6 +277,13 @@ if __name__ == "__main__":
     corrs_settings_df = concatenate_results(corrs_settings_dict)
     cmap = get_ranking_cmap(corrs_settings_df.values, corrs_sig_settings_df.values)
 
+    corrs_settings_df.columns.names = COLLEVELNAMES
     corrs_settings_df = corrs_settings_df.round(3).map(lambda x: f"{x:.3f}")
     corrs_settings_df = apply_latex_coloring(corrs_settings_df, cmap)
     save_styled_to_latex(corrs_settings_df, savepath / "ablation-training-corrs.tex")
+
+    for score in SCORES:
+        filter_corrs = corrs_settings_df.xs(score, level="Metric")
+        save_styled_to_latex(
+            filter_corrs, savepath / f"ablation-training-corrs-{score}.tex"
+        )

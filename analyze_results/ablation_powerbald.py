@@ -195,7 +195,16 @@ for dataset_name in SETTINGS:
         data_dict["Dataset"] = dataset_name.split("_")[0]
         data_dict["df"] = pd.concat(
             [data_dict["df_auc"], data_dict["df_beta"]], axis=1
-        )[["AUBC", "AUBC std", "beta", "beta std", "Final", "Final std"]]
+        )[
+            [
+                "AUBC",
+                "AUBC std",
+                "Final",
+                "Final std",
+                "beta",
+                "beta std",
+            ]
+        ]
         data_dict["df"].reset_index(inplace=True)
         print(data_dict["df"].columns)
         data_dict["df"]["index"] = data_dict["df"]["index"].map(
