@@ -149,14 +149,13 @@ def main(
 
             print(f"Processing: {name}")
             auc_dicts = {}
-            aucval_dicts = {}
             for exp_row in setting_analyses[dataset_name][budget]:
                 analysis = setting_analyses[dataset_name][budget][exp_row]
-                auc = analysis.compute_auc_df(enforce_full=not COMPARATIVE)
-                auc_dicts[exp_row] = auc
-                aucval_dicts[exp_row] = pd.DataFrame(
-                    analysis._compute_auc_row_dicts([MAIN_METRIC])
+                auc = analysis.compute_auc_df(enforce_full=not COMPARATIVE).reindex(
+                    CUSTOM_ORDER
                 )
+                auc.rename(RENAMING_DICT, axis=0, inplace=True)
+                auc_dicts[exp_row] = auc
 
             for score in SCORES:
                 metric = f"{MAIN_METRIC} {score}"
@@ -181,9 +180,6 @@ def main(
                     merged_df[(metric, "ranking " + exp_row)] = auc_dicts[exp_row][
                         mean_key
                     ].rank(ascending=False)
-
-                merged_df = merged_df.reindex(CUSTOM_ORDER, axis=0)
-                merged_df.rename(RENAMING_DICT, axis=0, inplace=True)
 
                 merged_dfs[name][score] = merged_df
 

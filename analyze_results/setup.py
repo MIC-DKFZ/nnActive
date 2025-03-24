@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -17,9 +18,11 @@ CUSTOM_ORDER = [
     "softrank_bald",
     "pred_entropy",
     "power_pe",
+    # "class_pe33",
+    # "class_pe66",
     "random",
-    "random-label",
     "random-label2",
+    "random-label",
 ]
 
 small_dict = {
@@ -28,6 +31,8 @@ small_dict = {
     "softrank bald": "SoftrankBALD",
     "pred entropy": "Predictive Entropy",
     "power pe": "PowerPE",
+    "class pe33": "Balanced PE 33%",
+    "class pe66": "Balanced PE 66%",
     "random": "Random",
     "random-label": "Random 66% FG",
     "random-label2": "Random 33% FG",
@@ -47,22 +52,55 @@ VALUE_TO_COLOR_MAP = {
     2: "#008000",  # green
 }
 
+cmap = plt.get_cmap("tab10")
 QM_TO_COLOR = {
-    "BALD": "#bcbd22",  # Yellow-green
-    "PowerBALD": "#ff7f0e",  # Orange
-    "SoftrankBALD": "#7f7f7f",  # Gray
-    "PowerPE": "#2ca02c",  # Green
-    "Predictive Entropy": "#1f77b4",  # Blue
-    "Random": "#9467bd",  # Purple
-    "Random 66% FG": "#e377c2",  # Light Red
-    "Random 33% FG": "#d62728",  # Red
+    "BALD": 0,  # Blue
+    "PowerBALD": 9,  # light blue
+    "SoftrankBALD": 7,  # gray
+    "Predictive Entropy": 3,  # red
+    "PowerPE": 1,  # orange
+    "Balanced PE 33%": 2,  # medium blue
+    "Balanced PE 66%": 8,  # light blue
+    "Random": 4,  # Purple
+    "Random 33% FG": 6,  # brown
+    "Random 66% FG": 5,  # pink
 }
+for q in QM_TO_COLOR:
+    QM_TO_COLOR[q] = mcolors.to_hex(cmap(QM_TO_COLOR[q]))
+
+# QM_TO_COLOR = {
+#     # BALDS
+#     "BALD": "#bcbd22",  # Yellow-green
+#     "PowerBALD": "#ff7f0e",  # Orange
+#     "SoftrankBALD": "#7f7f7f",  # Gray
+#     # PEs
+#     "Predictive Entropy": "#344771",  # Dark Blue
+#     "PowerPE": "#a9e299",  # Green
+#     "Balanced PE 33%": "#005b96",  # medium blue
+#     "Balanced PE 66%": "#6497b1",  # light blue
+#     #
+#     # "Predictive Entropy": "#4169E1",  # Dark Blue
+#     # "PowerPE": "#2ca02c",  # Green
+#     # "Balanced PE 33%": "#1f77b4",  # medium blue
+#     # "Balanced PE 66%": "#87CEFA",  # light blue
+#     #
+#     # Randoms
+#     "Random": "#9467bd",  # Purple
+#     # "Random": "#ff0000",  # Red
+#     "Random 33% FG": "#ff5a00",  # Red
+#     "Random 66% FG": "#ff9a00",  # Light Red
+#     #
+#     # "Random" : "#9467bd",  # Purple
+#     # "Random 33% FG": "#d62728",  # Red
+#     # "Random 66% FG": "#e377c2",  # Light Red
+# }
 
 BASEPATH = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final/"
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/"
 )
 
 SAVEPATH = Path(
+    # "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_eval_classpe/"
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_eval/"
 )
 if not SAVEPATH.exists():
@@ -126,6 +164,7 @@ def load_setting_data_to_df(
     FINAL_COLUMNS: list[dict],
     setting_paths: dict[str, dict[str, dict[str, Path]]],
     setting_analyses: dict[str, dict[str, dict[str, SettingAnalysis]]],
+    comparative: bool = False,
 ) -> dict[str, dict[str, dict[str, pd.DataFrame]]]:
     """Load the data from the setting paths and analyses into a dictionary of DataFrames
 
@@ -146,7 +185,13 @@ def load_setting_data_to_df(
             data_dict[dataset][budget] = {}
             for sett in setting_analyses[dataset][budget]:
                 analysis = setting_analyses[dataset][budget][sett]
-                auc = pd.read_json(setting_paths[dataset][budget][sett] / "auc.json")
+                auc = analysis.compute_auc_df(enforce_full=not comparative)
+                auc.columns = [", ".join([f"{c}"]) for c in auc.columns]
+
+                # old and deprecated -- read values from auc.json
+                # auc = pd.read_json(
+                #     setting_paths[dataset][budget][sett] / "auc.json"
+                # )
                 auc.index.name = "Query Method"
                 auc = auc.map(lambda x: np.round(x * 100, 2))
                 beta = pd.read_json(setting_paths[dataset][budget][sett] / "beta.json")
@@ -160,6 +205,10 @@ def load_setting_data_to_df(
                     columns={c["ReadCol"]: c["PrintCol"] for c in FINAL_COLUMNS},
                     inplace=True,
                 )
+                if comparative:
+                    combined_df = combined_df[
+                        [col for col in combined_df.columns if "FG-Eff." not in col]
+                    ]
 
                 data_dict[dataset][budget][sett] = combined_df
     return data_dict
@@ -228,11 +277,13 @@ def shorten_hippocampus(BASEPATH):
 
     analysis = SettingAnalysis.load(datapath / "analysis.pkl")
 
-    df_filter = analysis.df[analysis.df["Loop"] <= 4]
-    df_filter[analysis.max_loops_key] = 5
-    df_filter = df_filter.reset_index()
+    datapath = datapath.parent / f"{datapath.name}_v0"
+    analysis2 = SettingAnalysis.load(datapath / "analysis.pkl")
 
-    analysis.df = df_filter
+    analysis.df = pd.concat([analysis2.df, analysis.df], axis=0)
+    analysis.df = analysis.df[analysis.df["Loop"] <= 4]
+    analysis.df[analysis.max_loops_key] = 5
+    analysis.df = analysis.df.reset_index()
 
     analysis.save(save_path / "analysis.pkl")
 

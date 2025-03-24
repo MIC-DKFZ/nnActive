@@ -259,7 +259,7 @@ if __name__ == "__main__":
         zip(USE_SETTINGS_LIST, COPY_VALUES_LIST)
     ):
         print("Compare: ", use_settings)
-        dictname = " \\& ".join([RENAMING_DICT.get(s, s) for s in use_settings])
+        dictname = " \\& ".join([RENAME_SETTINGS.get(s, s) for s in use_settings])
         savename = "-".join(use_settings)
         savename = savename.replace(" ", "")
         savename = savename.lower()

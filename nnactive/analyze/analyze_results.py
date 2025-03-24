@@ -22,24 +22,39 @@ from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on
 
 sns.set_style("whitegrid")
 
+sns.set_style("whitegrid")
+
+# TODO: Final version
+# Load all strategies from nnactive/strategies/__init__.py
 PALETTE = {
-    "random": "tab:blue",
-    "pred_entropy": "tab:green",
-    "mutual_information": "tab:orange",
-    "expected_dice": "tab:purple",
-    "random-label": "tab:red",
-    "random-label2": "tab:cyan",
-    "power_bald": "tab:brown",
-    "power_bald_b5": "tab:olive",
-    "power_bald_b10": "0",
-    "power_pe": "tab:gray",
-    "softrank_bald": "tab:pink",
-    "kmeans_bald": "tab:olive",
-    "power_bald_b20": "tab:olive",
-    "power_bald_b40": "tab:olive",
-    "class_pe66": "tab:olive",
-    "class_pe33": "tab:purple",
+    "random": None,
+    "pred_entropy": None,
+    "mutual_information": None,
+    "expected_dice": None,
+    "random-label": None,
+    "random-label2": None,
+    "power_bald": None,
+    "power_bald_b5": None,
+    "power_bald_b10": None,
+    "power_bald_b20": None,
+    "power_bald_b40": None,
+    "power_bald_b100": None,
+    "power_pe": None,
+    "softrank_bald": None,
+    "kmeans_bald": None,
+    "class_pe66": None,
+    "class_pe33": None,
+    "class_power_pe66_exp": None,
+    "class_power_pe33_exp": None,
+    "class_power_pe66_smooth_sigmoid": None,
+    "class_power_pe33_smooth_sigmoid": None,
+    "class_power_pe66_sharp_sigmoid": None,
+    "class_power_pe33_sharp_sigmoid": None,
 }
+
+unique_colors = sns.color_palette("husl", len(PALETTE))
+for i, key in enumerate(PALETTE):
+    PALETTE[key] = unique_colors[i]
 
 # Defuault is Class 1, 2, 3, ....
 # For some datasets we only want to plot a subset of classes

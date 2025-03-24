@@ -32,10 +32,14 @@ USE_SETTINGS_LIST = [
     ["Precomputed"],
     ["QSx2"],
     ["QSx1/2"],
-    ["Patchx1/2"],  # Curently broken
+    ["Patchx1/2"],
     ["Main", "Precomputed", "500 Epochs"],
     ["QSx1/2", "Main", "QSx2"],
-    ["Patchx1/2", "Main"],  # Currently broken
+    ["Patchx1/2", "Main"],
+]
+
+COMPARATIVE_LIST = [
+    False if len(setting) == 1 else True for setting in USE_SETTINGS_LIST
 ]
 
 RENAME_SETTINGS_LIST = [
@@ -50,27 +54,71 @@ RENAME_SETTINGS_LIST = [
     {"Main": "Patchx1"},
 ]
 
+COPY_SETTINGS_LIST = [
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    {
+        "Source": "Precomputed",
+        "Target": "500 Epochs",
+        "Copy": ["Random", "Random 33% FG", "Random 66% FG"],
+        "Transfer_fct": lambda x: (slice(None), x),
+    },
+    None,
+    None,
+]
+
 
 FINAL_COLUMNS = [
     {"ReadCol": "('Mean Dice AUBC', 'mean')", "PrintCol": "AUBC", "better": "higher"},
     {"ReadCol": "('Mean Dice AUBC', 'std')", "PrintCol": "AUBC std", "better": None},
-    {"ReadCol": "('Mean Dice Final', 'mean')", "PrintCol": "Final", "better": "higher"},
-    {"ReadCol": "('Mean Dice Final', 'std')", "PrintCol": "Final std", "better": None},
-    {"ReadCol": "beta", "PrintCol": "beta", "better": "higher"},
-    {"ReadCol": "beta_std", "PrintCol": "beta std", "better": None},
+    {
+        "ReadCol": "('Mean Dice Final', 'mean')",
+        "PrintCol": "Final Dice",
+        "better": "higher",
+    },
+    {
+        "ReadCol": "('Mean Dice Final', 'std')",
+        "PrintCol": "Final Dice std",
+        "better": None,
+    },
+    {"ReadCol": "beta", "PrintCol": "FG-Eff.", "better": "higher"},
+    {"ReadCol": "beta_std", "PrintCol": "FG-Eff. std", "better": None},
 ]
 
 
 def generate_colored_latex_report_table(
-    CMAP, FINAL_COLUMNS: list[dict], whole_data: pd.DataFrame, savepath: str | Path
+    CMAP,
+    FINAL_COLUMNS: list[dict],
+    whole_data: pd.DataFrame,
+    savepath: str | Path,
+    colorization: str = "linear",
+    copy_setting: dict[str, str | list[str]] | None = None,
 ):
     is_better = [c["PrintCol"] for c in FINAL_COLUMNS if c["better"] == "higher"]
     subset = [col for col in whole_data.columns if col[-1] in is_better]
 
     print_data = whole_data.copy(deep=True)
+    if copy_setting is not None:
+        # using .values is necessary here to avoid NaNs due to multicolumn indexing
+        print_data.loc[
+            copy_setting["Copy"], copy_setting["Transfer_fct"](copy_setting["Target"])
+        ] = print_data.loc[
+            copy_setting["Copy"], copy_setting["Transfer_fct"](copy_setting["Source"])
+        ].values
+
     for n in print_data.index:
         print_data.rename(index={n: n.replace("%", "\%")}, inplace=True)
-    gmap = compute_column_normalized_gmap(print_data[subset], invert=True)
+    if colorization == "linear":
+        gmap = compute_column_normalized_gmap(print_data[subset], invert=True)
+    elif colorization == "rank":
+        gmap = print_data[subset].rank(method="min", ascending=False)
+        gmap = gmap / print_data.shape[0]
+    else:
+        raise ValueError(f"Colorization {colorization} not supported")
     for col in subset:
         std_col = tuple(list(col[:-1]) + [col[-1] + " std"])
         print_data[col] = (
@@ -104,17 +152,24 @@ def generate_colored_latex_report_table(
 
 
 if __name__ == "__main__":
-    for setting, rename_setting in zip(USE_SETTINGS_LIST, RENAME_SETTINGS_LIST):
+    for setting, rename_setting, cp_setting, comparative in zip(
+        USE_SETTINGS_LIST, RENAME_SETTINGS_LIST, COPY_SETTINGS_LIST, COMPARATIVE_LIST
+    ):
         print(setting)
         print_setting = "_".join(setting).replace(" ", "").replace("/", "-")
         setting_paths = get_settings_for_combination(setting)
-        setting_analyses = load_settings(setting_paths, comparative=COMPARATIVE)
+        setting_analyses = load_settings(setting_paths, comparative=comparative)
         if rename_setting is not None:
             rename_settings_in_analysis(setting_analyses, rename_setting)
             rename_settings_in_analysis(setting_paths, rename_setting)
 
+        colorization = "linear" if len(setting) == 1 else "rank"
         data_dict = load_setting_data_to_df(
-            CUSTOM_ORDER, FINAL_COLUMNS, setting_paths, setting_analyses
+            CUSTOM_ORDER,
+            FINAL_COLUMNS,
+            setting_paths,
+            setting_analyses,
+            comparative=comparative,
         )
 
         # 1 table per dataset and budget with multiple settings
@@ -129,9 +184,7 @@ if __name__ == "__main__":
                 for budget in data_dict[dataset]:
                     whole_data.append(data_dict[dataset][budget][setting])
                 if len(whole_data) == 0:
-                    import IPython
-
-                    IPython.embed()
+                    raise ValueError(f"No data for {dataset} in {setting}")
                 whole_data = pd.concat(
                     whole_data,
                     axis=1,
@@ -176,5 +229,12 @@ if __name__ == "__main__":
             whole_data = print_tables[print_table]
             fn = f"{print_setting}--{print_table}".lower()
             tex_fn = tex_folder / f"{fn}.tex"
-            generate_colored_latex_report_table(CMAP, FINAL_COLUMNS, whole_data, tex_fn)
+            generate_colored_latex_report_table(
+                CMAP,
+                FINAL_COLUMNS,
+                whole_data,
+                tex_fn,
+                colorization=colorization,
+                copy_setting=cp_setting,
+            )
             save_df_to_txt(whole_data, txt_folder / f"{fn}.txt")

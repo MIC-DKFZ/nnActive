@@ -14,9 +14,11 @@ from nnactive.utils.io import save_df_to_txt
 
 savepath = SAVEPATH / "tex" / "ablation_powerbald"
 savepath.mkdir(parents=True, exist_ok=True)
+figpath = SAVEPATH / "figures"
+figpath.mkdir(parents=True, exist_ok=True)
 print("Savepath:", savepath)
 
-basepath = BASEPATH.parent / (BASEPATH.name + "_test_pbald_ablation")
+basepath = BASEPATH.parent / (BASEPATH.name + "_pbald_ablation")
 COLLEVELNAMES = ["Dataset", "Budget", "Metric"]
 SETTINGS = {
     "ACDC": {
@@ -154,8 +156,8 @@ def _load_and_format_auc_df(path: Path) -> pd.DataFrame:
             columns={
                 "('Mean Dice AUBC', 'mean')": "AUBC",
                 "('Mean Dice AUBC', 'std')": "AUBC std",
-                "('Mean Dice Final', 'mean')": "Final",
-                "('Mean Dice Final', 'std')": "Final std",
+                "('Mean Dice Final', 'mean')": "Final Dice",
+                "('Mean Dice Final', 'std')": "Final Dice std",
             }
         )
         .apply(lambda x: np.round(x * 100, 2))
@@ -169,7 +171,7 @@ def _load_and_format_beta_df(path: Path) -> pd.DataFrame:
         pd.read_json(path / "beta.json")
         .set_index("Query Method")
         .apply(lambda x: np.round(x, 2))
-    ).rename(columns={"beta_std": "beta std"})
+    ).rename(columns={"beta": "FG Eff.", "beta_std": "FG Eff. std"})
 
 
 for dataset_name in SETTINGS:
@@ -199,10 +201,10 @@ for dataset_name in SETTINGS:
             [
                 "AUBC",
                 "AUBC std",
-                "Final",
-                "Final std",
-                "beta",
-                "beta std",
+                "Final Dice",
+                "Final Dice std",
+                "FG Eff.",
+                "FG Eff. std",
             ]
         ]
         data_dict["df"].reset_index(inplace=True)
@@ -241,7 +243,7 @@ for dataset_name in SETTINGS:
     whole_data.index.name = "Query Method"
 
     cmap = "Oranges"
-    higher_is_better = ["AUBC", "Final", "beta"]
+    higher_is_better = ["AUBC", "Final Dice", "FG Eff."]
     subset = [col for col in whole_data.columns if col[-1] in higher_is_better]
 
     print_data = whole_data.copy(deep=True)
@@ -282,3 +284,43 @@ for dataset_name in SETTINGS:
     )
 
     entire_data.append(whole_data)
+
+
+from itertools import product
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+entire_data = pd.concat(entire_data, axis=1)
+
+df = entire_data.unstack().unstack(level=2)
+
+
+datasets = df.index.levels[0]
+metrics = ["AUBC", "Final Dice", "FG Eff."]
+fig, axs = plt.subplots(
+    nrows=len(datasets), ncols=len(metrics), squeeze=False, sharex=True
+)
+for (j, dataset), (i, metric) in product(enumerate(datasets), enumerate(metrics)):
+    sns.lineplot(
+        ax=axs[i, j],
+        data=df.loc[dataset],
+        x="Query Method",
+        y=metric,
+        hue="Budget",
+        marker="o",
+    )
+
+    axs[i, j].legend().remove()
+    axs[i, j].set_ylabel(None)
+    if i == 0:
+        axs[i, j].set_title(dataset)
+        ax = axs[len(datasets) - 1, j]
+        ax.set_xlabel("$\\beta$-Parameter")
+        ax.set_xticklabels(["1", "5", "10", "20", "40", "$\\infty$"])
+
+    axs[i, 0].set_ylabel(metric)
+
+fig.tight_layout()
+axs[axs.shape[-1] - 1, 0].legend(loc=(0.5, -0.7), handlelength=4, ncols=4)
+plt.savefig(figpath / "ablation-powerbald.pdf", bbox_inches="tight")

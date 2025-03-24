@@ -143,7 +143,7 @@ class SettingAnalysis:
     )
     performance_keys: list[str] | None = None
     statistic_keys: list[str] | None = None
-    palette: dict[str, str] | None = None
+    palette: dict[str, Any] | None = None
     string_id: str | None = None
 
     def __post_init__(self):

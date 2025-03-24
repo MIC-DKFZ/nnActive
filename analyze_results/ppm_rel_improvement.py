@@ -22,16 +22,18 @@ from nnactive.utils.io import save_df_to_txt
 # matplotlib.rcParams["font.family"] = "Computer Modern"
 
 MAIN_ORDER = CUSTOM_ORDER
+LEGEND = True
 
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
 savepath = SAVEPATH / "figures"
+IMGTYPE = "pdf"
 
 COMPARATIVE = False
 
 USE_SETTINGS_LIST = [
     {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
@@ -40,6 +42,7 @@ USE_SETTINGS_LIST = [
 RENAME_SETTINGS = None
 
 RANDOM_BASELINE = "Random 66% FG"
+# RANDOM_BASELINE = "Random"
 SORT_BY_PERFORMANCE = False
 MIRROR_BAR_PLOTS = False
 
@@ -74,6 +77,7 @@ def rel_improvement_barplot(
     mirrored: bool = False,
     value_text: bool = True,
     baseline: str = "Random 66% FG",
+    add_legend: bool = True,
 ):
     to_drop = ["Mean", "Random", "Random 33% FG", "Random 66% FG"]
     to_drop.remove(baseline)
@@ -157,29 +161,37 @@ def rel_improvement_barplot(
                     horizontalalignment="center",
                 )
 
-    # Create dummy legend handles
-    upper_bar_legend = mpatches.Patch(
-        color="black", alpha=0.7, label="Outperforming Random (66% FG)"
-    )
-    lower_bar_legend = mpatches.Patch(
-        color="black", hatch="//", alpha=0.3, label="Outperformed by Random (66% FG)"
-    )
+    if add_legend:
+        # Create dummy legend handles
+        # upper_bar_legend = mpatches.Patch(
+        #     color="black", alpha=0.7, label="Outperforming Random (66% FG)"
+        # )
+        upper_bar_legend = mpatches.Patch(color="black", alpha=0.7, label="Wins")
+        lower_bar_legend = mpatches.Patch(
+            color="black",
+            hatch="//",
+            alpha=0.3,
+            label="Losses",
+        )
 
-    # Add the legend
-    ax.legend(handles=[upper_bar_legend, lower_bar_legend])
-    ax.grid(False)
+        # Add the legend
+        ax.legend(handles=[upper_bar_legend, lower_bar_legend])
+    ax.grid(axis="x")
     ax.set_axisbelow(True)
 
     # Formatting
     ax.set_xticks(x)
     ax.set_xticklabels(df_col["Method"])
-    plt.ylabel("Fraction of main study experiments [%]")
+    # ax.set_xticklabels(df_col["Method"], rotation=45, ha="center")
+    # plt.ylabel("Fraction of main study experiments [%]")
+    plt.ylabel("Fraction of experiments [%]")
     plt.axhline(0, color="black", linewidth=1)
 
     # Make all yticklabels positive
     if mirrored:
         ax.set_yticklabels([f"{abs(int(tick))}" for tick in ax.get_yticks()])
 
+    print(f"Saving to {out_path}")
     plt.savefig(out_path, bbox_inches="tight")
 
 
@@ -217,7 +229,7 @@ for setting in USE_SETTINGS_LIST:
             ]
         )
         df_matrix = pairwisematrix_to_df(merged_matrix)
-        fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.png"
+        fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
         rel_improvement_barplot(
             df_matrix,
             out_path=savepath / fname,
@@ -225,6 +237,7 @@ for setting in USE_SETTINGS_LIST:
             value_text=True,
             sort_by_performance=SORT_BY_PERFORMANCE,
             baseline=RANDOM_BASELINE,
+            add_legend=LEGEND,
         )
 
     merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
@@ -236,7 +249,7 @@ for setting in USE_SETTINGS_LIST:
         ]
     )
     df_matrix = pairwisematrix_to_df(merged_matrix)
-    fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.png"
+    fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
     rel_improvement_barplot(
         df_matrix,
         out_path=savepath / fname,
@@ -244,4 +257,5 @@ for setting in USE_SETTINGS_LIST:
         value_text=True,
         sort_by_performance=SORT_BY_PERFORMANCE,
         baseline=RANDOM_BASELINE,
+        add_legend=LEGEND,
     )
