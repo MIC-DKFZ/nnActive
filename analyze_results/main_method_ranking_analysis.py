@@ -57,8 +57,8 @@ FINAL_COLUMNS = [
         "PrintCol": "Final Dice std",
         "better": None,
     },
-    {"ReadCol": "beta", "PrintCol": "FG-Eff.", "better": "higher"},
-    {"ReadCol": "beta_std", "PrintCol": "FG-Eff. std", "better": None},
+    {"ReadCol": "beta", "PrintCol": "FG-Eff", "better": "higher"},
+    {"ReadCol": "beta_std", "PrintCol": "FG-Eff std", "better": None},
 ]
 
 ADD_LEGEND = False

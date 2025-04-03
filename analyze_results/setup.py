@@ -136,7 +136,6 @@ def get_ranking_cmap(
 
 
 def compute_column_normalized_gmap(data: pd.DataFrame, invert: bool):
-
     # NOTE: Manually compute gradient map because Normalize returns 0 if vmax - vmin == 0, but we
     # NOTE:   want it to be 1 in that case
 
@@ -207,7 +206,7 @@ def load_setting_data_to_df(
                 )
                 if comparative:
                     combined_df = combined_df[
-                        [col for col in combined_df.columns if "FG-Eff." not in col]
+                        [col for col in combined_df.columns if "FG-Eff" not in col]
                     ]
 
                 data_dict[dataset][budget][sett] = combined_df
