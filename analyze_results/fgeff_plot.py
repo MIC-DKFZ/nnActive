@@ -3,15 +3,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
-from scipy.optimize import curve_fit
-from setup import CUSTOM_ORDER, QM_TO_COLOR, RENAMING_DICT
+from setup import BASEPATH, QM_TO_COLOR, RENAMING_DICT, RESULTSPATH
 
-from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
-from nnactive.analyze.analyze_results import PALETTE, MultiExperimentAnalysis
-from nnactive.analyze.metrics import DatasetBeta
-from nnactive.utils.io import load_pickle, save_df_to_txt
+from nnactive.analyze.analysis import SettingAnalysis
+from nnactive.utils.io import load_pickle
 
 qm_list = [
     "power_pe",
@@ -21,15 +16,14 @@ qm_list = [
 
 SAVETYPE = "pdf"
 
-SAVEPATH = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/fg_effplot/"
-)
+SAVEPATH = RESULTSPATH / "fg_effplot"
+
 if SAVEPATH.exists() is False:
     os.makedirs(SAVEPATH)
 
 PATHS = [
-    # "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka-main/Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+    BASEPATH
+    / "Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
 ]
 
 if __name__ == "__main__":
@@ -91,9 +85,3 @@ if __name__ == "__main__":
         ax.legend()
         plt.savefig(SAVEPATH / f"fg-eff_plot.{SAVETYPE}", bbox_inches="tight")
         pprint(datasetbeta)
-
-
-import pandas as pd
-
-df = pd.read_pickle("analysis_df.pkl")
-((df["percentage_of_num_voxels"].min() / df["num_patches"].min()) * 100)

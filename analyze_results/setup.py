@@ -72,41 +72,22 @@ for q in QM_TO_COLOR:
 
 QM_TO_COLOR["LPowBalanced PE 66%"] = "#87CEFA"
 
-# QM_TO_COLOR = {
-#     # BALDS
-#     "BALD": "#bcbd22",  # Yellow-green
-#     "PowerBALD": "#ff7f0e",  # Orange
-#     "SoftrankBALD": "#7f7f7f",  # Gray
-#     # PEs
-#     "Predictive Entropy": "#344771",  # Dark Blue
-#     "PowerPE": "#a9e299",  # Green
-#     "Balanced PE 33%": "#005b96",  # medium blue
-#     "Balanced PE 66%": "#6497b1",  # light blue
-#     #
-#     # "Predictive Entropy": "#4169E1",  # Dark Blue
-#     # "PowerPE": "#2ca02c",  # Green
-#     # "Balanced PE 33%": "#1f77b4",  # medium blue
-#     # "Balanced PE 66%": "#87CEFA",  # light blue
-#     #
-#     # Randoms
-#     "Random": "#9467bd",  # Purple
-#     # "Random": "#ff0000",  # Red
-#     "Random 33% FG": "#ff5a00",  # Red
-#     "Random 66% FG": "#ff9a00",  # Light Red
-#     #
-#     # "Random" : "#9467bd",  # Purple
-#     # "Random 33% FG": "#d62728",  # Red
-#     # "Random 66% FG": "#e377c2",  # Light Red
-# }
 
 BASEPATH = Path(
     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/"
 )
 
-SAVEPATH = Path(
-    # "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_eval_classpe/"
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_eval/"
-)
+RESULTSPATH = Path(__file__).parent.parent / "results"
+if not RESULTSPATH.exists():
+    print("Creating Resultspath: ", RESULTSPATH)
+    os.makedirs(RESULTSPATH)
+else:
+    print("Resultspath already exists: ", RESULTSPATH)
+
+
+SAVEPATH = RESULTSPATH / "horeka_rsync_eval"
+# SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
+
 if not SAVEPATH.exists():
     print("Creating Savepath: ", SAVEPATH)
     os.makedirs(SAVEPATH)

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from setup import BASEPATH, RENAMING_DICT
+from setup import BASEPATH, RENAMING_DICT, RESULTSPATH
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -52,10 +52,10 @@ IDENTIFIER_DICT = {
     500: "High-Label Regime",
 }
 
+savepath = RESULTSPATH / "amos_check"
+if not savepath.exists():
+    os.makedirs(savepath)
 
-savepath = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/amos_check/"
-)
 
 for name in SETTINGS:
     SETTINGS[name] = [BASEPATH / p for p in SETTINGS[name]]
