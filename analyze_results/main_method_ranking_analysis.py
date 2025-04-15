@@ -32,7 +32,7 @@ savepath.mkdir(exist_ok=True, parents=True)
 filetype = "pdf"
 
 NAME = "main_method_ranking"
-COLLEVELANMES = ["Dataset", "Budget", "Metric"]
+COLLEVELANMES = ["Dataset", "Label Regime", "Metric"]
 
 USE_SETTINGS_LIST = [
     ["Main"],

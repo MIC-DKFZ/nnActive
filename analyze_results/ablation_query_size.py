@@ -36,7 +36,7 @@ setting_analyses = load_settings(settings, comparative=COMPARATIVE)
 RENAME_SETTINGS = {
     "Main": "QSx1",
 }
-COLLEVELNAMES = ["Dataset", "Budget"]
+COLLEVELNAMES = ["Dataset", "Label Regime"]
 
 rename_settings_in_analysis(setting_analyses, RENAME_SETTINGS)
 

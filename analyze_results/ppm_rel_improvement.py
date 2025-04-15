@@ -22,10 +22,16 @@ from nnactive.utils.io import save_df_to_txt
 # matplotlib.rcParams["font.family"] = "Computer Modern"
 
 MAIN_ORDER = CUSTOM_ORDER
-LEGEND = True
+LEGEND = False
 
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
+# NORANDOM_ORDER.remove("class_pe33")
+# MINIORDER = [
+#     "class_pe66",
+#     "class_power_pe66_exp",
+#     "random-label",
+# ]
 savepath = SAVEPATH / "figures"
 IMGTYPE = "pdf"
 
@@ -34,6 +40,7 @@ COMPARATIVE = False
 USE_SETTINGS_LIST = [
     {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
@@ -41,8 +48,11 @@ USE_SETTINGS_LIST = [
 
 RENAME_SETTINGS = None
 
-RANDOM_BASELINE = "Random 66% FG"
-# RANDOM_BASELINE = "Random"
+RANDOM_BASELINES = [
+    "Random 33% FG",
+    "Random 66% FG",
+    "Random",  # 500 Epochs setting does not run with this baseline
+]
 SORT_BY_PERFORMANCE = False
 MIRROR_BAR_PLOTS = False
 
@@ -96,7 +106,7 @@ def rel_improvement_barplot(
         df_col = df_col.sort_values(by="Value", ascending=True)
 
     # Create figure and axis
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(6, 3))
 
     bar_width = 0.8 if mirrored else 0.4
     x = np.arange(len(df_col))
@@ -181,7 +191,9 @@ def rel_improvement_barplot(
 
     # Formatting
     ax.set_xticks(x)
-    ax.set_xticklabels(df_col["Method"])
+    ax.set_xticklabels(
+        [x if i % 2 == 0 else f"\n{x}" for i, x in enumerate(df_col["Method"])]
+    )
     # ax.set_xticklabels(df_col["Method"], rotation=45, ha="center")
     # plt.ylabel("Fraction of main study experiments [%]")
     plt.ylabel("Fraction of experiments [%]")
@@ -195,67 +207,73 @@ def rel_improvement_barplot(
     plt.savefig(out_path, bbox_inches="tight")
 
 
-for setting in USE_SETTINGS_LIST:
-    setting_names = setting["setting_names"]
-    custom_order = setting["custom_order"]
-    setting_paths = get_settings_for_combination(setting_names)
-    setting_data = load_settings(setting_paths)
-    if RENAME_SETTINGS is not None:
-        rename_settings_in_analysis(setting_data)
-    save_setting = "_".join(setting_names).replace(" ", "").replace("/", "-").lower()
-    print_setting = " & ".join(setting_names)
+if __name__ == "__main__":
 
-    all_matrices = {}
-    for dataset in setting_data:
-        all_matrices[dataset] = {}
-        for budget in setting_data[dataset]:
-            all_matrices[dataset][budget] = {}
-            for subsetting in setting_data[dataset][budget]:
-                analysis = setting_data[dataset][budget][subsetting]
-                matrix = analysis.compute_pairwise_penalty()
-                del_algs = [a for a in matrix.algs if a not in custom_order]
-                for a in del_algs:
-                    matrix.delete_alg(a)
-                matrix = matrix.custom_order_matrix(custom_order)
-                matrix.rename_algs(RENAMING_DICT)
-                all_matrices[dataset][budget][subsetting] = matrix
-
-    for dataset in all_matrices:
-        merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
-            [
-                mat[subsetting]
-                for subsetting in setting_names
-                for mat in all_matrices[dataset].values()
-            ]
+    for setting in USE_SETTINGS_LIST:
+        setting_names = setting["setting_names"]
+        custom_order = setting["custom_order"]
+        setting_paths = get_settings_for_combination(setting_names)
+        setting_data = load_settings(setting_paths)
+        if RENAME_SETTINGS is not None:
+            rename_settings_in_analysis(setting_data)
+        save_setting = (
+            "_".join(setting_names).replace(" ", "").replace("/", "-").lower()
         )
-        df_matrix = pairwisematrix_to_df(merged_matrix)
-        fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
-        rel_improvement_barplot(
-            df_matrix,
-            out_path=savepath / fname,
-            mirrored=MIRROR_BAR_PLOTS,
-            value_text=True,
-            sort_by_performance=SORT_BY_PERFORMANCE,
-            baseline=RANDOM_BASELINE,
-            add_legend=LEGEND,
-        )
+        print_setting = " & ".join(setting_names)
 
-    merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
-        [
-            all_matrices[d][b][s]
-            for d in all_matrices
-            for b in all_matrices[d]
-            for s in all_matrices[d][b]
-        ]
-    )
-    df_matrix = pairwisematrix_to_df(merged_matrix)
-    fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
-    rel_improvement_barplot(
-        df_matrix,
-        out_path=savepath / fname,
-        mirrored=MIRROR_BAR_PLOTS,
-        value_text=True,
-        sort_by_performance=SORT_BY_PERFORMANCE,
-        baseline=RANDOM_BASELINE,
-        add_legend=LEGEND,
-    )
+        all_matrices = {}
+        for dataset in setting_data:
+            all_matrices[dataset] = {}
+            for budget in setting_data[dataset]:
+                all_matrices[dataset][budget] = {}
+                for subsetting in setting_data[dataset][budget]:
+                    analysis = setting_data[dataset][budget][subsetting]
+                    matrix = analysis.compute_pairwise_penalty()
+                    del_algs = [a for a in matrix.algs if a not in custom_order]
+                    for a in del_algs:
+                        matrix.delete_alg(a)
+                    matrix = matrix.custom_order_matrix(custom_order)
+                    matrix.rename_algs(RENAMING_DICT)
+                    all_matrices[dataset][budget][subsetting] = matrix
+
+        for RANDOM_BASELINE in RANDOM_BASELINES:
+
+            for dataset in all_matrices:
+                merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
+                    [
+                        mat[subsetting]
+                        for subsetting in setting_names
+                        for mat in all_matrices[dataset].values()
+                    ]
+                )
+                df_matrix = pairwisematrix_to_df(merged_matrix)
+                fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
+                rel_improvement_barplot(
+                    df_matrix,
+                    out_path=savepath / fname,
+                    mirrored=MIRROR_BAR_PLOTS,
+                    value_text=True,
+                    sort_by_performance=SORT_BY_PERFORMANCE,
+                    baseline=RANDOM_BASELINE,
+                    add_legend=LEGEND,
+                )
+
+            merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
+                [
+                    all_matrices[d][b][s]
+                    for d in all_matrices
+                    for b in all_matrices[d]
+                    for s in all_matrices[d][b]
+                ]
+            )
+            df_matrix = pairwisematrix_to_df(merged_matrix)
+            fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
+            rel_improvement_barplot(
+                df_matrix,
+                out_path=savepath / fname,
+                mirrored=MIRROR_BAR_PLOTS,
+                value_text=True,
+                sort_by_performance=SORT_BY_PERFORMANCE,
+                baseline=RANDOM_BASELINE,
+                add_legend=LEGEND,
+            )

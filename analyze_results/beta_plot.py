@@ -6,36 +6,41 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.optimize import curve_fit
+from setup import CUSTOM_ORDER, QM_TO_COLOR, RENAMING_DICT
 
 from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
 from nnactive.analyze.analyze_results import PALETTE, MultiExperimentAnalysis
 from nnactive.analyze.metrics import DatasetBeta
 from nnactive.utils.io import load_pickle, save_df_to_txt
 
+qm_list = [
+    "power_pe",
+    "pred_entropy",
+    "random-label",
+]
+
+SAVETYPE = "pdf"
+
+SAVEPATH = Path(
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/fg_effplot/"
+)
+if SAVEPATH.exists() is False:
+    os.makedirs(SAVEPATH)
+
+PATHS = [
+    # "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka-main/Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
+    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200",
+]
+
 if __name__ == "__main__":
 
-    paths = [
-        "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka-main/Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
-    ]
-    output_dir = Path(".")
-
-    # paths = [
-    # "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka-main/Dataset135_KiTS2021/patch-64_64_64__sb-random-label2-all-classes__sbs-200__qs-200"
-    # ]
-
-    # path = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka-main"
-    # )
-    # paths = list(path.rglob("analysis.pkl"))
-    # paths = [p.parent for p in paths if "Dataset004" not in str(p)]
-
-    for i in range(len(paths)):
-        paths[i] = Path(paths[i])
+    for i in range(len(PATHS)):
+        PATHS[i] = Path(PATHS[i])
 
     x_axs = "percentage_of_voxels_foreground"
     y_axs = "Mean Dice"
 
-    for path in paths:
+    for path in PATHS:
         setting: SettingAnalysis = load_pickle(path / "analysis.pkl")
 
         trainer = str(setting.df["trainer"].unique()[0])
@@ -45,156 +50,50 @@ if __name__ == "__main__":
             trainer_use = f"{trainer_use}_{epochs[-1]}"
         betas = setting.compute_beta_curve(
             trainer_use,
-            "percentage_of_voxels_foreground",
+            x_axs,
         )
         datasetbeta = setting.compute_beta_curve(trainer_use, x_axs, y_axs)
         from pprint import pprint
 
-        beta_df = datasetbeta.to_beta_df()
-        # beta_df.to_json(path / "beta.json")
-        # save_df_to_txt(beta_df, path / "beta.txt")
-
-    # data = pd.concat(data_dicts, axis=0)
-    # setting.df = data
-    # x_axs = "percentage_of_voxels_foreground"
-    # y_axs = "Mean Dice"
-
-    # fig, axs = plt.subplots()
-
-    # for key, df in setting.df.groupby(setting.query_key):
-    #     sns.regplot(
-    #         data=df,
-    #         x=x_axs,
-    #         y=y_axs,
-    #         logx=True,
-    #     )
-
-    # plt.savefig("fit.png", bbox_inches="tight")
-
-    # c_ = np.mean(
-    #     setting.df[setting.df["#Patches"] == setting.df["#Patches"].min()][y_axs]
-    # )
-    # # amos full data 200 epochs
-    a = 0.8600327277955928
-    # c = a - c_
-    # curve = lambda x, b: a - np.exp(-x * b) * c
-    # # Center around 0!
-    # setting.df["x_fit"] = setting.df[x_axs] - setting.df[x_axs].min()
-
-    # fig, axs = plt.subplots()
-    # print(setting.df["x_fit"])
-    # print(a, c)
-    # fit_dirs = []
-    # for key, df in setting.df.groupby(setting.query_key):
-    #     popt, pcov = curve_fit(curve, df["x_fit"], df[y_axs])
-    #     print(f"{key=}, {popt=}")
-    #     df["y_fit"] = curve(df["x_fit"], *popt)
-    #     sns.lineplot(
-    #         data=df,
-    #         x=x_axs,
-    #         y="y_fit",
-    #         ax=axs,
-    #         hue=setting.query_key,
-    #         palette=PALETTE,
-    #     )
-    #     sns.scatterplot(
-    #         data=df,
-    #         x=x_axs,
-    #         y=y_axs,
-    #         ax=axs,
-    #         hue=setting.query_key,
-    #         palette=PALETTE,
-    #         legend=False,
-    #     )
-    #     fit_dirs.append({"Query Method": key, "b": popt[0], "b_std": pcov[0, 0]})
-    # plt.savefig(output_dir / "fit2.png", bbox_inches="tight")
-    # axs.set_xscale("log")
-
-    # plt.savefig(output_dir / "fit2_log.png", bbox_inches="tight")
-    # from pprint import pprint
-
-    # pprint(pd.DataFrame(fit_dirs))
-
-    # # curve = lambda x, b: a - np.exp(-x * b) + c_
-    # # setting.df["x_fit"] = (
-    # #     setting.df["percentage_of_voxels_foreground"]
-    # #     - setting.df["percentage_of_voxels_foreground"].min()
-    # # )
-
-    # # fig, axs = plt.subplots()
-    # # print(setting.df["x_fit"])
-    # # print(a, c)
-    # # for key, df in setting.df.groupby(setting.query_key):
-    # #     popt, pcov = curve_fit(curve, df["x_fit"], df[y_axs])
-    # #     print(f"{key=}, {popt=}")
-    # #     df["y_fit"] = curve(df["x_fit"], *popt)
-    # #     sns.lineplot(
-    # #         data=df,
-    # #         x="percentage_of_voxels_foreground",
-    # #         y="y_fit",
-    # #         ax=axs,
-    # #         hue=setting.query_key,
-    # #         palette=PALETTE,
-    # #     )
-    # #     sns.scatterplot(
-    # #         data=df,
-    # #         x="percentage_of_voxels_foreground",
-    # #         y=y_axs,
-    # #         ax=axs,
-    # #         hue=setting.query_key,
-    # #         palette=PALETTE,
-    # #         legend=False,
-    # #     )
-    # # axs.set_xscale("log")
-
-    # # plt.savefig(output_dir / "fit3.png", bbox_inches="tight")
-
-    c_ = np.mean(setting.df[setting.df[x_axs] == setting.df[x_axs].min()][y_axs])
-    # amos full data 200 epochs
-    a = 0.8600327277955928
-    c = a - c_
-    curve = lambda x, b: a - np.exp(-x * b) * c
-    # Center around 0!
-    setting.df["x_fit"] = (
-        setting.df["percentage_of_voxels_foreground"]
-        - setting.df["percentage_of_voxels_foreground"].min()
-    )
-
-    fig, axs = plt.subplots()
-    fit_dirs = []
-    for key, df in setting.df.groupby(setting.query_key):
-        popt, pcov = curve_fit(curve, df["x_fit"], df[y_axs])
-        df["y_fit"] = curve(df["x_fit"], *popt)
-        sns.lineplot(
-            data=df,
-            x="percentage_of_voxels_foreground",
-            y="y_fit",
-            ax=axs,
-            hue=setting.query_key,
-            palette=PALETTE,
+        x_min = setting.df[x_axs].min()
+        x_max = setting.df[x_axs].max()
+        x_range = np.linspace(x_min, x_max, 100)
+        factor = 4 / 5
+        fig, ax = plt.subplots(figsize=(8 * factor, 6 * factor))
+        for qm in qm_list:
+            qm_name = RENAMING_DICT[qm]
+            y_vals = datasetbeta.compute(x_range, qm)
+            qm_df = setting.df[setting.df[setting.query_key] == qm]
+            ax.plot(
+                x_range * 100,
+                y_vals,
+                label=qm_name
+                + r" ($\gamma=$"
+                + str(round(datasetbeta.beta_dict[qm], 2))
+                + ")",
+                color=QM_TO_COLOR[qm_name],
+            )
+            ax.scatter(
+                qm_df[x_axs] * 100,
+                qm_df[y_axs],
+                color=QM_TO_COLOR[qm_name],
+            )
+        ax.set_xlabel("Percentage of Voxels Foreground [%]")
+        ax.set_ylabel(y_axs.replace("_", " "))
+        plt.hlines(
+            datasetbeta.c,
+            x_min * 100,
+            x_max * 100,
+            color="black",
+            linestyle="--",
+            label=r"$\hat{y}_{\text{full}}$",
         )
-        sns.scatterplot(
-            data=df,
-            x="percentage_of_voxels_foreground",
-            y=y_axs,
-            ax=axs,
-            hue=setting.query_key,
-            palette=PALETTE,
-            legend=False,
-        )
-        fit_dirs.append({"Query Method": key, "b": popt[0], "b_std": pcov[0, 0]})
-    plt.savefig(output_dir / "fit4.png", bbox_inches="tight")
-    axs.set_xscale("log")
+        ax.legend()
+        plt.savefig(SAVEPATH / f"fg-eff_plot.{SAVETYPE}", bbox_inches="tight")
+        pprint(datasetbeta)
 
-    plt.savefig(output_dir / "fit4_log.png", bbox_inches="tight")
-    # from pprint import pprint
 
-    # pprint(pd.DataFrame(fit_dirs))
+import pandas as pd
 
-    # fitted = DatasetBeta.from_df(
-    #     setting.df, x=x_axs, y=y_axs, y_max=a, qm_key=setting.query_key
-    # )
-    # fitted.compute(fitted.x_offset, "random")
-    # df_fitted = fitted.to_beta_df()
-
-    # save_df_to_txt(df_fitted, "fitted.txt")
+df = pd.read_pickle("analysis_df.pkl")
+((df["percentage_of_num_voxels"].min() / df["num_patches"].min()) * 100)

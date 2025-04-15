@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 from setup import BASEPATH, RENAMING_DICT, SAVEPATH
 
 from nnactive.analyze.aggregate_results import pretty_auc
@@ -19,7 +20,7 @@ figpath.mkdir(parents=True, exist_ok=True)
 print("Savepath:", savepath)
 
 basepath = BASEPATH.parent / (BASEPATH.name + "_pbald_ablation")
-COLLEVELNAMES = ["Dataset", "Budget", "Metric"]
+COLLEVELNAMES = ["Dataset", "Label Regime", "Metric"]
 SETTINGS = {
     "ACDC": {
         "Low": [
@@ -171,7 +172,7 @@ def _load_and_format_beta_df(path: Path) -> pd.DataFrame:
         pd.read_json(path / "beta.json")
         .set_index("Query Method")
         .apply(lambda x: np.round(x, 2))
-    ).rename(columns={"beta": "FG Eff.", "beta_std": "FG Eff. std"})
+    ).rename(columns={"beta": "FG-Eff", "beta_std": "FG-Eff std"})
 
 
 for dataset_name in SETTINGS:
@@ -203,8 +204,8 @@ for dataset_name in SETTINGS:
                 "AUBC std",
                 "Final Dice",
                 "Final Dice std",
-                "FG Eff.",
-                "FG Eff. std",
+                "FG-Eff",
+                "FG-Eff std",
             ]
         ]
         data_dict["df"].reset_index(inplace=True)
@@ -243,7 +244,7 @@ for dataset_name in SETTINGS:
     whole_data.index.name = "Query Method"
 
     cmap = "Oranges"
-    higher_is_better = ["AUBC", "Final Dice", "FG Eff."]
+    higher_is_better = ["AUBC", "Final Dice", "FG-Eff"]
     subset = [col for col in whole_data.columns if col[-1] in higher_is_better]
 
     print_data = whole_data.copy(deep=True)
@@ -297,7 +298,7 @@ df = entire_data.unstack().unstack(level=2)
 
 
 datasets = df.index.levels[0]
-metrics = ["AUBC", "Final Dice", "FG Eff."]
+metrics = ["AUBC", "Final Dice", "FG-Eff"]
 fig, axs = plt.subplots(
     nrows=len(datasets), ncols=len(metrics), squeeze=False, sharex=True
 )
@@ -307,7 +308,7 @@ for (j, dataset), (i, metric) in product(enumerate(datasets), enumerate(metrics)
         data=df.loc[dataset],
         x="Query Method",
         y=metric,
-        hue="Budget",
+        hue="Label Regime",
         marker="o",
     )
 
@@ -324,3 +325,53 @@ for (j, dataset), (i, metric) in product(enumerate(datasets), enumerate(metrics)
 fig.tight_layout()
 axs[axs.shape[-1] - 1, 0].legend(loc=(0.5, -0.7), handlelength=4, ncols=4)
 plt.savefig(figpath / "ablation-powerbald.pdf", bbox_inches="tight")
+
+for dataset in datasets:
+    fig, axs = plt.subplots(
+        nrows=1, ncols=len(metrics), squeeze=False, sharex=False, figsize=(6, 2)
+    )
+    i = 0
+    for j, metric in enumerate(metrics):
+        ax: Axes = axs[i, j]
+        sns.lineplot(
+            ax=ax,
+            data=df.loc[dataset],
+            x="Query Method",
+            y=metric,
+            hue="Label Regime",
+            marker="o",
+        )
+
+        ax.legend().remove()
+        # axs[i, j].set_ylabel(None)
+        if i == 0:
+            # axs[i, j].set_title(dataset)
+            # ax = axs[0, j]
+            ax.set_xlabel("$\\beta$-Parameter")
+            ax.set_xticklabels(["1", "5", "10", "20", "40", "$\\infty$"])
+
+        if metric == "FG-Eff":
+            ax.text(
+                0.95,
+                0.95,
+                r"Noise strength",
+                horizontalalignment="right",
+                verticalalignment="top",
+                transform=ax.transAxes,
+                fontsize=8,
+            )
+            ax.text(
+                0.9,
+                0.88,
+                r"$\longleftarrow$",
+                horizontalalignment="right",
+                verticalalignment="top",
+                transform=ax.transAxes,
+                fontsize=18,
+            )
+
+        # axs[i, 0].set_ylabel(metric)
+
+    fig.tight_layout()
+    axs[0, 0].legend(loc=(0.5, -0.6), handlelength=4, ncols=4)
+    plt.savefig(figpath / f"ablation-powerbald_{dataset}.pdf", bbox_inches="tight")

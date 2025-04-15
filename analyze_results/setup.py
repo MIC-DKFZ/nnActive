@@ -20,6 +20,7 @@ CUSTOM_ORDER = [
     "power_pe",
     # "class_pe33",
     # "class_pe66",
+    # "class_power_pe66_exp",
     "random",
     "random-label2",
     "random-label",
@@ -31,11 +32,12 @@ small_dict = {
     "softrank bald": "SoftrankBALD",
     "pred entropy": "Predictive Entropy",
     "power pe": "PowerPE",
-    "class pe33": "Balanced PE 33%",
-    "class pe66": "Balanced PE 66%",
+    # "class pe33": "Balanced PE 33%",
+    # "class pe66": "Balanced PE 66%",
+    # "class power pe66 exp": "LPowBalanced PE 66%",
     "random": "Random",
-    "random-label": "Random 66% FG",
     "random-label2": "Random 33% FG",
+    "random-label": "Random 66% FG",
 }
 
 RENAMING_DICT = {}
@@ -67,6 +69,8 @@ QM_TO_COLOR = {
 }
 for q in QM_TO_COLOR:
     QM_TO_COLOR[q] = mcolors.to_hex(cmap(QM_TO_COLOR[q]))
+
+QM_TO_COLOR["LPowBalanced PE 66%"] = "#87CEFA"
 
 # QM_TO_COLOR = {
 #     # BALDS

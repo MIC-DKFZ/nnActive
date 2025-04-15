@@ -61,7 +61,7 @@ CUSTOM_ORDER = [
 COPY_VALUES = ["random", "random-label", "random-label2"]
 SCORES = ["Final", "AUBC"]
 MAIN_METRIC = "Mean Dice"
-COLLEVELNAMES = ["Dataset", "Budget"]
+COLLEVELNAMES = ["Dataset", "Label Regime"]
 
 QUERYMETHODS = [
     "BALD",

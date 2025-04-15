@@ -263,6 +263,8 @@ class PairwiseMatrix:
         df_matrix = df_matrix.reindex(order[:-1] + ["Delete"] + order[-1:])
 
         # Plot the heatmap
+        fontsize_text = 12
+        fontsize_map = 14
         fig, axs = plt.subplots(figsize=(10, 8))
         sns.heatmap(
             ax=axs,
@@ -273,13 +275,18 @@ class PairwiseMatrix:
             cbar=True,
             vmin=0,
             vmax=max_poss_ent,
+            annot_kws={"fontsize": fontsize_map},
         )
         axs.set_title(f"Pairwise Penalty Matrix ({title_tag})")
         ticks = list(axs.get_yticks())
         axs.set_yticks(ticks[:-2] + ticks[-1:])
-        axs.set_xticklabels(axs.get_xticklabels(), rotation=30)
-        axs.set_ylabel(r"Algorithm outperforms $\uparrow$")
-        axs.set_xlabel(r"Algorithm outperformed by $\downarrow$")
+        axs.set_xticklabels(axs.get_xticklabels(), rotation=45, fontsize=fontsize_text)
+
+        axs.set_yticklabels(axs.get_yticklabels(), fontsize=fontsize_text)
+        axs.set_ylabel(r"Algorithm outperforms $\uparrow$", fontsize=fontsize_text)
+        axs.set_xlabel(
+            r"Algorithm outperformed by $\downarrow$", fontsize=fontsize_text
+        )
 
         # Save the plot if savepath is provided
         if savepath:

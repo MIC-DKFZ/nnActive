@@ -102,7 +102,7 @@ for dataset_name in setting_analyses:
             std_key = (metric, "std")
             dataset = name.split(" ")[0]
             budget = name.split(" ")[1]
-            ranking = {"Metric": score, "Dataset": dataset, "Budget": budget}
+            ranking = {"Metric": score, "Dataset": dataset, "Label Regime": budget}
 
             for exp_row in exp_row_names:
                 ranking["ranking " + exp_row] = auc_dict[exp_row][mean_key].rank(
@@ -133,7 +133,7 @@ ranking_df = pd.DataFrame(rankings)
 for score in scores:
     mean_ranking_df = (
         ranking_df[ranking_df["Metric"] == score]
-        .groupby(["Dataset", "Budget"])
+        .groupby(["Dataset", "Label Regime"])
         .mean(numeric_only=True)
     )
 

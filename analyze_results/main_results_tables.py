@@ -22,7 +22,7 @@ from nnactive.utils.io import save_df_to_txt
 
 COMPARATIVE = False
 CMAP = "Oranges"
-COLLEVELNAMES = ["Dataset", "Budget", "Setting", "Metric"]
+COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
 
 savepath = SAVEPATH
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
         else:
             collevelnames = COLLEVELNAMES.copy()
-            collevelnames.remove("Budget")
+            collevelnames.remove("Label Regime")
             for dataset in data_dict:
                 for budget in data_dict[dataset]:
                     whole_data = []

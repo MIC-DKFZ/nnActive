@@ -43,6 +43,7 @@ FULL_SETTINGS = {
             "Patchx1/2": "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
             "PowerBALD_beta": "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",  # from specific Path
             "500 Epochs": None,
+            # "500 Epochs": "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
             "Precomputed": None,
         },
         "Medium": {

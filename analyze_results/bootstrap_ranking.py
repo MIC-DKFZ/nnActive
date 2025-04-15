@@ -32,7 +32,7 @@ STANDARD_COLNAMES = ["Low", "Medium", "High"]
 IMGTYPE = "pdf"
 
 COMPARATIVE = False
-COLLEVELNAMES = ["Dataset", "Budget", "Setting", "Metric"]
+COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
 
 USE_SETTINGS_LIST = [
     ["Main"],  # enable for mean_rank in appendix
@@ -122,7 +122,7 @@ def nested_dict_of_df_to_df(
     for dset_name in bootstrap_rankings_dict:
         for budget in bootstrap_rankings_dict[dset_name]:
             bootstrap_rankings_dict[dset_name][budget]["Dataset"] = dset_name
-            bootstrap_rankings_dict[dset_name][budget]["Budget"] = budget
+            bootstrap_rankings_dict[dset_name][budget]["Label Regime"] = budget
     bootstrap_rankings_df = pd.concat(
         [v for d in bootstrap_rankings_dict.values() for v in d.values()]
     )
@@ -150,7 +150,7 @@ def plot_bootstrap_ranking_overview(
     )
     bootstrap_rankings_df = nested_dict_of_df_to_df(nested_bootstrap_ranking_dict)
     mean_ranks = bootstrap_rankings_df.groupby(
-        ["Query Method", "Dataset", "Budget"]
+        ["Query Method", "Dataset", "Label Regime"]
     ).mean(numeric_only=True)
     locations = [
         pd.IndexSlice[:, [d], [b]]
@@ -364,7 +364,7 @@ if __name__ == "__main__":
                     seeds = bootstrap_rankings["Left Out Seed"].unique()
                     stat_dict = {
                         "Name": dataset,
-                        "Budget": budget,
+                        "Label Regime": budget,
                     }
                     for c_metric in C_METRICS:
                         taus = []
@@ -403,7 +403,7 @@ if __name__ == "__main__":
             for c_metric in C_METRICS
             for suffix in ["Tau", "Pval"]
         ]
-        print(statistics_df[["Name", "Budget"] + mlist])
+        print(statistics_df[["Name", "Label Regime"] + mlist])
 
         add_mean_rankings = True
         bootstrap_rankings_df = nested_dict_of_df_to_df(nested_bootstrap_ranking_dict)
