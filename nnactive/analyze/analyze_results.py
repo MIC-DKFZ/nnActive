@@ -12,27 +12,49 @@ from loguru import logger
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import GridPlotter, SettingAnalysis
 from nnactive.analyze.experiment_results import SingleExperimentResults
-from nnactive.analyze.experiment_statistics import SingleExperimentStastistics
+from nnactive.analyze.experiment_statistics import (
+    SingleExperimentStastistics,
+    efficient_multistatitistics_nested_labels,
+)
 from nnactive.config.struct import Final
 from nnactive.utils.io import save_df_to_txt
 from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
 
 sns.set_style("whitegrid")
 
+sns.set_style("whitegrid")
+
+# TODO: Final version
+# Load all strategies from nnactive/strategies/__init__.py
 PALETTE = {
-    "random": "tab:blue",
-    "pred_entropy": "tab:green",
-    "mutual_information": "tab:orange",
-    "expected_dice": "tab:purple",
-    "random-label": "tab:red",
-    "random-label2": "tab:cyan",
-    "power_bald": "tab:brown",
-    "power_bald_b5": "tab:olive",
-    "power_bald_b10": "0",
-    "power_pe": "tab:gray",
-    "softrank_bald": "tab:pink",
-    "kmeans_bald": "tab:olive",
+    "random": None,
+    "pred_entropy": None,
+    "mutual_information": None,
+    "expected_dice": None,
+    "random-label": None,
+    "random-label2": None,
+    "power_bald": None,
+    "power_bald_b5": None,
+    "power_bald_b10": None,
+    "power_bald_b20": None,
+    "power_bald_b40": None,
+    "power_bald_b100": None,
+    "power_pe": None,
+    "softrank_bald": None,
+    "kmeans_bald": None,
+    "class_pe66": None,
+    "class_pe33": None,
+    "class_power_pe66_exp": None,
+    "class_power_pe33_exp": None,
+    "class_power_pe66_smooth_sigmoid": None,
+    "class_power_pe33_smooth_sigmoid": None,
+    "class_power_pe66_sharp_sigmoid": None,
+    "class_power_pe33_sharp_sigmoid": None,
 }
+
+unique_colors = sns.color_palette("husl", len(PALETTE))
+for i, key in enumerate(PALETTE):
+    PALETTE[key] = unique_colors[i]
 
 # Defuault is Class 1, 2, 3, ....
 # For some datasets we only want to plot a subset of classes
@@ -195,10 +217,12 @@ class MultiExperimentAnalysis:
         dataset_statistics: list[SingleExperimentStastistics],
         dataset_results: list[SingleExperimentResults],
         value: str = "Dice",
-        num_processes: int = 6,
+        num_processes: int = 4,
     ):
+        """Creates a merged dataframe for one unique base experiment."""
         df_stat_dicts: list[dict] = []
 
+        efficient_multistatitistics_nested_labels(dataset_statistics)
         if num_processes == 0:
             for exp in dataset_statistics:
                 df_stat_dict, stat_skip_keys = exp.to_df_row_dicts()
@@ -294,12 +318,18 @@ class MultiExperimentAnalysis:
             df["agg_stride"] = df["agg_stride"].apply(
                 lambda x: tuple([x] * 3) if isinstance(x, int) else x
             )
+        output_dirs = []
         for key, df_g in df.groupby(vals, as_index=False):
-            pre_suffix = df_g["pre_suffix"].iloc[0]
             identifier = create_string_identifier(key, ignore_ident=remove_ind)
             logger.info(f"Creating plots for Identifier: {identifier}")
             # create plots for each unique setting of the respective dataset
+            pre_suffix = df_g["pre_suffix"].iloc[0]
             setting_dir: Path = output_dir / (pre_suffix[2:])
+            i = 0
+            while setting_dir in output_dirs:
+                setting_dir = setting_dir.parent / (setting_dir.name + f"_v{i}")
+                i += 1
+            output_dirs.append(setting_dir)
             if not setting_dir.is_dir():
                 os.makedirs(setting_dir)
 

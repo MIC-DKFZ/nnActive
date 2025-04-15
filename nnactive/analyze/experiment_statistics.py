@@ -20,7 +20,7 @@ from nnactive.utils.io import load_json, load_label_map, save_json
 from nnactive.utils.patches import get_slices_for_file_from_patch
 from nnactive.utils.pyutils import get_clean_dataclass_dict
 
-CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches"]
+CONFIGSKIPKEYS = ["seed", "uncertainty", "#Patches", "queries_from_experiment"]
 
 
 @dataclass
@@ -132,10 +132,15 @@ class SingleExperimentStastistics:
     def __init__(self, raw_path: Path, results_path: Path | None = None):
         self.raw_path = raw_path
         self.results_path = results_path
+        self._nested_patches = None
+        self._dataset_json = None
+        self._init_nested_patch_labels()
 
     @property
     def dataset_json(self) -> dict:
-        return load_json(self.raw_path / "dataset.json")
+        if self._dataset_json is None:
+            self._dataset_json = load_json(self.raw_path / "dataset.json")
+        return self._dataset_json
 
     @property
     def config(self) -> ActiveConfig | None:
@@ -143,6 +148,14 @@ class SingleExperimentStastistics:
             return ActiveConfig.from_json(self.results_path / ActiveConfig.filename())
         else:
             return None
+
+    @property
+    def completed_patch_labels(self):
+        for loop in self._nested_patch_labels:
+            for patch in loop:
+                if patch is None:
+                    return False
+        return True
 
     @cached_property
     def full_data_statistic(self):
@@ -210,63 +223,61 @@ class SingleExperimentStastistics:
 
     @property
     def nested_patches(self) -> list[list[Patch]]:
-        return get_nested_patches_from_loop_files(self.raw_path)
+        if self._nested_patches is None:
+            self._nested_patches = get_nested_patches_from_loop_files(self.raw_path)
+        return self._nested_patches
 
-    @cached_property
+    @property
     def nested_patch_labels(self) -> list[list[dict[int, int]]]:
-        nested_labels = []
-        for loop_patches in self.nested_patches:
-            loop_labels = []
-            for patch in loop_patches:
-                label_image = load_label_map(
-                    patch.file, self.source_dataset_path / "labelsTr", ""
-                )
-                patch_access = get_slices_for_file_from_patch([patch], patch.file)[0]
-                patch_labels = label_image[patch_access]
-                # fill statistics
-                unique_cls, counts = np.unique(patch_labels, return_counts=True)
+        if not self.completed_patch_labels:
+            self._nested_patch_labels = self.efficient_nested_patch_labels()
+        return self._nested_patch_labels
 
-                patch_stastics = {
-                    int(unique_cl): int(count)
-                    for unique_cl, count in zip(unique_cls, counts)
-                }
-                loop_labels.append(patch_stastics)
-            nested_labels.append(loop_labels)
-        return nested_labels
+    def _init_nested_patch_labels(self):
+        nested_labels = [
+            [None] * len(loop_patches) for loop_patches in self.nested_patches
+        ]
+        self._nested_patch_labels = nested_labels
 
-    @cached_property
     def efficient_nested_patch_labels(self) -> list[list[dict[int, int]]]:
         files = [
             patch.file for loop_patches in self.nested_patches for patch in loop_patches
         ]
-        nested_labels = [
-            [None] * len(loop_patches) for loop_patches in self.nested_patches
-        ]
+        self._init_nested_patch_labels()
         for file in files:
             label_image = load_label_map(
                 file, self.source_dataset_path / "labelsTr", ""
             )
-            for i, loop_patches in enumerate(self.nested_patches):
-                for j, patch in enumerate(loop_patches):
-                    if patch.file == file:
-                        patch_access = get_slices_for_file_from_patch(
-                            [patch], patch.file
-                        )[0]
-                        patch_labels = label_image[patch_access]
-                        # fill statistics
-                        unique_cls, counts = np.unique(patch_labels, return_counts=True)
+            self.update_patch_statistics_for_file(file, label_image)
+        return self._nested_patch_labels
 
-                        nested_labels[i][j] = {
-                            int(unique_cl): int(count)
-                            for unique_cl, count in zip(unique_cls, counts)
-                        }
-        return nested_labels
+    def update_patch_statistics_for_file(self, file: str, label_image: np.ndarray):
+        """Inplace operation which updates the nested_labels with the statistics for the file
+
+        Args:
+            file (str): Identifier for label file with file ending (same as in loop_XXX.json)
+            label_image (np.ndarray): Numpy array carrying the labels for the file.
+        """
+        for i, loop_patches in enumerate(self.nested_patches):
+            for j, patch in enumerate(loop_patches):
+                if patch.file == file:
+                    patch_access = get_slices_for_file_from_patch([patch], patch.file)[
+                        0
+                    ]
+                    patch_labels = label_image[patch_access]
+                    # fill statistics
+                    unique_cls, counts = np.unique(patch_labels, return_counts=True)
+
+                    self._nested_patch_labels[i][j] = {
+                        int(unique_cl): int(count)
+                        for unique_cl, count in zip(unique_cls, counts)
+                    }
 
     @property
-    def nested_statstics(self) -> list[Statistics]:
+    def nested_statistics(self) -> list[Statistics]:
         nested_statistics = []
         for loop_labels, loop_patches in zip(
-            self.efficient_nested_patch_labels, self.nested_patches
+            self.nested_patch_labels, self.nested_patches
         ):
             loop_statistics = Statistics(
                 [patch.file for patch in loop_patches],
@@ -280,7 +291,7 @@ class SingleExperimentStastistics:
 
     @property
     def statistics(self) -> list[Statistics]:
-        statistics = self.nested_statstics
+        statistics = self.nested_statistics
         for i in range(1, len(statistics)):
             statistics[i].update_statistics(statistics[i - 1])
         return statistics
@@ -325,7 +336,7 @@ class SingleExperimentStastistics:
         return out_results, skip_keys
 
     def plot_experiment(self, output_path: Path | str | None = None):
-        df = pd.DataFrame(self.statistics.to_df_row_dicts())
+        df = pd.DataFrame(self.to_df_row_dicts())
         for key in df.columns:
             if key in ["Loop", "Experiment"]:
                 continue
@@ -342,3 +353,28 @@ class SingleExperimentStastistics:
 
                 plt.savefig(output_path / f"{self.raw_path.name}-{key}.png")
             plt.close("all")
+
+
+def efficient_multistatitistics_nested_labels(
+    multi_experiment_statistics: list[SingleExperimentStastistics],
+):
+    """Computes and updates the nested patch labels for all experiments in the list.
+    Instead of computing the nested patch labels for each experiment individually, this function
+    computes the nested patch labels for all experiments at once. This is more efficient as the
+    label files are only loaded once.
+    """
+    dataset_path = multi_experiment_statistics[0].source_dataset_path
+    for exp in multi_experiment_statistics:
+        assert dataset_path == exp.source_dataset_path
+    file_ending = multi_experiment_statistics[0].dataset_json["file_ending"]
+
+    files = [
+        f.name
+        for f in (dataset_path / "labelsTr").iterdir()
+        if f.is_file() and f.name.endswith(file_ending)
+    ]
+
+    for file in files:
+        label_image = load_label_map(file, dataset_path / "labelsTr", "")
+        for exp in multi_experiment_statistics:
+            exp.update_patch_statistics_for_file(file, label_image)
