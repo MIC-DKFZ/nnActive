@@ -979,7 +979,7 @@ for config in dataset_configs:
         make_config,
         base_id=config["base_id"],
         seeds=__seeds,
-        uncertainties=__strategies,
+        uncertainties=[s for s in [*__strategies, "class_power_pe66_exp"]],
         query_size=config["query_size"],
         query_steps=5,
         patch_size=config["patch_size"],
