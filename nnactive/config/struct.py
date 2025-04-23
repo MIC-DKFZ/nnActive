@@ -49,6 +49,8 @@ class ActiveConfig:
     tile_step_size: float = 0.75  # %of patch step size per dim in query prediction
     patch_overlap: float = 0  # how much overlap is allowed for patchs
     additional_overlap: float = 0.4  # how much overlap is allowed with cost free annotated regions e.g. BraTS air areas
+    pred_tile_step_size: float = 0.5  # step size for validation predictions
+    disable_pred_tta: bool = False  # disable TTA for validation predictions
 
     def __post_init__(self):
         if self.n_patch_per_image is None:
