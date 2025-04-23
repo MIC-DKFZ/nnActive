@@ -625,7 +625,12 @@ for qs in _query_sizes:
     register(
         make_kits_config,
         seeds=__seeds,
-        uncertainties=[*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"],
+        uncertainties=[
+            *__strategies,
+            "class_pe33",
+            "class_pe66",
+            "class_power_pe66_exp",
+        ],
         query_size=qs,
         query_steps=5,
     )
@@ -647,7 +652,13 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66", "class_power_pe66_exp"],
+    uncertainties=[
+        *__strategies,
+        "kmeans_bald",
+        "class_pe33",
+        "class_pe66",
+        "class_power_pe66_exp",
+    ],
     query_size=20,
     query_steps=5,
 )
@@ -655,7 +666,13 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66", "class_power_pe66_exp"],
+    uncertainties=[
+        *__strategies,
+        "kmeans_bald",
+        "class_pe33",
+        "class_pe66",
+        "class_power_pe66_exp",
+    ],
     query_size=40,
     query_steps=5,
 )
@@ -663,7 +680,13 @@ register(
 register(
     make_hippocampus_config,
     seeds=__seeds,
-    uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66", "class_power_pe66_exp"],
+    uncertainties=[
+        *__strategies,
+        "kmeans_bald",
+        "class_pe33",
+        "class_pe66",
+        "class_power_pe66_exp",
+    ],
     query_size=60,
     query_steps=5,
 )
@@ -673,7 +696,13 @@ for qs in _query_sizes:
     register(
         make_acdc_config,
         seeds=__seeds,
-        uncertainties=[*__strategies, "kmeans_bald", "class_pe33", "class_pe66", "class_power_pe66_exp"],
+        uncertainties=[
+            *__strategies,
+            "kmeans_bald",
+            "class_pe33",
+            "class_pe66",
+            "class_power_pe66_exp",
+        ],
         query_size=qs,
         query_steps=5,
     )
@@ -689,7 +718,12 @@ for qs in _query_sizes:
     register(
         make_amos_config,
         seeds=__seeds,
-        uncertainties=[*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"],
+        uncertainties=[
+            *__strategies,
+            "class_pe33",
+            "class_pe66",
+            "class_power_pe66_exp",
+        ],
         query_size=qs,
         query_steps=5,
     )
@@ -767,7 +801,9 @@ for config in dataset_configs:
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
         # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
-        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
+        pre_suffix_format=__revision_pre_suffix_format
+        if config["base_id"] == 27
+        else __standard_pre_suffix_format,
     )
 
 ################## Larger Query Size Ablation Experiments ################
@@ -831,7 +867,9 @@ for config in dataset_configs:
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
         # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
-        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
+        pre_suffix_format=__revision_pre_suffix_format
+        if config["base_id"] == 27
+        else __standard_pre_suffix_format,
     )
 
 ################## Training Length Experiments #############
@@ -840,7 +878,11 @@ pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__s
 register(
     make_amos_config,
     seeds=__seeds,
-    uncertainties=[s for s in ["random-label2", "class_pe66", "class_power_pe66_exp"] if s != "random"],
+    uncertainties=[
+        s
+        for s in ["random-label2", "class_pe66", "class_power_pe66_exp"]
+        if s != "random"
+    ],
     query_size=40,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -850,7 +892,11 @@ register(
 register(
     make_kits_config,
     seeds=__seeds,
-    uncertainties=[s for s in [*__strategies, "class_pe66", "class_power_pe66_exp"] if s != "random"],
+    uncertainties=[
+        s
+        for s in [*__strategies, "class_pe66", "class_power_pe66_exp"]
+        if s != "random"
+    ],
     query_size=200,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -860,7 +906,11 @@ register(
 register(
     make_amos_config,
     seeds=__seeds,
-    uncertainties=[s for s in [*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"] if s != "random"],
+    uncertainties=[
+        s
+        for s in [*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"]
+        if s != "random"
+    ],
     query_size=200,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -870,7 +920,11 @@ register(
 register(
     make_kits_config,
     seeds=__seeds,
-    uncertainties=[s for s in [*__strategies, "class_pe66", "class_power_pe66_exp"] if s != "random"],
+    uncertainties=[
+        s
+        for s in [*__strategies, "class_pe66", "class_power_pe66_exp"]
+        if s != "random"
+    ],
     query_size=500,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -880,7 +934,11 @@ register(
 register(
     make_amos_config,
     seeds=__seeds,
-    uncertainties=[s for s in [*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"] if s != "random"],
+    uncertainties=[
+        s
+        for s in [*__strategies, "class_pe33", "class_pe66", "class_power_pe66_exp"]
+        if s != "random"
+    ],
     query_size=500,
     query_steps=5,
     trainer="nnActiveTrainer_500epochs",
@@ -997,15 +1055,60 @@ strategies = [
 ]
 
 dataset_configs: list[dict] = [
-    {"base_id": 216, "query_size": 40, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
-    {"base_id": 216, "query_size": 200, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
-    {"base_id": 216, "query_size": 500, "patch_size": [32, 74, 74], "agg_stride": 8},  # AMOS
-    {"base_id": 135, "query_size": 40, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
-    {"base_id": 135, "query_size": 200, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
-    {"base_id": 135, "query_size": 500, "patch_size": [64, 64, 64], "agg_stride": 8},  # KiTS
-    {"base_id": 27, "query_size": 30, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
-    {"base_id": 27, "query_size": 60, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
-    {"base_id": 27, "query_size": 90, "patch_size": [4, 40, 40], "agg_stride": [1, 8, 8]},  # ACDC
+    {
+        "base_id": 216,
+        "query_size": 40,
+        "patch_size": [32, 74, 74],
+        "agg_stride": 8,
+    },  # AMOS
+    {
+        "base_id": 216,
+        "query_size": 200,
+        "patch_size": [32, 74, 74],
+        "agg_stride": 8,
+    },  # AMOS
+    {
+        "base_id": 216,
+        "query_size": 500,
+        "patch_size": [32, 74, 74],
+        "agg_stride": 8,
+    },  # AMOS
+    {
+        "base_id": 135,
+        "query_size": 40,
+        "patch_size": [64, 64, 64],
+        "agg_stride": 8,
+    },  # KiTS
+    {
+        "base_id": 135,
+        "query_size": 200,
+        "patch_size": [64, 64, 64],
+        "agg_stride": 8,
+    },  # KiTS
+    {
+        "base_id": 135,
+        "query_size": 500,
+        "patch_size": [64, 64, 64],
+        "agg_stride": 8,
+    },  # KiTS
+    {
+        "base_id": 27,
+        "query_size": 30,
+        "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
+    },  # ACDC
+    {
+        "base_id": 27,
+        "query_size": 60,
+        "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
+    },  # ACDC
+    {
+        "base_id": 27,
+        "query_size": 90,
+        "patch_size": [4, 40, 40],
+        "agg_stride": [1, 8, 8],
+    },  # ACDC
 ]
 
 for config in dataset_configs:
@@ -1021,7 +1124,9 @@ for config in dataset_configs:
         trainer=__standard_trainer,
         starting_budget=__standard_starting_budget,
         # TODO add revision tag to ACDC experiments. Remove this once all revisions are completed.
-        pre_suffix_format=__revision_pre_suffix_format if config["base_id"] == 27 else __standard_pre_suffix_format,
+        pre_suffix_format=__revision_pre_suffix_format
+        if config["base_id"] == 27
+        else __standard_pre_suffix_format,
     )
 
 ################## Noise Schedule Ablation for Class-balanced Power PE ###############
@@ -1121,3 +1226,71 @@ register(
     starting_budget=__old_starting_budget,
     pre_suffix_format=__old_pre_suffix_format,
 )
+
+################## nnActive v2 Roll-out Experiments ################
+
+__rollout_strategies = [
+    "random-label",
+    "random",
+    "pred_entropy",
+    "class_power_pe66_exp",
+]
+
+dataset_configs: list[dict] = [
+    {
+        "base_id": 657,
+        "starting_budget_size": 300,
+        "query_size": 300,
+        "patch_size": [64, 64, 64],
+        "agg_stride": 8,
+        "trainer": __standard_trainer,
+    },  # CTORG
+    {
+        "base_id": 654,
+        "starting_budget_size": 800,
+        "query_size": 800,
+        "patch_size": [29, 74, 87],
+        "agg_stride": [4, 8, 8],
+        "trainer": __standard_trainer,
+    },  # WORD
+    {
+        "base_id": 3,
+        "starting_budget_size": 150,
+        "query_size": 150,
+        "patch_size": [28, 44, 39],
+        "agg_stride": 8,
+        "trainer": __standard_trainer,
+    },  # LiTS
+    {
+        "base_id": 95,
+        "starting_budget_size": 100,
+        "query_size": 100,
+        "patch_size": [16, 48, 57],
+        "agg_stride": [2, 4, 4],
+        "trainer": __standard_trainer,
+        "pred_tile_step_size": 0.75,
+        "disable_pred_tta": True,
+    },  # MAMA MIA
+    {
+        "base_id": 119,
+        "starting_budget_size": 2100,
+        "query_size": 2100,
+        "patch_size": [33, 34, 35],
+        "agg_stride": [4, 6, 6],
+        "trainer": "nnActiveTrainer_NoMirroring_200epochs",
+        "disable_pred_tta": True,
+    },  # ToothFairy
+]
+
+for config in dataset_configs:
+    register(
+        make_config,
+        seeds=__seeds,
+        uncertainties=__rollout_strategies,
+        query_steps=5,
+        starting_budget=__standard_starting_budget,
+        pre_suffix_format=__standard_pre_suffix_format,
+        additional_overlap=0,
+        n_patch_per_image=None,
+        **config,
+    )
