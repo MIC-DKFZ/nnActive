@@ -19,8 +19,8 @@ CUSTOM_ORDER = [
     "pred_entropy",
     "power_pe",
     # "class_pe33",
-    # "class_pe66",
-    # "class_power_pe66_exp",
+    "class_pe66",
+    "class_power_pe66_exp",
     "random",
     "random-label2",
     "random-label",
@@ -33,8 +33,8 @@ small_dict = {
     "pred entropy": "Predictive Entropy",
     "power pe": "PowerPE",
     # "class pe33": "Balanced PE 33%",
-    # "class pe66": "Balanced PE 66%",
-    # "class power pe66 exp": "LPowBalanced PE 66%",
+    "class pe66": "Balanced PE 66%",
+    "class power pe66 exp": "LPowBalanced PE 66%",
     "random": "Random",
     "random-label2": "Random 33% FG",
     "random-label": "Random 66% FG",
@@ -85,8 +85,8 @@ else:
     print("Resultspath already exists: ", RESULTSPATH)
 
 
-SAVEPATH = RESULTSPATH / "horeka_rsync_eval"
-# SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
+# SAVEPATH = RESULTSPATH / "horeka_rsync_eval"
+SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
 
 if not SAVEPATH.exists():
     print("Creating Savepath: ", SAVEPATH)

@@ -29,7 +29,7 @@ if USETEX:
 
 savepath = SAVEPATH / "figures"
 savepath.mkdir(exist_ok=True, parents=True)
-filetype = "pdf"
+filetype = "png"
 
 NAME = "main_method_ranking"
 COLLEVELANMES = ["Dataset", "Label Regime", "Metric"]
@@ -81,9 +81,11 @@ def plot_row(whole_data: pd.DataFrame, ax1: Axes, ax2: Axes, metric: str):
     )
 
     # Create ranking line plot
+    methods = []
     for method_name in QM_TO_COLOR:
         if method_name not in ranks.index:
             continue
+        methods.append(method_name)
         ax1.plot(
             ranks.loc[method_name, :].values,
             marker="o",
@@ -97,17 +99,26 @@ def plot_row(whole_data: pd.DataFrame, ax1: Axes, ax2: Axes, metric: str):
             # markerfacecolor=QM_TO_COLOR[method_name],
         )
 
+    upper_limit = len(methods) + 0.5
     ax1.add_patch(
-        patches.Rectangle((-0.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+        patches.Rectangle(
+            (-0.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.1
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((2.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
+        patches.Rectangle(
+            (2.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.03
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((5.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+        patches.Rectangle(
+            (5.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.1
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((8.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
+        patches.Rectangle(
+            (8.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.03
+        )
     )
 
     ax1.set_xlim(-0.5, 11.5)
@@ -235,7 +246,8 @@ if __name__ == "__main__":
             )
             for metric, ax_row in zip(plot_metrics, axs):
                 plot_row(whole_data, ax_row[0], ax_row[1], metric)
-            axs[-1][0].legend(loc=(0.1, -0.375), handlelength=4, ncols=4)
+            # axs[-1][0].legend(loc=(0.1, -0.375), handlelength=4, ncols=4)
+            axs[-1][0].legend(loc=(0.1, -0.475), handlelength=4, ncols=4)
             plt.savefig(
                 savepath / f"method_ranking--{name}.{filetype}",
                 bbox_inches="tight",

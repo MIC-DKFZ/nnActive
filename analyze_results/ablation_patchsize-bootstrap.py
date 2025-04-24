@@ -15,6 +15,7 @@ from evaluator import (
 from scipy.stats import kendalltau
 from setup import (
     BASEPATH,
+    CUSTOM_ORDER,
     QM_TO_COLOR,
     RENAMING_DICT,
     SAVEPATH,
@@ -29,7 +30,7 @@ plt.style.use("default")
 
 SAVENAME = "bootstrap_ranking"
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
-IMGTYPE = "pdf"
+IMGTYPE = "png"
 
 COMPARATIVE = False
 COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
@@ -49,16 +50,16 @@ texpath.mkdir(exist_ok=True, parents=True)
 savepath.mkdir(exist_ok=True, parents=True)
 
 
-CUSTOM_ORDER = [
-    "mutual_information",
-    "power_bald",
-    "softrank_bald",
-    "pred_entropy",
-    "power_pe",
-    "random",
-    "random-label",
-    "random-label2",
-]
+# CUSTOM_ORDER = [
+#     "mutual_information",
+#     "power_bald",
+#     "softrank_bald",
+#     "pred_entropy",
+#     "power_pe",
+#     "random",
+#     "random-label",
+#     "random-label2",
+# ]
 
 
 def compute_rankings(
@@ -176,17 +177,26 @@ def plot_bootstrap_ranking_overview(
             ),
         )
     ax1.set_ylabel(f"Mean Rank ({c_metric})")
+    upper_limit = len(methods) + 0.5
     ax1.add_patch(
-        patches.Rectangle((-0.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+        patches.Rectangle(
+            (-0.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.1
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((2.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
+        patches.Rectangle(
+            (2.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.03
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((5.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.1)
+        patches.Rectangle(
+            (5.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.1
+        )
     )
     ax1.add_patch(
-        patches.Rectangle((8.5, 0), 3, 8.5, linewidth=1, facecolor="k", alpha=0.03)
+        patches.Rectangle(
+            (8.5, 0), 3, upper_limit, linewidth=1, facecolor="k", alpha=0.03
+        )
     )
 
     ax1.set_xlim(-0.5, 11.5)
@@ -208,7 +218,7 @@ def plot_bootstrap_ranking_overview(
     )
     ax1.set_yticks(ticks=np.arange(len(methods)) + 1)
     ax1.set_ylabel(f"Method Rank ({c_metric})")
-    ax1.legend(loc=(0.1, -0.25), handlelength=4, ncols=4)
+    ax1.legend(loc=(0.1, -0.25), handlelength=3, ncols=5)
 
     avg_ranks = bootstrap_rankings_df.groupby("Query Method").mean(numeric_only=True)[
         plot_key
@@ -234,9 +244,11 @@ def plot_bootstrap_ranking_overview(
     ax2.set_xticks(ticks=[0], labels=["Mean Rank"])
     ax2.tick_params("x", length=0, pad=7)
     ax2.grid(axis="y")
+    fig.tight_layout()
 
     plt.savefig(
-        savepath / f"bootstrap_ranking-overview-{print_setting}-{c_metric}.{IMGTYPE}"
+        savepath / f"bootstrap_ranking-overview-{print_setting}-{c_metric}.{IMGTYPE}",
+        bbox_inches="tight",
     )
 
 

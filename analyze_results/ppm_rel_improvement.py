@@ -27,23 +27,26 @@ LEGEND = False
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
 # NORANDOM_ORDER.remove("class_pe33")
-# MINIORDER = [
-#     "class_pe66",
-#     "class_power_pe66_exp",
-#     "random-label",
-# ]
+MINIORDER = [
+    "class_pe66",
+    "class_power_pe66_exp",
+    "random-label",
+    "random-label2",
+]
 savepath = SAVEPATH / "figures"
-IMGTYPE = "pdf"
+IMGTYPE = "png"
 
 COMPARATIVE = False
 
 USE_SETTINGS_LIST = [
-    {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
+    # Used for nnActive_v2
+    {"setting_names": ["500 Epochs"], "custom_order": MINIORDER},
+    {"setting_names": ["Main"], "custom_order": MINIORDER},
 ]
 
 RENAME_SETTINGS = None
@@ -51,7 +54,7 @@ RENAME_SETTINGS = None
 RANDOM_BASELINES = [
     "Random 33% FG",
     "Random 66% FG",
-    "Random",  # 500 Epochs setting does not run with this baseline
+    # "Random",  # 500 Epochs setting does not run with this baseline
 ]
 SORT_BY_PERFORMANCE = False
 MIRROR_BAR_PLOTS = False
@@ -237,7 +240,8 @@ if __name__ == "__main__":
                     all_matrices[dataset][budget][subsetting] = matrix
 
         for RANDOM_BASELINE in RANDOM_BASELINES:
-
+            if RANDOM_BASELINE not in RENAMING_DICT.values():
+                continue
             for dataset in all_matrices:
                 merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
                     [

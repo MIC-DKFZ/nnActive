@@ -28,14 +28,14 @@ NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
 savepath = SAVEPATH / "figures"
 savepath.mkdir(exist_ok=True, parents=True)
-filetype = "pdf"
+filetype = "png"
 
 COMPARATIVE = False
 
 USE_SETTINGS_LIST = [
     {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
-    {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
 ]
@@ -64,7 +64,16 @@ for setting in USE_SETTINGS_LIST:
                 del_algs = [a for a in matrix.algs if a not in custom_order]
                 for a in del_algs:
                     matrix.delete_alg(a)
-                matrix = matrix.custom_order_matrix(custom_order)
+                try:
+
+                    matrix = matrix.custom_order_matrix(custom_order)
+                except:
+                    print(
+                        f"Custom order {custom_order} not possible for {dataset} {budget} {subsetting}"
+                    )
+                    import IPython
+
+                    IPython.embed()
                 matrix.rename_algs(RENAMING_DICT)
                 all_matrices[dataset][budget][subsetting] = matrix
 
