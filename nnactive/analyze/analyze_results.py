@@ -18,11 +18,14 @@ from nnactive.analyze.experiment_statistics import (
 )
 from nnactive.config.struct import Final
 from nnactive.utils.io import save_df_to_txt
-from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
+from nnactive.utils.pyutils import (
+    create_string_identifier,
+    merge_dict_lists_on_indices,
+    rglob_follow_symlinks,
+)
 
 sns.set_style("whitegrid")
 
-sns.set_style("whitegrid")
 
 # TODO: Final version
 # Load all strategies from nnactive/strategies/__init__.py
@@ -81,6 +84,7 @@ class MultiExperimentAnalysis:
         base_results_path: Path,
         base_raw_path: Path,
         filter_final: bool = True,
+        trainer_use: str = "nnUNetTrainer",
     ):
         """Allows analysis of multiple experiments from a base_folder.
         Finding all subsequent folders containing results and aggregates and plots them.
@@ -100,6 +104,7 @@ class MultiExperimentAnalysis:
         self.base_results_path = base_results_path
         self.base_raw_path = base_raw_path
         self.filter_final = filter_final
+        self.trainer_use = trainer_use
 
     @cached_property
     def exp_results_paths(self):
@@ -116,7 +121,11 @@ class MultiExperimentAnalysis:
                 search_paths.extend(results_paths)
             else:
                 experiment_paths.extend(
-                    [fn.parent for fn in search_path.rglob("*/config.json")]
+                    [
+                        fn.parent
+                        for fn in rglob_follow_symlinks(search_path, "*/config.json")
+                    ]
+                    # [fn.parent for fn in search_path.rglob("*/config.json")]
                 )
         logger.debug(f"Found {len(experiment_paths)} experiments.")
         if self.filter_final:
@@ -366,10 +375,9 @@ class MultiExperimentAnalysis:
             ppm.save(setting_dir / "ppm.json")
 
             trainer = str(analysis.df["trainer"].unique()[0])
-            trainer_use = "nnUNetTrainer"
             if len(trainer.split("_")) > 1:
                 epochs = trainer.split("_")
-                trainer_use = f"{trainer_use}_{epochs[-1]}"
+                trainer_use = f"{self.trainer_use}_{epochs[-1]}"
                 logger.info(f"Using Full Performance Trainer: {trainer_use}")
             trainers = [
                 f.label
