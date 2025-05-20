@@ -12,39 +12,49 @@ from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import save_df_to_txt
 
-CUSTOM_ORDER = [
+small_dict = {
+    "mutual_information": "BALD",
+    "power_bald": "PowerBALD",
+    "softrank_bald": "SoftrankBALD",
+    "pred_entropy": "Predictive Entropy",
+    "power_pe": "PowerPE",
+    "random": "Random",
+    "random-label2": "Random 33% FG",
+    "random-label": "Random 66% FG",
+    "class_pe33": "Cla PE 33%",
+    "class_pe66": "Cla PE 66%",
+    "class_power_pe66_exp": "ClaSP PE",
+}
+
+ROLL_OUT_ORDER = [
+    "random",
+    "random-label",
+    "pred_entropy",
+    "class_power_pe66_exp",
+]
+
+MAIN_ORDER = [
     "mutual_information",
     "power_bald",
     "softrank_bald",
     "pred_entropy",
     "power_pe",
-    # "class_pe33",
-    # "class_pe66",
-    # "class_power_pe66_exp",
     "random",
     "random-label2",
     "random-label",
+    "class_power_pe66_exp",
 ]
 
-small_dict = {
-    "mutual information": "BALD",
-    "power bald": "PowerBALD",
-    "softrank bald": "SoftrankBALD",
-    "pred entropy": "Predictive Entropy",
-    "power pe": "PowerPE",
-    # "class pe33": "Balanced PE 33%",
-    # "class pe66": "Balanced PE 66%",
-    # "class power pe66 exp": "LPowBalanced PE 66%",
-    "random": "Random",
-    "random-label2": "Random 33% FG",
-    "random-label": "Random 66% FG",
-}
+
+SAVETYPE = "pdf"
+
+CUSTOM_ORDER = [k for k in small_dict.keys()]
 
 RENAMING_DICT = {}
 keys = list(small_dict.keys())
 for key in keys:
     RENAMING_DICT[key] = small_dict[key]
-    RENAMING_DICT[key.replace(" ", "_")] = small_dict[key]
+    RENAMING_DICT[key.replace("_", " ")] = small_dict[key]
 
 VALUE_TO_COLOR_MAP = {
     -2: "#FF0000",  # red
@@ -61,21 +71,17 @@ QM_TO_COLOR = {
     "SoftrankBALD": 7,  # gray
     "Predictive Entropy": 3,  # red
     "PowerPE": 1,  # orange
-    "Balanced PE 33%": 2,  # medium blue
-    "Balanced PE 66%": 8,  # light blue
-    "Random": 4,  # Purple
-    "Random 33% FG": 6,  # brown
-    "Random 66% FG": 5,  # pink
+    "Cla PE 66%": 2,  # medium green
+    "ClaSP PE": 8,  # light green
+    "Random": 5,  # brown
+    "Random 33% FG": 6,  # pink
+    "Random 66% FG": 4,  # purple
 }
 for q in QM_TO_COLOR:
     QM_TO_COLOR[q] = mcolors.to_hex(cmap(QM_TO_COLOR[q]))
 
-QM_TO_COLOR["LPowBalanced PE 66%"] = "#87CEFA"
+QM_TO_COLOR["Cla PE 33%"] = "#023020"
 
-
-BASEPATH = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/"
-)
 
 RESULTSPATH = Path(__file__).parent.parent / "results"
 if not RESULTSPATH.exists():
@@ -84,13 +90,38 @@ if not RESULTSPATH.exists():
 else:
     print("Resultspath already exists: ", RESULTSPATH)
 
+BASEPATH = RESULTSPATH / "horeka_rsync_final_test"
+if not BASEPATH.exists():
+    print("Creating Basepath: ", BASEPATH)
+    print(
+        "Please save in this location the output from '$nnactive analyze_experiments...'"
+    )
+    os.makedirs(BASEPATH)
 
-SAVEPATH = RESULTSPATH / "horeka_rsync_eval"
-# SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
+
+SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
 
 if not SAVEPATH.exists():
     print("Creating Savepath: ", SAVEPATH)
     os.makedirs(SAVEPATH)
+
+
+FINAL_COLUMNS = [
+    {"ReadCol": "('Mean Dice AUBC', 'mean')", "PrintCol": "AUBC", "better": "higher"},
+    {"ReadCol": "('Mean Dice AUBC', 'std')", "PrintCol": "AUBC std", "better": None},
+    {
+        "ReadCol": "('Mean Dice Final', 'mean')",
+        "PrintCol": "Final Dice",
+        "better": "higher",
+    },
+    {
+        "ReadCol": "('Mean Dice Final', 'std')",
+        "PrintCol": "Final Dice std",
+        "better": None,
+    },
+    {"ReadCol": "beta", "PrintCol": "FG-Eff", "better": "higher"},
+    {"ReadCol": "beta_std", "PrintCol": "FG-Eff std", "better": None},
+]
 
 
 def df_to_multicol(df):
@@ -257,6 +288,9 @@ def shorten_hippocampus(BASEPATH):
         hippcompaus_path / "patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20"
     )
     save_path = hippcompaus_path / f"{datapath.name}__5loops"
+    if (save_path / "analysis.pkl").is_file():
+        logger.info(f"Analysis already exists: {save_path}")
+        return
     os.makedirs(save_path, exist_ok=True)
 
     analysis = SettingAnalysis.load(datapath / "analysis.pkl")

@@ -18,11 +18,14 @@ from nnactive.analyze.experiment_statistics import (
 )
 from nnactive.config.struct import Final
 from nnactive.utils.io import save_df_to_txt
-from nnactive.utils.pyutils import create_string_identifier, merge_dict_lists_on_indices
+from nnactive.utils.pyutils import (
+    create_string_identifier,
+    merge_dict_lists_on_indices,
+    rglob_follow_symlinks,
+)
 
 sns.set_style("whitegrid")
 
-sns.set_style("whitegrid")
 
 # TODO: Final version
 # Load all strategies from nnactive/strategies/__init__.py
@@ -81,6 +84,8 @@ class MultiExperimentAnalysis:
         base_results_path: Path,
         base_raw_path: Path,
         filter_final: bool = True,
+        trainer_use: str = "nnUNetTrainer",
+        strict: bool = False,
     ):
         """Allows analysis of multiple experiments from a base_folder.
         Finding all subsequent folders containing results and aggregates and plots them.
@@ -100,6 +105,8 @@ class MultiExperimentAnalysis:
         self.base_results_path = base_results_path
         self.base_raw_path = base_raw_path
         self.filter_final = filter_final
+        self.trainer_use = trainer_use
+        self.strict = strict
 
     @cached_property
     def exp_results_paths(self):
@@ -116,7 +123,11 @@ class MultiExperimentAnalysis:
                 search_paths.extend(results_paths)
             else:
                 experiment_paths.extend(
-                    [fn.parent for fn in search_path.rglob("*/config.json")]
+                    [
+                        fn.parent
+                        for fn in rglob_follow_symlinks(search_path, "*/config.json")
+                    ]
+                    # [fn.parent for fn in search_path.rglob("*/config.json")]
                 )
         logger.debug(f"Found {len(experiment_paths)} experiments.")
         if self.filter_final:
@@ -277,6 +288,7 @@ class MultiExperimentAnalysis:
         output_dir: Path = Path("."),
         value: str = "Dice",
         save_df: bool = False,
+        create_detailed_plots: bool = False,
     ):
         dataset_statistics = [
             exp for exp in self.exp_statistics if exp.base_id == unique_id
@@ -325,29 +337,56 @@ class MultiExperimentAnalysis:
             # create plots for each unique setting of the respective dataset
             pre_suffix = df_g["pre_suffix"].iloc[0]
             setting_dir: Path = output_dir / (pre_suffix[2:])
-            i = 0
-            while setting_dir in output_dirs:
-                setting_dir = setting_dir.parent / (setting_dir.name + f"_v{i}")
-                i += 1
-            output_dirs.append(setting_dir)
-            if not setting_dir.is_dir():
-                os.makedirs(setting_dir)
+            if self.strict:
+                i = 0
+                while setting_dir in output_dirs:
+                    setting_dir = setting_dir.parent / (setting_dir.name + f"_v{i}")
+                    i += 1
+                output_dirs.append(setting_dir)
+                if not setting_dir.is_dir():
+                    os.makedirs(setting_dir)
 
-            # most default values from SettingAnalysis are already set for this analysis
-            analysis = SettingAnalysis(
-                df_g,
-                dataset=dataset_name,
-                query_key=self.query_key,
-                main_performance_key="Mean Dice",
-                budget_key="#Patches",
-                statistic_keys=dataset_statistics[0].plot_vals,
-                performance_keys=dataset_results[0]
-                .get_value_dict(plot_val=value)
-                .keys(),
-                full_performance_dict=y_full_dict,
-                palette=PALETTE,
-                string_id=identifier,
-            )
+                analysis = SettingAnalysis(
+                    df_g,
+                    dataset=dataset_name,
+                    query_key=self.query_key,
+                    main_performance_key="Mean Dice",
+                    budget_key="#Patches",
+                    statistic_keys=dataset_statistics[0].plot_vals,
+                    performance_keys=dataset_results[0]
+                    .get_value_dict(plot_val=value)
+                    .keys(),
+                    full_performance_dict=y_full_dict,
+                    palette=PALETTE,
+                    string_id=identifier,
+                )
+
+            else:
+                # most default values from SettingAnalysis are already set for this analysis
+                analysis = SettingAnalysis(
+                    df_g,
+                    dataset=dataset_name,
+                    query_key=self.query_key,
+                    main_performance_key="Mean Dice",
+                    budget_key="#Patches",
+                    statistic_keys=dataset_statistics[0].plot_vals,
+                    performance_keys=dataset_results[0]
+                    .get_value_dict(plot_val=value)
+                    .keys(),
+                    full_performance_dict=y_full_dict,
+                    palette=PALETTE,
+                    string_id=identifier,
+                )
+                if setting_dir in output_dirs:
+                    logger.info(
+                        f"Found existing analysis in {setting_dir}. Merging experiments."
+                    )
+                    prev_ana = SettingAnalysis.load(setting_dir / "analysis.pkl")
+                    analysis.df = pd.concat(
+                        [prev_ana.df, analysis.df], ignore_index=True
+                    )
+                output_dirs.append(setting_dir)
+            logger.info(f"Saving results to {setting_dir.name}")
 
             analysis.save(save_path=setting_dir / "analysis.pkl")
 
@@ -366,10 +405,9 @@ class MultiExperimentAnalysis:
             ppm.save(setting_dir / "ppm.json")
 
             trainer = str(analysis.df["trainer"].unique()[0])
-            trainer_use = "nnUNetTrainer"
             if len(trainer.split("_")) > 1:
                 epochs = trainer.split("_")
-                trainer_use = f"{trainer_use}_{epochs[-1]}"
+                trainer_use = f"{self.trainer_use}_{epochs[-1]}"
                 logger.info(f"Using Full Performance Trainer: {trainer_use}")
             trainers = [
                 f.label
@@ -411,36 +449,38 @@ class MultiExperimentAnalysis:
                 x_names=x_names,
             )
 
-            # performance plots
-            x_names = ["Loop", "#Patches"]
-            y_names = analysis.performance_keys
-            analysis.save_setting_plots(
-                setting_dir / "results",
-                y_names,
-                x_names,
-                x_ticks=True,
-                y_full_dict=y_full_dict,
-            )
+            if create_detailed_plots:
 
-            # statistic plots
-            x_names = ["Loop"]
-            y_names = analysis.statistic_keys
-            analysis.save_setting_plots(
-                setting_dir / "statistics", y_names, x_names, x_ticks=True
-            )
-
-            # statistic results plots
-            x_names = analysis.statistic_keys
-            y_names = analysis.performance_keys
-            for y_name in y_names:
-                y_names_ = [y_name]
+                # performance plots
+                x_names = ["Loop", "#Patches"]
+                y_names = analysis.performance_keys
                 analysis.save_setting_plots(
-                    setting_dir / "results_statistics" / y_name,
-                    y_names_,
+                    setting_dir / "results",
+                    y_names,
                     x_names,
+                    x_ticks=True,
                     y_full_dict=y_full_dict,
-                    x_ticks=False,
                 )
+
+                # statistic plots
+                x_names = ["Loop"]
+                y_names = analysis.statistic_keys
+                analysis.save_setting_plots(
+                    setting_dir / "statistics", y_names, x_names, x_ticks=True
+                )
+
+                # statistic results plots
+                x_names = analysis.statistic_keys
+                y_names = analysis.performance_keys
+                for y_name in y_names:
+                    y_names_ = [y_name]
+                    analysis.save_setting_plots(
+                        setting_dir / "results_statistics" / y_name,
+                        y_names_,
+                        x_names,
+                        y_full_dict=y_full_dict,
+                        x_ticks=False,
+                    )
 
     def analyze_multi_datasets(
         self,

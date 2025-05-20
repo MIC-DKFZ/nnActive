@@ -3,7 +3,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from setup import BASEPATH, QM_TO_COLOR, RENAMING_DICT, RESULTSPATH
+from setup import BASEPATH, QM_TO_COLOR, RENAMING_DICT, RESULTSPATH, SAVETYPE
 
 from nnactive.analyze.analysis import SettingAnalysis
 from nnactive.utils.io import load_pickle
@@ -14,7 +14,6 @@ qm_list = [
     "random-label",
 ]
 
-SAVETYPE = "pdf"
 
 SAVEPATH = RESULTSPATH / "fg_effplot"
 

@@ -18,6 +18,7 @@ from setup import (
     QM_TO_COLOR,
     RENAMING_DICT,
     SAVEPATH,
+    SAVETYPE,
     apply_latex_coloring,
     get_ranking_cmap,
     save_styled_to_latex,
@@ -29,7 +30,7 @@ plt.style.use("default")
 
 SAVENAME = "bootstrap_ranking"
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
-IMGTYPE = "pdf"
+
 
 COMPARATIVE = False
 COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
@@ -411,7 +412,7 @@ if __name__ == "__main__":
 
         for c_metric in C_METRICS:
             plot_bootstrap_rankings(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 add_subplot_labels,
                 print_setting,
@@ -420,7 +421,7 @@ if __name__ == "__main__":
                 add_mean_rankings,
             )
             plot_bootstrap_ranking_overview(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 print_setting,
                 nested_bootstrap_ranking_dict,
@@ -428,90 +429,3 @@ if __name__ == "__main__":
             )
         full_df.append(bootstrap_rankings_df)
     full_df = pd.concat(full_df)
-
-    ######################### PatchSize Ablation Analysis #########################
-
-    CMAP = "Oranges"
-    order = list(QM_TO_COLOR.keys())
-
-    subset = full_df["Dataset"].unique()
-    mean_dataset_rankings = full_df.groupby(
-        ["Setting", "Dataset", "Query Method"]
-    ).mean(numeric_only=True)
-
-    if len(full_df["Setting"].unique()) == 1:
-        pass
-    else:
-        comparisons = [
-            [c1, c2]
-            for i, c1 in enumerate(full_df["Setting"].unique())
-            for c2 in full_df["Setting"].unique()[i + 1 :]
-        ]
-        for comparsison in comparisons:
-            print_comp = f"{comparsison[0]}--{comparsison[1]}".replace(" ", "").replace(
-                "/", "-"
-            )
-            kendalltau_results = []
-            c1, c2 = comparsison[0], comparsison[1]
-            c1_values = mean_dataset_rankings.loc[c1]
-            c2_values = mean_dataset_rankings.loc[c2]
-            for s in subset:
-                stat_dict = {
-                    "Dataset": s,
-                }
-                s1 = c1_values.loc[s]
-                s2 = c2_values.loc[s]
-                for m in C_METRICS:
-                    tau, p = kendalltau(
-                        s1[f"Rank Mean Dice {m}"], s2[f"Rank Mean Dice {m}"]
-                    )
-                    stat_dict[f"{m} Tau"] = tau
-                    stat_dict[f"{m} Pval"] = p
-                kendalltau_results.append(stat_dict)
-
-            stat_dict = {"Dataset": "Mean"}
-            s1 = c1_values.groupby("Query Method").mean(numeric_only=True)
-            s2 = c2_values.groupby("Query Method").mean(numeric_only=True)
-            for m in C_METRICS:
-                tau, p = kendalltau(
-                    s1[f"Rank Mean Dice {m}"], s2[f"Rank Mean Dice {m}"]
-                )
-                stat_dict[f"{m} Tau"] = tau
-                stat_dict[f"{m} Pval"] = p
-            kendalltau_results.append(stat_dict)
-            kendalltau_df = pd.DataFrame(kendalltau_results).set_index("Dataset")
-            kendalltau_df = kendalltau_df.T
-            kendalltau_df.columns.name = None
-            kendalltau_df.index.name = None
-
-            styled = kendalltau_df.loc[[f"{m} Tau" for m in C_METRICS]].round(3)
-            cmap = get_ranking_cmap(
-                styled.values,
-                kendalltau_df.loc[[f"{m} Pval" for m in C_METRICS]].values < 0.05,
-            )
-            styled = apply_latex_coloring(styled, cmap)
-            styled.index = styled.index.str.replace("Tau", "")
-            save_styled_to_latex(
-                styled, texpath / f"{SAVENAME}--{print_comp}--rank_correlations.tex"
-            )
-
-    # Create some nice table to show rankings
-    save_dataset_rankings = mean_dataset_rankings.copy()
-    del save_dataset_rankings["Left Out Seed"]
-    save_dataset_rankings = save_dataset_rankings.reorder_levels(
-        ["Dataset", "Query Method", "Setting"]
-    )
-    save_dataset_rankings = save_dataset_rankings.unstack(level="Setting")
-
-    for n in save_dataset_rankings.index.levels[0]:
-        save_df: pd.DataFrame = save_dataset_rankings.loc[n]
-        create_latex_from_ranked_data(
-            SAVENAME, texpath, CMAP, n, save_df, order_index=order
-        )
-    #     cmap = compute_column_normalized_gmap(cmap)
-    mean_rankings = sum(
-        save_dataset_rankings.loc[n] for n in save_dataset_rankings.index.levels[0]
-    ) / len(save_dataset_rankings.index.levels[0])
-    create_latex_from_ranked_data(
-        SAVENAME, texpath, CMAP, "mean", mean_rankings, order_index=order
-    )

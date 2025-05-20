@@ -224,6 +224,7 @@ class PairwiseMatrix:
         norm_val: int | None = None,
         savepath: str = None,
         show: bool = False,
+        main_paper: bool = False,
     ):
         """Plots or saves PairWise Matrix.
         Each row i indicates the number of settings in which algorithm i beats other algorithms
@@ -277,16 +278,24 @@ class PairwiseMatrix:
             vmax=max_poss_ent,
             annot_kws={"fontsize": fontsize_map},
         )
-        axs.set_title(f"Pairwise Penalty Matrix ({title_tag})")
         ticks = list(axs.get_yticks())
         axs.set_yticks(ticks[:-2] + ticks[-1:])
         axs.set_xticklabels(axs.get_xticklabels(), rotation=45, fontsize=fontsize_text)
 
-        axs.set_yticklabels(axs.get_yticklabels(), fontsize=fontsize_text)
-        axs.set_ylabel(r"Algorithm outperforms $\uparrow$", fontsize=fontsize_text)
-        axs.set_xlabel(
-            r"Algorithm outperformed by $\downarrow$", fontsize=fontsize_text
-        )
+        axs.set_yticklabels(axs.get_yticklabels(), fontsize=fontsize_text, rotation=0)
+        if main_paper:
+            axs.set_ylabel(
+                r"Method significant wins $\uparrow$[%]", fontsize=fontsize_text
+            )
+            axs.set_xlabel(
+                r"Method significant losses $\downarrow$ [%]", fontsize=fontsize_text
+            )
+        else:
+            axs.set_title(f"Pairwise Penalty Matrix ({title_tag})")
+            axs.set_ylabel(r"Algorithm outperforms $\uparrow$", fontsize=fontsize_text)
+            axs.set_xlabel(
+                r"Algorithm outperformed by $\downarrow$", fontsize=fontsize_text
+            )
 
         # Save the plot if savepath is provided
         if savepath:

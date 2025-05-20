@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.patches as mpatches
@@ -10,7 +11,7 @@ from evaluator import (
     load_settings,
     rename_settings_in_analysis,
 )
-from setup import CUSTOM_ORDER, QM_TO_COLOR, RENAMING_DICT, SAVEPATH
+from setup import CUSTOM_ORDER, QM_TO_COLOR, RENAMING_DICT, SAVEPATH, SAVETYPE
 
 from nnactive.analyze.metrics import PairwiseMatrix, PairwisePenaltyMatrix
 from nnactive.utils.io import save_df_to_txt
@@ -26,39 +27,49 @@ LEGEND = False
 
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
-# NORANDOM_ORDER.remove("class_pe33")
-# MINIORDER = [
-#     "class_pe66",
-#     "class_power_pe66_exp",
-#     "random-label",
-# ]
+MINIORDER = [
+    "class_pe66",
+    "class_power_pe66_exp",
+    "random-label",
+    "random-label2",
+]
 savepath = SAVEPATH / "figures"
-IMGTYPE = "pdf"
 
 COMPARATIVE = False
 
 USE_SETTINGS_LIST = [
     {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
-    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
+    # Used for nnActive_v2
+    # {"setting_names": ["500 Epochs"], "custom_order": MINIORDER},
+    # {"setting_names": ["Main"], "custom_order": MINIORDER},
+    {
+        "setting_names": ["Main", "500 Epochs"],
+        "custom_order": MINIORDER,
+        "print_name_settings_dict": {"Main": "200 Epochs"},
+    },
 ]
+
+for setting in USE_SETTINGS_LIST:
+    if "print_name_settings_dict" not in setting:
+        setting["print_name_settings_dict"] = {}
 
 RENAME_SETTINGS = None
 
 RANDOM_BASELINES = [
     "Random 33% FG",
     "Random 66% FG",
-    "Random",  # 500 Epochs setting does not run with this baseline
+    # "Random",  # 500 Epochs setting does not run with this baseline
 ]
 SORT_BY_PERFORMANCE = False
 MIRROR_BAR_PLOTS = False
 
 
 def pairwisematrix_to_df(matrix: PairwiseMatrix, name_dict=None):
-    norm_val = merged_matrix.max_pos_ent
+    norm_val = matrix.max_pos_ent
 
     # Convert matrix to DataFrame
     matrix = matrix.matrix
@@ -212,6 +223,7 @@ if __name__ == "__main__":
     for setting in USE_SETTINGS_LIST:
         setting_names = setting["setting_names"]
         custom_order = setting["custom_order"]
+        print_name_settings_dict = setting["print_name_settings_dict"]
         setting_paths = get_settings_for_combination(setting_names)
         setting_data = load_settings(setting_paths)
         if RENAME_SETTINGS is not None:
@@ -236,8 +248,12 @@ if __name__ == "__main__":
                     matrix.rename_algs(RENAMING_DICT)
                     all_matrices[dataset][budget][subsetting] = matrix
 
-        for RANDOM_BASELINE in RANDOM_BASELINES:
-
+        for random_baseline in RANDOM_BASELINES:
+            if (
+                random_baseline not in RENAMING_DICT.values()
+                or random_baseline not in custom_order
+            ):
+                continue
             for dataset in all_matrices:
                 merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
                     [
@@ -247,14 +263,14 @@ if __name__ == "__main__":
                     ]
                 )
                 df_matrix = pairwisematrix_to_df(merged_matrix)
-                fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
+                fname = f"rel_improvement_{save_setting}_{random_baseline.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{SAVETYPE}"
                 rel_improvement_barplot(
                     df_matrix,
                     out_path=savepath / fname,
                     mirrored=MIRROR_BAR_PLOTS,
                     value_text=True,
                     sort_by_performance=SORT_BY_PERFORMANCE,
-                    baseline=RANDOM_BASELINE,
+                    baseline=random_baseline,
                     add_legend=LEGEND,
                 )
 
@@ -267,13 +283,289 @@ if __name__ == "__main__":
                 ]
             )
             df_matrix = pairwisematrix_to_df(merged_matrix)
-            fname = f"rel_improvement_{save_setting}_{RANDOM_BASELINE.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{IMGTYPE}"
+            fname = f"rel_improvement_{save_setting}_{random_baseline.lower().replace(' ', '').replace('%', '')}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{SAVETYPE}"
             rel_improvement_barplot(
                 df_matrix,
                 out_path=savepath / fname,
                 mirrored=MIRROR_BAR_PLOTS,
                 value_text=True,
                 sort_by_performance=SORT_BY_PERFORMANCE,
-                baseline=RANDOM_BASELINE,
+                baseline=random_baseline,
                 add_legend=LEGEND,
             )
+        ######################## Win Loss single method Barplots ########################
+        for method in custom_order:
+            method_name = RENAMING_DICT.get(method, method)
+            if method_name in RANDOM_BASELINES:
+                continue
+            for dataset, budget_matrices in all_matrices.items():
+                x = np.arange(len(RANDOM_BASELINES))
+                bar_width = 0.4
+                df_dict = {}
+                colors = ["red", "orange", "purple"]
+                labels = ["Low", "Medium", "High"]
+
+                setting_wins = defaultdict(list)
+                setting_losses = defaultdict(list)
+                setting_max_val = defaultdict(lambda: 0)
+
+                for budget, subsetting_matrices in budget_matrices.items():
+                    df_dict[budget] = {}
+                    for subsetting, matrix in subsetting_matrices.items():
+                        if method_name not in matrix.algs:
+                            continue
+                        df_matrix = pairwisematrix_to_df(matrix)
+                        df_dict[budget][subsetting] = df_matrix
+                        wins = df_matrix.loc[method_name, RANDOM_BASELINES]
+                        losses = df_matrix.loc[RANDOM_BASELINES, method_name]
+                        setting_wins[subsetting].append(wins)
+                        setting_losses[subsetting].append(losses)
+                        setting_max_val[subsetting] += matrix.max_pos_ent
+
+                fig, axs = plt.subplots(
+                    1,
+                    len(setting_wins),
+                    figsize=(6 * len(setting_wins), 3),
+                    sharey=True,
+                )
+                if not isinstance(axs, np.ndarray):
+                    axs = [axs]
+
+                for i_s, (s) in enumerate(setting_wins):
+                    wins_arr = setting_wins[s]
+                    losses_arr = setting_losses[s]
+                    ax = axs[i_s]
+                    np_wins = np.array(wins_arr) / setting_max_val[s]
+                    np_losses = np.array(losses_arr) / setting_max_val[s]
+                    cumsum_wins = np.cumsum(np_wins, axis=0)
+                    cumsum_losses = np.cumsum(np_losses, axis=0)
+
+                    for i in range(len(wins_arr)):
+                        ax.bar(
+                            x - bar_width / 2,
+                            np_wins[i],
+                            width=bar_width,
+                            color=colors[i],
+                            bottom=cumsum_wins[i - 1] if i > 0 else 0,
+                        )
+                        ax.bar(
+                            x + bar_width / 2,
+                            np_losses[i],
+                            width=bar_width,
+                            color=colors[i],
+                            bottom=cumsum_losses[i - 1] if i > 0 else 0,
+                            hatch="//",
+                            # alpha=0.5,
+                            alpha=1,
+                        )
+                    ax.grid(axis="x")
+                    xticks = np.concatenate(
+                        [x - bar_width / 2, x + bar_width / 2, x], axis=0
+                    )
+                    xlabels = (
+                        ["Wins"] * len(x)
+                        + ["Losses"] * len(x)
+                        + [f"\n{method_name} vs. {r}" for r in RANDOM_BASELINES]
+                        # + [f"\n{method_name} vs. \n {r}" for r in RANDOM_BASELINES]
+                    )
+                    ax.set_xticks(xticks, labels=xlabels)
+                    for l in ax.get_xticklabels()[-len(x) :]:
+                        l.set_fontweight("bold")
+                    ax.set_title(print_name_settings_dict.get(s, s))
+                    if i_s == 0:
+                        print("Setting Label")
+                        ax.set_ylabel("Fraction of experiments [%]")
+                        pass
+
+                    if len(setting_wins) == 1:
+                        legends = []
+                        for i, label in enumerate(labels):
+                            legends.append(mpatches.Patch(color=colors[i], label=label))
+                        # Add the legend
+                        ax.legend(handles=legends)
+                legends = (
+                    [mpatches.Patch(color="None", label="Label Regime:")]
+                    + [
+                        mpatches.Patch(color=colors[i], label=labels[i])
+                        for i in range(len(labels))
+                    ]
+                    + [mpatches.Patch(color="None", label="Outcome:")]
+                    + [
+                        mpatches.Patch(color="black", alpha=1, label="Wins"),
+                        mpatches.Patch(
+                            facecolor="white",
+                            # color="black",
+                            edgecolor="black",
+                            hatch="//",
+                            alpha=1,
+                            label="Losses",
+                            # edgecolor="white",
+                        ),
+                    ]
+                )
+                fig.tight_layout()
+                fig.legend(
+                    loc="lower center",
+                    bbox_to_anchor=(0.5, -0.1),
+                    ncols=len(legends),
+                    handles=legends,
+                )
+                if not savepath.is_dir():
+                    savepath.mkdir(parents=True, exist_ok=True)
+                plt.savefig(
+                    savepath / "ppm_rel_improvement_stacked_"
+                    f"{save_setting}_{method_name.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{SAVETYPE}",
+                    bbox_inches="tight",
+                )
+                plt.close()
+
+        ######################## Win Neutral Loss single method Barplots ########################
+        for method in custom_order:
+            method_name = RENAMING_DICT.get(method, method)
+            if method_name in RANDOM_BASELINES:
+                continue
+            for dataset, budget_matrices in all_matrices.items():
+                x = np.arange(len(RANDOM_BASELINES))
+                bar_width = 0.3
+                df_dict = {}
+                colors = ["red", "orange", "purple"]
+                labels = ["Low", "Medium", "High"]
+
+                setting_wins = defaultdict(list)
+                setting_losses = defaultdict(list)
+
+                setting_max_val = defaultdict(lambda: 0)
+
+                for budget, subsetting_matrices in budget_matrices.items():
+                    df_dict[budget] = {}
+                    for subsetting, matrix in subsetting_matrices.items():
+                        if method_name not in matrix.algs:
+                            continue
+                        df_matrix = pairwisematrix_to_df(matrix)
+                        df_dict[budget][subsetting] = df_matrix
+                        wins = df_matrix.loc[method_name, RANDOM_BASELINES]
+                        losses = df_matrix.loc[RANDOM_BASELINES, method_name]
+                        setting_wins[subsetting].append(wins)
+                        setting_losses[subsetting].append(losses)
+                        setting_max_val[subsetting] += matrix.max_pos_ent
+
+                fig, axs = plt.subplots(
+                    1,
+                    len(setting_wins),
+                    figsize=(6 * len(setting_wins), 3),
+                    sharey=True,
+                )
+                if not isinstance(axs, np.ndarray):
+                    axs = [axs]
+                for i_s, (s) in enumerate(setting_wins):
+                    wins_arr = setting_wins[s]
+                    losses_arr = setting_losses[s]
+                    ax = axs[i_s]
+                    np_wins = np.array(wins_arr) / setting_max_val[s]
+                    np_losses = np.array(losses_arr) / setting_max_val[s]
+                    np_neutral = 100 / setting_max_val[s] - (np_wins + np_losses)
+                    cumsum_neutral = np.cumsum(np_neutral, axis=0)
+                    cumsum_wins = np.cumsum(np_wins, axis=0)
+                    cumsum_losses = np.cumsum(np_losses, axis=0)
+                    for i in range(len(wins_arr)):
+                        ax.bar(
+                            x - bar_width,
+                            np_wins[i],
+                            width=bar_width,
+                            color=colors[i],
+                            bottom=cumsum_wins[i - 1] if i > 0 else 0,
+                        )
+                        ax.bar(
+                            x,
+                            np_neutral[i],
+                            width=bar_width,
+                            color=colors[i],
+                            # hatch="/",
+                            alpha=0.6,
+                            bottom=cumsum_neutral[i - 1] if i > 0 else 0,
+                        )
+                        ax.bar(
+                            x + bar_width,
+                            np_losses[i],
+                            width=bar_width,
+                            color=colors[i],
+                            bottom=cumsum_losses[i - 1] if i > 0 else 0,
+                            hatch="\\",
+                            # alpha=0.5,
+                            alpha=1,
+                        )
+                    ax.grid(axis="x")
+                    xticks = np.concatenate(
+                        [
+                            x - bar_width,
+                            x + bar_width,
+                            x,
+                            x + 1e-10,
+                        ],
+                        axis=0,
+                    )
+                    xlabels = (
+                        ["Win"] * len(x)
+                        + ["Loss"] * len(x)
+                        + ["Tie"] * len(x)
+                        + [f"\n{method_name} vs. {r}" for r in RANDOM_BASELINES]
+                        # + [f"Tie\n{method_name} vs. {r}" for r in RANDOM_BASELINES]
+                    )
+                    ax.set_xticks(xticks, labels=xlabels)
+                    for l in ax.get_xticklabels()[-len(x) :]:
+                        l.set_fontweight("bold")
+                    ax.set_title(print_name_settings_dict.get(s, s))
+                    if i_s == 0:
+                        print("Setting Label")
+                        ax.set_ylabel("Fraction of experiments [%]")
+                        pass
+
+                    if len(setting_wins) == 1:
+                        legends = []
+                        for i, label in enumerate(labels):
+                            legends.append(mpatches.Patch(color=colors[i], label=label))
+                        # Add the legend
+                        ax.legend(handles=legends)
+                legends = (
+                    [mpatches.Patch(color="None", label="Label Regime:")]
+                    + [
+                        mpatches.Patch(color=colors[i], label=labels[i])
+                        for i in range(len(labels))
+                    ]
+                    + [mpatches.Patch(color="None", label="Outcome:")]
+                    + [
+                        mpatches.Patch(
+                            facecolor="black",
+                            edgecolor="black",
+                            alpha=1,
+                            label="Win",
+                        ),
+                        mpatches.Patch(
+                            facecolor="black",
+                            edgecolor="black",
+                            # hatch="//",
+                            alpha=0.5,
+                            label="Tie",
+                        ),
+                        mpatches.Patch(
+                            facecolor="black",
+                            edgecolor="white",
+                            hatch="\\\\",
+                            alpha=1,
+                            label="Loss",
+                        ),
+                    ]
+                )
+                fig.tight_layout()
+                fig.legend(
+                    loc="lower center",
+                    bbox_to_anchor=(0.5, -0.1),
+                    ncols=len(legends),
+                    handles=legends,
+                )
+                plt.savefig(
+                    savepath / "ppm_rel_improvement_stacked_wnl_"
+                    f"{save_setting}_{method_name.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{SAVETYPE}",
+                    bbox_inches="tight",
+                )
+                plt.close()

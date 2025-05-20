@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
@@ -6,6 +7,16 @@ from typing import Any, Hashable, Iterable, List
 import numpy as np
 from PIL import Image
 from pydantic import dataclasses
+
+
+def rglob_follow_symlinks(root: Path, pattern: str):
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        current_dir = Path(dirpath)
+        # Check both files and dirs
+        for name in filenames + dirnames:
+            path = current_dir / name
+            if path.match(pattern):
+                yield path
 
 
 def create_string_identifier(
