@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from setup import BASEPATH, RENAMING_DICT, RESULTSPATH
+from setup import BASEPATH, RENAMING_DICT, RESULTSPATH, SAVETYPE
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -43,7 +43,6 @@ COMPARISONS = [
     "random",
 ]
 
-SAVETYPE = "pdf"
 BASELINES = ["random-label", "random-label2", "random"]
 
 IDENTIFIER_DICT = {

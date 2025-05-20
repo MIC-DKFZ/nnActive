@@ -18,6 +18,7 @@ dependencies = [
     "wandb",
     "jsonargparse[signatures]",
     "shtab",
+    "scikit-posthocs",
 ]
 
 [project.optional-dependencies]

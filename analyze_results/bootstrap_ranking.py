@@ -18,6 +18,7 @@ from setup import (
     QM_TO_COLOR,
     RENAMING_DICT,
     SAVEPATH,
+    SAVETYPE,
     apply_latex_coloring,
     get_ranking_cmap,
     save_styled_to_latex,
@@ -29,7 +30,7 @@ plt.style.use("default")
 
 SAVENAME = "bootstrap_ranking"
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
-IMGTYPE = "pdf"
+
 
 COMPARATIVE = False
 COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
@@ -411,7 +412,7 @@ if __name__ == "__main__":
 
         for c_metric in C_METRICS:
             plot_bootstrap_rankings(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 add_subplot_labels,
                 print_setting,
@@ -420,7 +421,7 @@ if __name__ == "__main__":
                 add_mean_rankings,
             )
             plot_bootstrap_ranking_overview(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 print_setting,
                 nested_bootstrap_ranking_dict,

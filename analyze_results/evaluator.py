@@ -123,6 +123,27 @@ FULL_SETTINGS = {
             "Precomputed": "Dataset135_KiTS2021/tr-nnActiveTrainer_500epochs__patch-64_64_64__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
         },
     },
+    "LiTS": {
+        "Roll-Out": {
+            "Roll-Out": "Dataset003_Liver/patch-28_44_39__sb-random-label2-all-classes__sbs-150__qs-150",
+        }
+    },
+    "WORD": {
+        "Roll-Out": {
+            "Roll-Out": "Dataset654_word/patch-29_74_87__sb-random-label2-all-classes__sbs-800__qs-800",
+        }
+    },
+    "Tooth Fairy 2": {
+        "Roll-Out": {
+            "Roll-Out": "Dataset119_ToothFairy2_All/patch-33_34_35__sb-random-label2-all-classes__sbs-2100__qs-2100",
+        }
+    },
+    "MAMA MIA": {
+        "Roll-Out": {
+            "Roll-Out": "Dataset095_MAMA_MIA_subtracted/patch-16_48_57__sb-random-label2-all-classes__sbs-100__qs-100"
+        }
+    },
+    "CTOrg": {"Roll-Out": {"Roll-Out": None}},
 }
 
 for S in FULL_SETTINGS:
@@ -157,6 +178,9 @@ def load_settings(
                             f"Analysis file not found for {D} {S} {M}: {analysis_file}"
                         )
                         remove_budgets.add(S)
+                else:
+                    print(f"Skipping {D} {S} {M}: No path provided")
+                    remove_budgets.add(S)
 
             for M in remove_budgets:
                 del out_settings[D][S]
@@ -185,6 +209,8 @@ def ensure_overlap(out_settings: dict[str, dict[str, dict[str, SettingAnalysis]]
                 overlapping_budgets.append(
                     out_settings[D][S][M].df[out_settings[D][S][M].budget_key].unique()
                 )
+            if len(overlapping_budgets) == 0:
+                continue
             overlapping_budgets = list(set.intersection(*map(set, overlapping_budgets)))
             for M in out_settings[D][S]:
                 out_settings[D][S][M].df = out_settings[D][S][M].df[
@@ -206,7 +232,9 @@ def get_settings_for_combination(key_combination: list[str] | str) -> dict:
             values = [entries.get(key) for key in key_combination if key in entries]
 
             if all(values):  # Ensure all keys have non-None value
-                result.setdefault(dataset, {}).setdefault(level, {})
+                result.setdefault(dataset, {}).setdefault(
+                    level, dict(zip(key_combination, [None] * len(key_combination)))
+                )
                 for key, value in zip(key_combination, values):
                     result[dataset][level][key] = value
 

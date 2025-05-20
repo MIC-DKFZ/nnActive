@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from setup import BASEPATH, RENAMING_DICT, SAVEPATH
+from setup import BASEPATH, RENAMING_DICT, SAVEPATH, SAVETYPE
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -324,7 +324,7 @@ for (j, dataset), (i, metric) in product(enumerate(datasets), enumerate(metrics)
 
 fig.tight_layout()
 axs[axs.shape[-1] - 1, 0].legend(loc=(0.5, -0.7), handlelength=4, ncols=4)
-plt.savefig(figpath / "ablation-powerbald.pdf", bbox_inches="tight")
+plt.savefig(figpath / f"ablation-powerbald.{SAVETYPE}", bbox_inches="tight")
 
 for dataset in datasets:
     fig, axs = plt.subplots(
@@ -374,4 +374,6 @@ for dataset in datasets:
 
     fig.tight_layout()
     axs[0, 0].legend(loc=(0.5, -0.6), handlelength=4, ncols=4)
-    plt.savefig(figpath / f"ablation-powerbald_{dataset}.pdf", bbox_inches="tight")
+    plt.savefig(
+        figpath / f"ablation-powerbald_{dataset}.{SAVETYPE}", bbox_inches="tight"
+    )

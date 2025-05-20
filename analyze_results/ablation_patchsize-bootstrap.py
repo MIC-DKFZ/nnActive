@@ -16,9 +16,11 @@ from scipy.stats import kendalltau
 from setup import (
     BASEPATH,
     CUSTOM_ORDER,
+    MAIN_ORDER,
     QM_TO_COLOR,
     RENAMING_DICT,
     SAVEPATH,
+    SAVETYPE,
     apply_latex_coloring,
     get_ranking_cmap,
     save_styled_to_latex,
@@ -30,16 +32,31 @@ plt.style.use("default")
 
 SAVENAME = "bootstrap_ranking"
 STANDARD_COLNAMES = ["Low", "Medium", "High"]
-IMGTYPE = "png"
 
 COMPARATIVE = False
 COLLEVELNAMES = ["Dataset", "Label Regime", "Setting", "Metric"]
+
+ANALYSIS_CONFIGS = [
+    {
+        "settings": ["Main"],
+        "comparative": False,
+        "rename": None,
+        "order": MAIN_ORDER,
+    },
+    {
+        "settings": ["Patchx1/2"],
+        "comparative": False,
+        "rename": None,
+        "order": MAIN_ORDER,
+    },
+]
 
 USE_SETTINGS_LIST = [
     ["Main"],  # enable for mean_rank in appendix
     ["Patchx1/2"],  # enable for mean_rank in appendix
 ]
 RENAME_SETTINGS_LIST = [None] * len(USE_SETTINGS_LIST)
+
 
 C_METRICS = ["AUBC", "Final"]
 
@@ -341,7 +358,10 @@ if __name__ == "__main__":
 
     full_df = []
 
-    for setting, rename_setting in zip(USE_SETTINGS_LIST, RENAME_SETTINGS_LIST):
+    for config in ANALYSIS_CONFIGS:
+        setting = config["settings"]
+        rename_setting = config["rename"]
+        order = config["order"]
         print(setting)
         print_setting = "_".join(setting).replace(" ", "").replace("/", "-")
         setting_paths = get_settings_for_combination(setting)
@@ -360,7 +380,7 @@ if __name__ == "__main__":
                 for budget_setting in budget_settings:
                     data = budget_settings[budget_setting]
                     aucvals = pd.DataFrame(data._compute_auc_row_dicts([f"Mean Dice"]))
-                    aucvals = aucvals[aucvals["Query Method"].isin(CUSTOM_ORDER)]
+                    aucvals = aucvals[aucvals["Query Method"].isin(order)]
                     aucvals["Query Method"] = aucvals["Query Method"].replace(
                         RENAMING_DICT
                     )
@@ -418,7 +438,7 @@ if __name__ == "__main__":
 
         for c_metric in C_METRICS:
             plot_bootstrap_rankings(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 add_subplot_labels,
                 print_setting,
@@ -427,7 +447,7 @@ if __name__ == "__main__":
                 add_mean_rankings,
             )
             plot_bootstrap_ranking_overview(
-                IMGTYPE,
+                SAVETYPE,
                 savepath,
                 print_setting,
                 nested_bootstrap_ranking_dict,

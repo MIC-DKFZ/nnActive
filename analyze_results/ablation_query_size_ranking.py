@@ -18,7 +18,6 @@ from scipy.stats import (
 )
 from setup import (
     BASEPATH,
-    RENAMING_DICT,
     SAVEPATH,
     VALUE_TO_COLOR_MAP,
     apply_latex_coloring,

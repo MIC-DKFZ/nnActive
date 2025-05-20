@@ -8,7 +8,15 @@ from evaluator import (
     load_settings,
     rename_settings_in_analysis,
 )
-from setup import BASEPATH, CUSTOM_ORDER, RENAMING_DICT, SAVEPATH
+from setup import (
+    BASEPATH,
+    CUSTOM_ORDER,
+    MAIN_ORDER,
+    RENAMING_DICT,
+    ROLL_OUT_ORDER,
+    SAVEPATH,
+    SAVETYPE,
+)
 
 from nnactive.analyze.aggregate_results import pretty_auc
 from nnactive.analyze.analysis import SettingAnalysis
@@ -22,22 +30,43 @@ from nnactive.utils.io import save_df_to_txt
 # matplotlib.rcParams["font.family"] = "Computer Modern"
 plt.style.use("default")
 
-MAIN_ORDER = CUSTOM_ORDER
-
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
 savepath = SAVEPATH / "figures"
 savepath.mkdir(exist_ok=True, parents=True)
-filetype = "png"
 
 COMPARATIVE = False
 
+
 USE_SETTINGS_LIST = [
-    {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
-    # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
-    # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
-    {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
+    {
+        "setting_names": ["Main"],
+        "custom_order": MAIN_ORDER,
+        "savename": "main",
+    },
+    {
+        "setting_names": ["Main", "Patchx1/2"],
+        "custom_order": MAIN_ORDER,
+        "savename": "main_patchx1-2",
+    },
+    # {
+    #     "setting_names": ["Main"],
+    #     "custom_order": CUSTOM_ORDER,
+    #     "savename": "ablation",
+    # },
+    # # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
+    # # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
+    {
+        "setting_names": ["Patchx1/2"],
+        "custom_order": MAIN_ORDER,
+        "savename": "patchx1-2",
+    },
+    {
+        "setting_names": ["Roll-Out"],
+        "custom_order": ROLL_OUT_ORDER,
+        "savename": "rollout",
+    },
 ]
 
 RENAME_SETTINGS = None
@@ -46,6 +75,7 @@ RENAME_SETTINGS = None
 for setting in USE_SETTINGS_LIST:
     setting_names = setting["setting_names"]
     custom_order = setting["custom_order"]
+    savename = setting.get("savename")
     setting_paths = get_settings_for_combination(setting_names)
     setting_data = load_settings(setting_paths)
     if RENAME_SETTINGS is not None:
@@ -71,9 +101,6 @@ for setting in USE_SETTINGS_LIST:
                     print(
                         f"Custom order {custom_order} not possible for {dataset} {budget} {subsetting}"
                     )
-                    import IPython
-
-                    IPython.embed()
                 matrix.rename_algs(RENAMING_DICT)
                 all_matrices[dataset][budget][subsetting] = matrix
 
@@ -85,25 +112,36 @@ for setting in USE_SETTINGS_LIST:
                 for mat in all_matrices[dataset].values()
             ]
         )
+        if len(merged_matrix.algs) == 0:
+            print(
+                f"Custom order {custom_order} not possible for {dataset} {budget} {subsetting}"
+            )
+            continue
         PairwisePenaltyMatrix.plot_pairwise_matrix(
             merged_matrix,
-            savepath=savepath / f"{save_setting}_{dataset}_ppm.{filetype}",
+            savepath=savepath / f"{savename}_{dataset}_ppm.{SAVETYPE}",
             max_poss_ent=None,
             title_tag=f"{print_setting} {dataset} [%]",
             norm_val=merged_matrix.max_pos_ent,
         )
-    merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
-        [
-            all_matrices[d][b][s]
-            for d in all_matrices
-            for b in all_matrices[d]
-            for s in all_matrices[d][b]
-        ]
-    )
-    PairwisePenaltyMatrix.plot_pairwise_matrix(
-        merged_matrix,
-        savepath=savepath / f"{save_setting}_ppm.{filetype}",
-        max_poss_ent=None,
-        title_tag=f"{print_setting} [%]",
-        norm_val=merged_matrix.max_pos_ent,
-    )
+    try:
+        merged_matrix = PairwisePenaltyMatrix.create_merged_matrix(
+            [
+                all_matrices[d][b][s]
+                for d in all_matrices
+                for b in all_matrices[d]
+                for s in all_matrices[d][b]
+            ]
+        )
+        PairwisePenaltyMatrix.plot_pairwise_matrix(
+            merged_matrix,
+            savepath=savepath / f"{savename}_ppm.{SAVETYPE}",
+            max_poss_ent=None,
+            title_tag=f"{print_setting} [%]",
+            norm_val=merged_matrix.max_pos_ent,
+        )
+    except ValueError:
+        print(
+            "Algorithms do not match for all datasets and settings. "
+            "Therefore, no merged matrix is created. "
+        )
