@@ -328,6 +328,9 @@ if __name__ == "__main__":
                     figsize=(6 * len(setting_wins), 3),
                     sharey=True,
                 )
+                if not isinstance(axs, np.ndarray):
+                    axs = [axs]
+
                 for i_s, (s) in enumerate(setting_wins):
                     wins_arr = setting_wins[s]
                     losses_arr = setting_losses[s]
@@ -407,6 +410,8 @@ if __name__ == "__main__":
                     ncols=len(legends),
                     handles=legends,
                 )
+                if not savepath.is_dir():
+                    savepath.mkdir(parents=True, exist_ok=True)
                 plt.savefig(
                     savepath / "ppm_rel_improvement_stacked_"
                     f"{save_setting}_{method_name.lower().replace(' ', '').replace('%', '')}_{dataset}{'_mirrored' if MIRROR_BAR_PLOTS else ''}.{SAVETYPE}",
@@ -450,6 +455,8 @@ if __name__ == "__main__":
                     figsize=(6 * len(setting_wins), 3),
                     sharey=True,
                 )
+                if not isinstance(axs, np.ndarray):
+                    axs = [axs]
                 for i_s, (s) in enumerate(setting_wins):
                     wins_arr = setting_wins[s]
                     losses_arr = setting_losses[s]

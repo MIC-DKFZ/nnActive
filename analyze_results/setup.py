@@ -83,10 +83,6 @@ for q in QM_TO_COLOR:
 QM_TO_COLOR["Cla PE 33%"] = "#023020"
 
 
-BASEPATH = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnactive/results/horeka_rsync_final_test/"
-)
-
 RESULTSPATH = Path(__file__).parent.parent / "results"
 if not RESULTSPATH.exists():
     print("Creating Resultspath: ", RESULTSPATH)
@@ -94,8 +90,15 @@ if not RESULTSPATH.exists():
 else:
     print("Resultspath already exists: ", RESULTSPATH)
 
+BASEPATH = RESULTSPATH / "horeka_rsync_final_test"
+if not BASEPATH.exists():
+    print("Creating Basepath: ", BASEPATH)
+    print(
+        "Please save in this location the output from '$nnactive analyze_experiments...'"
+    )
+    os.makedirs(BASEPATH)
 
-# SAVEPATH = RESULTSPATH / "horeka_rsync_eval"
+
 SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
 
 if not SAVEPATH.exists():
@@ -285,6 +288,9 @@ def shorten_hippocampus(BASEPATH):
         hippcompaus_path / "patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20"
     )
     save_path = hippcompaus_path / f"{datapath.name}__5loops"
+    if (save_path / "analysis.pkl").is_file():
+        logger.info(f"Analysis already exists: {save_path}")
+        return
     os.makedirs(save_path, exist_ok=True)
 
     analysis = SettingAnalysis.load(datapath / "analysis.pkl")
