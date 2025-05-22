@@ -1,12 +1,36 @@
-# nnActive
+<p align="center">
+    <img src="./assets/nnactive-logo.png" style="width: 70%">
+    <br/>
+</p>
 
-Scripts for nnActive development
+<!-- # nnActive -->
+Scripts for nnActive installation, usage, and development.
+
+**Contents:**
+- **nnActive**
+    - [Installation](#installation)
+    - [Set up nnActive](#set-up-nnactive)
+    - [Autocompletion](#autocompletion)
+    - [Setting up the data](#setting-up-the-data)
+    - [Active Learning Experiment](#active-learning-experiment)
+    - [Analysis](#analysis)
+    - [Dataset Requirements](#requirements)
+    - [Additional Labels](#additional-labels-path)
+    - [Active Learning Integration](#active-learning-integration)
+    - [Contributing](#contributing)
+- [📊 **Benchmark Results**](#benchmark-results)
+- [🛠️ **How to benchmark a new AL method?**](#adding-a-new-al-method)
+
+---
+
+## Installation
 
 Install with
 ```bash
 # use Pytorch 2.4.0 and CUDA 12.4
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install -e '.[dev]'
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install -e nnunetv2
+pip install -e nnactive '.[dev]'
 ```
 
 We recommend a swap memory size of ≥128GB to avoid OOM issues.
@@ -16,7 +40,7 @@ Set up paths as follows:
 ```bash
 export nnActive_raw=Path_to_raw_nnunet_data # contains base datasets are derived
 export nnActive_data=Path_to_nnactive_data # contains data for Active Learning experiments
-export nnActive_results=Path_to_nnactive_results # contains results from Active Learning experiments
+export nnActive_results=$nnActive_data # contains results from Active Learning experiments
 export nnUNet_raw=$nnActive_raw/nnUNet_raw # base_datasets (ID)
 export nnUNet_preprocessed=$nnActive_raw/nnUNet_preprocessed # base datasets (ID)
 export nnUNet_results=Path_to_nnUnet_results # base datasets (ID)
@@ -127,19 +151,19 @@ $nnUNet_raw
 ## Active Learning Experiment
 After the base dataset has been set up we create an experiment with the setup function
 ```bash
-nnactive setup_experiment --experiment Hippocampus__patch-20_20_20__qs-40__unc-random__seed-12345
+nnactive setup_experiment --experiment Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-random__seed-12345
 ```
 This creates the following folders:
 ```bash
 $nnActive_data
 ├── Dataset004_Hippocampus # base_dataset folder
 │   ├── nnUNet_preprocessed
-│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   ├── Dataset000_Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-random__seed-12345
 │   │   │   ├── nnUNetPlans.json
 │   │   │   ├── gt_segmentations
 │   │   │   └── nnUNetPlans_3d_fullres
 │   ├── nnUNet_raw
-│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   ├── Dataset000_Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-random__seed-12345
 │   │   │   ├── loop_000.json # contains annotated patches
 │   │   │   ├── imagesTr -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/imagesTr
 │   │   │   ├── imagesTs -> $nnActive_raw/nnUNet_raw/Dataset004_Hippocampus/imagesTs
@@ -153,14 +177,14 @@ $nnActive_data
 $nnActive_results
 ├── Dataset004_Hippocampus # base_dataset folder
 │   ├── nnActive_results
-│   │   ├── Dataset000_Hippocampus__patch-20__qs20__unc-random__seed-12345
+│   │   ├── Dataset000_Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-random__seed-12345
 │   │   │   └── config.json
 │   │   │   └── loop_000 # these will be created for validation and performance etc.
 ```
 
 After the experiment has been set up, it can now be executed.
 ```bash
-nnactive run_experiment --experiment Hippocampus__patch-20_20_20__qs-40__unc-random__seed-12345
+nnactive run_experiment --experiment Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-random__seed-12345
 ```
 
 ## Analysis
@@ -202,10 +226,10 @@ Results in the following folder structure
 ```
 {OUTPUT_FOLDER}/DatasetXYZ
 ├── loop_000
-│   ├── loop-00__id-00__img-BraTS2021_01541.png
-│   ├── loop-00__id-01__img-BraTS2021_00542.png
-│   ├── loop-00__id-02__img-BraTS2021_01504.png
-│   └── loop-00__id-19__img-BraTS2021_00260.png
+│   ├── loop-00__id-00__img-ACDC_01541.png
+│   ├── loop-00__id-01__img-ACDC_00542.png
+│   ├── loop-00__id-02__img-ACDC_01504.png
+│   └── loop-00__id-19__img-ACDC_00260.png
 ├── loop_001
 ...
 ├── loop_002
@@ -306,3 +330,59 @@ To recreate the dataset for `loop_002.json` needs to be aggregated with `loop_00
             ...
         ]
         ```
+
+# 📊 Benchmark Results
+We provide all benchmark results on huggingface (available on acceptance for anonymity)
+
+To download the results for all experiments:
+```bash
+python assets/download_from_huggingface.py --help
+```
+
+# 🛠️ Benchmarking a new AL method
+
+## Add Query Strategy
+1. Create a new file `nnactive/strategies/my_qm.py` containing the QM implementation. You can use the existing methods as templates, e.g. Expected Entropy:
+    ```python
+    from pathlib import Path
+    import torch
+
+    from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
+    from nnactive.strategies.uncertainties import Probs
+
+    # Inherit from AbstractUncertainQueryMethod for QMs based on predicted
+    # class probability distributions.
+    class ExpectedEntropy(AbstractUncertainQueryMethod):
+        # The core of the QM implementation
+        def get_uncertainty(
+            self, probs: list[Path] | torch.Tensor | Probs, device: torch.device
+        ) -> torch.Tensor:
+            # Use the Probs (ProbsFromFiles) class (at strategies/uncertainties.py).
+            # This automatically combines probability maps from temporary files.
+            if not isinstance(probs, Probs):
+                probs = Probs.create(probs)
+            return probs.exp_entropy(probs, device=device)
+    ```
+
+2. Add the new QM to the `strategydict` in `nnactive/strategies/__init__.py`. 
+
+## Add Experiment Configurations
+Register new experiments to make them available in the CLI.
+
+```python
+from nnactive.experiments import register, make_hippocampus_config
+
+register(
+    make_hippocampus_config,  # our default Hippocampus configuration
+    seeds=list(i + 12345 for i in range(4)),
+    uncertainties=["my_qm"],  # as stored in the strategydict
+    query_size=40,  # medium label regime
+    query_steps=5,  # 5 AL cycles
+)
+```
+
+## Run new Experiments
+```bash
+nnactive setup_experiment --experiment Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-my_qm__seed-12345
+nnactive run_experiment --experiment Hippocampus__patch-20_20_20__sb-random-label2-all-classes__sbs-40__qs-40__unc-my_qm__seed-12345
+```
