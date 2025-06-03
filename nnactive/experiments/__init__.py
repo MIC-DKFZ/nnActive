@@ -1298,3 +1298,30 @@ for config in dataset_configs:
         additional_overlap=0,
         **config,
     )
+
+
+################## WORD 500 epochs training ################
+
+pre_suffix_format = "__tr-{trainer}__patch-{patch_size}__sb-{starting_budget}__sbs-{starting_budget_size}__qs-{query_size}"
+
+register(
+    make_config,
+    seeds=__seeds,
+    uncertainties=[
+        "random-label",
+        "random",
+        "pred_entropy",
+        "class_power_pe66_exp",
+    ],
+    query_steps=5,
+    starting_budget=__standard_starting_budget,
+    pre_suffix_format=pre_suffix_format,
+    additional_overlap=0,
+    base_id=654,
+    starting_budget_size=800,
+    query_size=800,
+    patch_size=[29, 74, 87],
+    agg_stride=[4, 8, 8],
+    trainer="nnActiveTrainer_500epochs",
+    n_patch_per_image=None,
+)
