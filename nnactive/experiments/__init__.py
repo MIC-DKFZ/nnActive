@@ -1244,6 +1244,7 @@ dataset_configs: list[dict] = [
         "patch_size": [64, 64, 64],
         "agg_stride": 8,
         "trainer": __standard_trainer,
+        "n_patch_per_image": None,
     },  # CTORG
     {
         "base_id": 654,
@@ -1252,6 +1253,7 @@ dataset_configs: list[dict] = [
         "patch_size": [29, 74, 87],
         "agg_stride": [4, 8, 8],
         "trainer": __standard_trainer,
+        "n_patch_per_image": None,
     },  # WORD
     {
         "base_id": 3,
@@ -1260,6 +1262,7 @@ dataset_configs: list[dict] = [
         "patch_size": [28, 44, 39],
         "agg_stride": 8,
         "trainer": __standard_trainer,
+        "n_patch_per_image": None,
     },  # LiTS
     {
         "base_id": 95,
@@ -1270,6 +1273,7 @@ dataset_configs: list[dict] = [
         "trainer": __standard_trainer,
         "pred_tile_step_size": 0.75,
         "disable_pred_tta": True,
+        "n_patch_per_image": None,
     },  # MAMA MIA
     {
         "base_id": 119,
@@ -1279,6 +1283,7 @@ dataset_configs: list[dict] = [
         "agg_stride": [4, 6, 6],
         "trainer": "nnActiveTrainer_NoMirroring_200epochs",
         "disable_pred_tta": True,
+        "n_patch_per_image": 50,
     },  # ToothFairy
 ]
 
@@ -1291,6 +1296,5 @@ for config in dataset_configs:
         starting_budget=__standard_starting_budget,
         pre_suffix_format=__standard_pre_suffix_format,
         additional_overlap=0,
-        n_patch_per_image=None,
         **config,
     )
