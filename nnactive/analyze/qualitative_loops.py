@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -156,6 +157,99 @@ def plot_query_trajectory(
             columns=5,
             image_padding=0,
         )
+
+
+def extract_al_method_from_path(path_str: str) -> str | None:
+    path = Path(path_str)
+    match = re.search(r"__unc-([a-zA-Z0-9_]+)__", path.name)
+    if match:
+        return match.group(1)
+    return None
+
+
+def plot_region_predictions_across_loops(
+    raw_folder: Path,
+    results_folder: Path,
+    image_name: str,
+    save_folder: Path,
+    img_folder: Path | None = None,
+    gt_folder: Path | None = None,
+):
+    results_folder = Path(results_folder)
+    save_folder = Path(save_folder)
+    save_folder.mkdir(exist_ok=True)
+
+    file_ending = load_json(Path(raw_folder) / "dataset.json")["file_ending"]
+    img_id = image_name.replace(file_ending, "")
+    image_name = img_id + file_ending
+
+    al_method = extract_al_method_from_path(results_folder)
+
+    # Load background image
+    if img_folder:
+        img_path = Path(img_folder) / (img_id + "_0000" + file_ending)
+        img = sitk.ReadImage(str(img_path))
+        img_np = sitk.GetArrayFromImage(img)
+        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
+    else:
+        img_np = None
+
+    # Gather and sort loop prediction folders
+    label_dirs = [gt_folder]
+    label_dirs += sorted(
+        results_folder.glob("loop_*__predVal"), key=lambda p: int(p.name.split("_")[1])
+    )
+    tags = ["GT"] + [f.name for f in label_dirs[1:]]
+
+    # Add the final predVal folder
+    final_pred_folder = results_folder / "predVal"
+    if final_pred_folder.exists():
+        label_dirs.append(final_pred_folder)
+        tags += ["final"]
+
+    if not label_dirs:
+        print(f"No prediction folders found in {results_folder}")
+        return
+
+    # Prepare the plot
+    fig, axs = plt.subplots(
+        1, len(label_dirs), figsize=(3.5 * len(label_dirs), 3), squeeze=False
+    )
+    axs = axs[0]
+    for i, (loop_folder, label) in enumerate(zip(label_dirs, tags)):
+        pred_path = loop_folder / image_name
+        if not pred_path.exists():
+            print(f"Missing prediction: {pred_path}")
+            axs[i].axis("off")
+            axs[i].set_title(f"{label}\n(Missing)")
+            continue
+
+        pred = sitk.GetArrayFromImage(sitk.ReadImage(str(pred_path)))
+        pred_shape = pred.shape
+        fixed_xcoord = pred_shape[0] // 2
+        pred = pred[fixed_xcoord]
+        pred = np.array(pred, dtype=float)
+        pred[pred == 0] = np.nan
+
+        if img_np is not None:
+            assert img_np.shape == pred_shape
+            base_img = img_np[fixed_xcoord]
+        else:
+            base_img = np.zeros_like(pred, dtype=np.float32)
+
+        axs[i].imshow(base_img, cmap="gray", vmin=0, vmax=1)
+        axs[i].imshow(pred, cmap="Set3", alpha=0.4)
+        axs[i].set_title(label)
+        axs[i].axis("off")
+
+    axs[0].axis("on")
+    axs[0].grid(False)
+    axs[0].set_xticks([])
+    axs[0].set_yticks([])
+    axs[0].set_ylabel(al_method)
+    fig.tight_layout()
+    fig.savefig(save_folder / f"{img_id}.pdf", bbox_inches="tight")
+    plt.close()
 
 
 if __name__ == "__main__":

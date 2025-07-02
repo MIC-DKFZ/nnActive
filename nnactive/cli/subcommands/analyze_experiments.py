@@ -7,6 +7,7 @@ from nnactive.analyze.analyze_queries import (
 from nnactive.analyze.analyze_results import analyze_multi_experiment_results
 from nnactive.analyze.qualitative_loops import (
     plot_query_trajectory,
+    plot_region_predictions_across_loops,
     visualize_query_trajectory,
 )
 from nnactive.cli.registry import register_subcommand
@@ -125,4 +126,40 @@ def entry_visualize_queries_iamges(
 
     plot_query_trajectory(
         raw_folder=raw_folder, img_folder=img_folder, save_folder=output_folder
+    )
+
+
+@register_subcommand("visualize_region_predictions")
+def entry_visualize_region_predictions(
+    raw_folder: str,
+    image_name: str,
+    results_folder: str | None = None,
+    output_folder: str | None = None,
+    img_folder: str | None = None,
+    gt_folder: str | None = None,
+):
+    raw_folder = Path(raw_folder)
+    if output_folder is None:
+        output_folder = raw_folder / "prediction__images"
+    else:
+        output_folder = Path(output_folder) / raw_folder.name
+
+    if results_folder is None:
+        results_folder = raw_folder.parent.parent / "nnUNet_results" / raw_folder.name
+
+    if img_folder is None:
+        img_folder = raw_folder / "imagesVal"
+    img_folder = Path(img_folder)
+
+    if gt_folder is None:
+        gt_folder = raw_folder / "labelsVal"
+    gt_folder = Path(gt_folder)
+
+    plot_region_predictions_across_loops(
+        raw_folder=raw_folder,
+        results_folder=results_folder,
+        image_name=image_name,
+        img_folder=img_folder,
+        gt_folder=gt_folder,
+        save_folder=output_folder,
     )
