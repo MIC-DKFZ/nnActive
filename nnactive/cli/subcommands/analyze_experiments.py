@@ -132,11 +132,13 @@ def entry_visualize_queries_iamges(
 @register_subcommand("visualize_region_predictions")
 def entry_visualize_region_predictions(
     raw_folder: str,
-    image_name: str,
+    image_name: str | None = None,
+    slice_axis: int = 0,
     results_folder: str | None = None,
     output_folder: str | None = None,
     img_folder: str | None = None,
     gt_folder: str | None = None,
+    max_loops: int | None = None,
 ):
     raw_folder = Path(raw_folder)
     if output_folder is None:
@@ -154,12 +156,22 @@ def entry_visualize_region_predictions(
     if gt_folder is None:
         gt_folder = raw_folder / "labelsVal"
     gt_folder = Path(gt_folder)
+    
+    if image_name is not None:
+        image_names = [image_name]
+    else:
+        image_names = [f.name for f in gt_folder.iterdir() if f.is_file()]
 
-    plot_region_predictions_across_loops(
-        raw_folder=raw_folder,
-        results_folder=results_folder,
-        image_name=image_name,
-        img_folder=img_folder,
-        gt_folder=gt_folder,
-        save_folder=output_folder,
-    )
+    from tqdm import tqdm
+    print(f"> Visualizing {str(raw_folder.stem)}")
+    for name in tqdm(sorted(image_names), total=len(image_names)):
+        plot_region_predictions_across_loops(
+            raw_folder=raw_folder,
+            results_folder=results_folder,
+            image_name=name,
+            slice_axis=slice_axis,
+            img_folder=img_folder,
+            gt_folder=gt_folder,
+            save_folder=output_folder,
+            max_loops=max_loops,
+        )

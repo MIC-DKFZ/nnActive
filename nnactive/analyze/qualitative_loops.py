@@ -172,14 +172,18 @@ def plot_region_predictions_across_loops(
     results_folder: Path,
     image_name: str,
     save_folder: Path,
+    slice_axis: int = 0,
     img_folder: Path | None = None,
     gt_folder: Path | None = None,
+    max_loops: int | None = 5,
 ):
     results_folder = Path(results_folder)
     save_folder = Path(save_folder)
     save_folder.mkdir(exist_ok=True)
 
-    file_ending = load_json(Path(raw_folder) / "dataset.json")["file_ending"]
+    dset_json = load_json(Path(raw_folder) / "dataset.json")
+    num_classes = len(dset_json["labels"])
+    file_ending = dset_json["file_ending"]
     img_id = image_name.replace(file_ending, "")
     image_name = img_id + file_ending
 
@@ -210,10 +214,13 @@ def plot_region_predictions_across_loops(
     if not label_dirs:
         print(f"No prediction folders found in {results_folder}")
         return
+    
+    if max_loops is not None:
+        label_dirs = label_dirs[:max_loops + 1]
 
     # Prepare the plot
     fig, axs = plt.subplots(
-        1, len(label_dirs), figsize=(3.5 * len(label_dirs), 3), squeeze=False
+        1, len(label_dirs), figsize=(2.5 * len(label_dirs), 3), squeeze=False
     )
     axs = axs[0]
     for i, (loop_folder, label) in enumerate(zip(label_dirs, tags)):
@@ -226,19 +233,20 @@ def plot_region_predictions_across_loops(
 
         pred = sitk.GetArrayFromImage(sitk.ReadImage(str(pred_path)))
         pred_shape = pred.shape
-        fixed_xcoord = pred_shape[0] // 2
-        pred = pred[fixed_xcoord]
+        slicer = [slice(None)] * 3
+        slicer[slice_axis] = pred_shape[slice_axis] // 2
+        pred = pred[tuple(slicer)]
         pred = np.array(pred, dtype=float)
         pred[pred == 0] = np.nan
 
         if img_np is not None:
             assert img_np.shape == pred_shape
-            base_img = img_np[fixed_xcoord]
+            base_img = img_np[tuple(slicer)]
         else:
             base_img = np.zeros_like(pred, dtype=np.float32)
 
         axs[i].imshow(base_img, cmap="gray", vmin=0, vmax=1)
-        axs[i].imshow(pred, cmap="Set3", alpha=0.4)
+        axs[i].imshow(pred, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes-1)
         axs[i].set_title(label)
         axs[i].axis("off")
 
