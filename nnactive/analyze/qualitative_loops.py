@@ -160,104 +160,134 @@ def plot_query_trajectory(
 
 
 def extract_al_method_from_path(path_str: str) -> str | None:
+    method_dict = {
+        "mutual_information": "BALD",
+        "power_bald": "PowerBALD",
+        "softrank_bald": "SoftrankBALD",
+        "pred_entropy": "Predictive Entropy",
+        "power_pe": "PowerPE",
+        "random": "Random",
+        "random-label2": "Random 33% FG",
+        "random-label": "Random 66% FG",
+        "class_pe33": "Cla PE 33%",
+        "class_pe66": "Cla PE 66%",
+        "class_power_pe66_exp": "ClaSP PE",
+    }
     path = Path(path_str)
-    match = re.search(r"__unc-([a-zA-Z0-9_]+)__", path.name)
-    if match:
-        return match.group(1)
-    return None
-
+    match = re.search(r"__unc-([a-zA-Z0-9_-]+)__", path.name)
+    if not match:
+        return None
+    return method_dict.get(match.group(1), match.group(1))
 
 def plot_region_predictions_across_loops(
-    raw_folder: Path,
-    results_folder: Path,
+    img_folder: Path,
+    gt_folder: Path,
     image_name: str,
     save_folder: Path,
+    raw_folder: Path | None = None,
+    raw_folders_from_file: Path | None = None,
+    results_folder: Path | None = None,
     slice_axis: int = 0,
-    img_folder: Path | None = None,
-    gt_folder: Path | None = None,
     max_loops: int | None = 5,
 ):
-    results_folder = Path(results_folder)
+    if (raw_folder is None) == (raw_folders_from_file is None):
+        raise ValueError("Must specify exactly one of: raw_folder, raw_folders_from_file")
+    
+    if raw_folder is not None:
+        raw_folders = [raw_folder]
+    else:
+        with open(raw_folders_from_file, "r") as f:
+            raw_folders = [line.strip() for line in f]
+
     save_folder = Path(save_folder)
-    save_folder.mkdir(exist_ok=True)
+    save_folder.mkdir(exist_ok=True, parents=True)
+    subimages_folder = save_folder / f"{image_name}"
+    subimages_folder.mkdir(exist_ok=True,)
+    
+    for method_idx, raw_folder in enumerate(raw_folders):
+        raw_folder = Path(raw_folder)
+        results_folder = raw_folder.parent.parent / "nnUNet_results" / raw_folder.name
 
-    dset_json = load_json(Path(raw_folder) / "dataset.json")
-    num_classes = len(dset_json["labels"])
-    file_ending = dset_json["file_ending"]
-    img_id = image_name.replace(file_ending, "")
-    image_name = img_id + file_ending
+        # Load dataset information
+        dset_json = load_json(Path(raw_folder) / "dataset.json")
+        num_classes = len(dset_json["labels"])
+        file_ending = dset_json["file_ending"]
+        img_id = image_name.replace(file_ending, "")
+        image_name = img_id + file_ending
+        
+        # Get AL method name for plot label
+        al_method = extract_al_method_from_path(results_folder)
 
-    al_method = extract_al_method_from_path(results_folder)
-
-    # Load background image
-    if img_folder:
+        # Load background image
         img_path = Path(img_folder) / (img_id + "_0000" + file_ending)
         img = sitk.ReadImage(str(img_path))
         img_np = sitk.GetArrayFromImage(img)
         img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-    else:
-        img_np = None
 
-    # Gather and sort loop prediction folders
-    label_dirs = [gt_folder]
-    label_dirs += sorted(
-        results_folder.glob("loop_*__predVal"), key=lambda p: int(p.name.split("_")[1])
-    )
-    tags = ["GT"] + [f.name for f in label_dirs[1:]]
+        # Gather and sort loop prediction folders
+        label_dirs = [gt_folder]
+        label_dirs += sorted(
+            results_folder.glob("loop_*__predVal"),
+            key=lambda p: int(p.name.split("_")[1])
+        )
 
-    # Add the final predVal folder
-    final_pred_folder = results_folder / "predVal"
-    if final_pred_folder.exists():
-        label_dirs.append(final_pred_folder)
-        tags += ["final"]
+        # Add the final predVal folder
+        final_pred_folder = results_folder / "predVal"
+        if final_pred_folder.exists():
+            label_dirs.append(final_pred_folder)
 
-    if not label_dirs:
-        print(f"No prediction folders found in {results_folder}")
-        return
-    
-    if max_loops is not None:
-        label_dirs = label_dirs[:max_loops + 1]
-
-    # Prepare the plot
-    fig, axs = plt.subplots(
-        1, len(label_dirs), figsize=(2.5 * len(label_dirs), 3), squeeze=False
-    )
-    axs = axs[0]
-    for i, (loop_folder, label) in enumerate(zip(label_dirs, tags)):
-        pred_path = loop_folder / image_name
-        if not pred_path.exists():
-            print(f"Missing prediction: {pred_path}")
-            axs[i].axis("off")
-            axs[i].set_title(f"{label}\n(Missing)")
+        if not label_dirs:
+            print(f"No prediction folders found in {results_folder}")
             continue
+        
+        if max_loops is not None:
+            label_dirs = label_dirs[:max_loops + 1]
 
-        pred = sitk.GetArrayFromImage(sitk.ReadImage(str(pred_path)))
-        pred_shape = pred.shape
-        slicer = [slice(None)] * 3
-        slicer[slice_axis] = pred_shape[slice_axis] // 2
-        pred = pred[tuple(slicer)]
-        pred = np.array(pred, dtype=float)
-        pred[pred == 0] = np.nan
+        # Prepare the plot
+        fig, axs = plt.subplots(
+            1, len(label_dirs), figsize=(2.5 * len(label_dirs), 3), squeeze=False
+        )
+        axs = axs[0]
+        for i, loop_folder in enumerate(label_dirs):
+            pred_path = loop_folder / image_name
+            if not pred_path.exists():
+                print(f"Missing prediction: {pred_path}")
+                axs[i].axis("off")
+                continue
 
-        if img_np is not None:
+            pred = sitk.GetArrayFromImage(sitk.ReadImage(str(pred_path)))
+            pred_shape = pred.shape
+            slicer = [slice(None)] * 3
+            slicer[slice_axis] = pred_shape[slice_axis] // 2
+            pred = pred[tuple(slicer)]
+            pred = np.array(pred, dtype=float)
+            pred[pred == 0] = np.nan
+
             assert img_np.shape == pred_shape
             base_img = img_np[tuple(slicer)]
-        else:
-            base_img = np.zeros_like(pred, dtype=np.float32)
 
-        axs[i].imshow(base_img, cmap="gray", vmin=0, vmax=1)
-        axs[i].imshow(pred, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes-1)
-        axs[i].set_title(label)
-        axs[i].axis("off")
+            axs[i].imshow(base_img, cmap="gray", vmin=0, vmax=1)
+            axs[i].imshow(pred, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes-1)
+            axs[i].axis("off")
 
-    axs[0].axis("on")
-    axs[0].grid(False)
-    axs[0].set_xticks([])
-    axs[0].set_yticks([])
-    axs[0].set_ylabel(al_method)
-    fig.tight_layout()
-    fig.savefig(save_folder / f"{img_id}.pdf", bbox_inches="tight")
-    plt.close()
+        axs[0].axis("on")
+        axs[0].grid(False)
+        axs[0].set_xticks([])
+        axs[0].set_yticks([])
+        axs[0].set_ylabel(al_method)
+        fig.tight_layout()
+        fig.savefig(
+            subimages_folder / f"{img_id}_{al_method}.png",
+            bbox_inches="tight",
+        )
+        plt.close()
+
+    stitch_images(
+        subimages_folder,
+        save_folder / f"overview_{image_name}.png",
+        columns=1,
+        image_padding=0,
+    )
 
 
 if __name__ == "__main__":

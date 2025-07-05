@@ -1,4 +1,5 @@
 from pathlib import Path
+from tqdm import tqdm
 
 from nnactive.analyze.analyze_queries import (
     analyze_queries_from_probs,
@@ -131,30 +132,17 @@ def entry_visualize_queries_iamges(
 
 @register_subcommand("visualize_region_predictions")
 def entry_visualize_region_predictions(
-    raw_folder: str,
+    img_folder: str,
+    gt_folder: str,
+    raw_folder: str | None = None,
+    raw_folders_from_file: str | None = None,
     image_name: str | None = None,
     slice_axis: int = 0,
     results_folder: str | None = None,
     output_folder: str | None = None,
-    img_folder: str | None = None,
-    gt_folder: str | None = None,
     max_loops: int | None = None,
 ):
-    raw_folder = Path(raw_folder)
-    if output_folder is None:
-        output_folder = raw_folder / "prediction__images"
-    else:
-        output_folder = Path(output_folder) / raw_folder.name
-
-    if results_folder is None:
-        results_folder = raw_folder.parent.parent / "nnUNet_results" / raw_folder.name
-
-    if img_folder is None:
-        img_folder = raw_folder / "imagesVal"
     img_folder = Path(img_folder)
-
-    if gt_folder is None:
-        gt_folder = raw_folder / "labelsVal"
     gt_folder = Path(gt_folder)
     
     if image_name is not None:
@@ -162,11 +150,10 @@ def entry_visualize_region_predictions(
     else:
         image_names = [f.name for f in gt_folder.iterdir() if f.is_file()]
 
-    from tqdm import tqdm
-    print(f"> Visualizing {str(raw_folder.stem)}")
     for name in tqdm(sorted(image_names), total=len(image_names)):
         plot_region_predictions_across_loops(
             raw_folder=raw_folder,
+            raw_folders_from_file=raw_folders_from_file,
             results_folder=results_folder,
             image_name=name,
             slice_axis=slice_axis,
