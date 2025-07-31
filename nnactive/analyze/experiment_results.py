@@ -17,13 +17,16 @@ from nnactive.utils.io import load_json
 DATASET_PERFORMANCES = []
 full_data_results_folder = Path(__file__).parent.parent.parent / "full_data_results"
 if full_data_results_folder.is_dir():
-    for result in full_data_results_folder.iterdir():
-        if result.suffix == ".json":
-            with open(result, "r") as file:
-                summary = load_json(result)
-                summary["Dataset"] = result.name.split("__")[0]
-                summary["Trainer"] = result.name.split("__")[1].split(".")[0]
-                DATASET_PERFORMANCES.append(summary)
+    try:
+        for result in full_data_results_folder.iterdir():
+            if result.suffix == ".json":
+                with open(result, "r") as file:
+                    summary = load_json(result)
+                    summary["Dataset"] = result.name.split("__")[0]
+                    summary["Trainer"] = result.name.split("__")[1].split(".")[0]
+                    DATASET_PERFORMANCES.append(summary)
+    except Exception as err:
+        logger.info("Error on retreiving full data results! Ignoring this...")
 else:
     logger.info(
         f"Folder for full_data_results does not exist.\n{full_data_results_folder}"
