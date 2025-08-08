@@ -263,77 +263,6 @@ def make_kits_debug_config(
     return config
 
 
-def make_brats_small_config(
-    seed: int,
-    uncertainty: str,
-    query_size: int = 20,
-    query_steps: int = 3,
-    patch_size: list[int] = [20, 20, 20],
-    starting_budget: str = __standard_starting_budget,
-    pre_suffix_format: str = __standard_pre_suffix_format,
-):
-    with set_raw_paths():
-        base_id = 981
-        dataset_name = convert_id_to_dataset_name(base_id)
-        if patch_size is None:
-            patch_size = get_patch_size(base_id)
-
-    config = ActiveConfig(
-        trainer="nnActiveTrainer_5epochs",
-        base_id=base_id,
-        patch_size=patch_size,
-        uncertainty=uncertainty,
-        query_size=query_size,
-        query_steps=query_steps,
-        starting_budget=starting_budget,
-        seed=seed,
-        dataset=dataset_name,
-        train_folds=5,
-        full_folds=5,
-        agg_stride=1,
-        patch_overlap=0,
-        additional_overlap=0.2,
-    )
-    config.set_pre_suffix(pre_suffix_format)
-    return config
-
-
-def make_brats_config(
-    seed: int,
-    uncertainty: str,
-    query_size: int = 20,
-    query_steps: int = 10,
-    patch_size: list[int] = [20, 20, 20],
-    starting_budget: str = __standard_starting_budget,
-    pre_suffix_format: str = __standard_pre_suffix_format,
-):
-    with set_raw_paths():
-        base_id = 137
-        dataset_name = convert_id_to_dataset_name(base_id)
-        if patch_size is None:
-            patch_size = get_patch_size(base_id)
-
-    config = ActiveConfig(
-        trainer=__standard_trainer,
-        base_id=base_id,
-        patch_size=[20, 20, 20],
-        uncertainty=uncertainty,
-        query_size=query_size,
-        query_steps=query_steps,
-        starting_budget=starting_budget,
-        seed=seed,
-        n_patch_per_image=20,
-        dataset=dataset_name,
-        train_folds=5,
-        full_folds=5,
-        agg_stride=1,
-        patch_overlap=0,
-        additional_overlap=0.2,
-    )
-    config.set_pre_suffix(pre_suffix_format)
-    return config
-
-
 def make_hippocampus_config(
     seed: int,
     uncertainty: str,
@@ -543,75 +472,6 @@ def make_amos_prototyping_config(
     return config
 
 
-def make_airway_config(
-    seed: int,
-    uncertainty: str,
-    query_size: int = 10,
-    query_steps: int = 10,
-    patch_size: list[int] | None = None,
-    starting_budget: str = __standard_starting_budget,
-    pre_suffix_format: str = __standard_pre_suffix_format,
-):
-    with set_raw_paths():
-        base_id = 980
-        dataset_name = convert_id_to_dataset_name(base_id)
-        if patch_size is None:
-            patch_size = get_patch_size(base_id)
-
-    config = ActiveConfig(
-        trainer="nnActiveTrainer_airway_200epochs",
-        base_id=base_id,
-        patch_size=patch_size,
-        uncertainty=uncertainty,
-        query_size=query_size,
-        query_steps=query_steps,
-        starting_budget=starting_budget,
-        seed=seed,
-        dataset=dataset_name,
-        train_folds=5,
-        full_folds=5,
-        agg_stride=8,
-        patch_overlap=0,
-        additional_overlap=0.2,
-    )
-    config.set_pre_suffix(pre_suffix_format)
-    return config
-
-
-def make_airway_small_config(
-    seed: int,
-    uncertainty: str,
-    query_size: int = 10,
-    query_steps: int = 3,
-    patch_size: list[int] | None = None,
-    starting_budget: str = __standard_starting_budget,
-    pre_suffix_format: str = __standard_pre_suffix_format,
-):
-    with set_raw_paths():
-        base_id = 983
-        dataset_name = convert_id_to_dataset_name(base_id)
-        if patch_size is None:
-            patch_size = get_patch_size(base_id)
-
-    config = ActiveConfig(
-        trainer="nnActiveTrainer_airway_5epochs",
-        base_id=base_id,
-        patch_size=patch_size,
-        uncertainty=uncertainty,
-        query_size=query_size,
-        query_steps=query_steps,
-        starting_budget=starting_budget,
-        seed=seed,
-        dataset=dataset_name,
-        train_folds=5,
-        full_folds=5,
-        agg_stride=8,
-        patch_overlap=0,
-    )
-    config.set_pre_suffix(pre_suffix_format)
-    return config
-
-
 ############### Base Experiments (3 label settings) ###############
 
 register(
@@ -637,25 +497,10 @@ for qs in _query_sizes:
     )
 
 register(
-    make_brats_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
-
-register(
-    make_brats_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=40,
-    query_steps=5,
-)
-
-register(
     make_hippocampus_config,
     seeds=__seeds,
     uncertainties=[
         *__strategies,
-        "kmeans_bald",
         "class_pe33",
         "class_pe66",
         "class_power_pe66",
@@ -670,7 +515,6 @@ register(
     seeds=__seeds,
     uncertainties=[
         *__strategies,
-        "kmeans_bald",
         "class_pe33",
         "class_pe66",
         "class_power_pe66",
@@ -685,7 +529,6 @@ register(
     seeds=__seeds,
     uncertainties=[
         *__strategies,
-        "kmeans_bald",
         "class_pe33",
         "class_pe66",
         "class_power_pe66",
@@ -702,7 +545,6 @@ for qs in _query_sizes:
         seeds=__seeds,
         uncertainties=[
             *__strategies,
-            "kmeans_bald",
             "class_pe33",
             "class_pe66",
             "class_power_pe66",
@@ -734,17 +576,6 @@ for qs in _query_sizes:
         query_steps=5,
     )
 
-register(
-    make_airway_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
-
-register(
-    make_airway_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
 
 ################## Smaller Query Size Ablation Experiments ################
 
@@ -1201,22 +1032,6 @@ register(
 
 register(
     make_kits_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
-
-register(
-    make_brats_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
-
-register(
-    make_brats_config,
     seeds=__seeds,
     uncertainties=__strategies,
     starting_budget=__old_starting_budget,

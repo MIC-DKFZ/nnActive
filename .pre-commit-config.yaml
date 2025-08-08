@@ -1,4 +1,4 @@
-# pre-commit configuration for fd-shifts
+# pre-commit configuration
 ---
 
 repos:
@@ -26,4 +26,3 @@ repos:
         
       - id: check-merge-conflict
         name: check for merge conflict strings
-

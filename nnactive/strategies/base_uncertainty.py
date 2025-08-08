@@ -132,8 +132,6 @@ def select_top_n_non_overlapping_patches(
     selected_patches = []
     sorted_uncertainty_scores = np.flip(np.sort(uncertainty_scores.flatten()))
     sorted_uncertainty_indices = np.flip(np.argsort(uncertainty_scores.flatten()))
-    # This was just for visualization purposes in MITK
-    # selected = 0
 
     # Iterate over the sorted uncertainty scores and their indices to get the most uncertain
     for uncertainty_score, uncertainty_index in zip(
@@ -157,7 +155,6 @@ def select_top_n_non_overlapping_patches(
                     "score": uncertainty_score,
                 }
             )
-            # selected += 1
             # Mark region as queried
             annotated_patches.append(patch)
         # Stop if we reach the maximum number of patches to be queried

@@ -8,12 +8,8 @@ from nnactive.utils.io import load_json, save_json
 # Execute this script before resampling of the dataset
 
 # Input and output folders
-input_dir = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnActive_raw/nnUNet_raw/Dataset094_MAMA_MIA"
-)
-target = Path(
-    "/home/c817h/Documents/projects/nnactive_project/nnActive_raw/nnUNet_raw/Dataset095_MAMA_MIA_subtracted"
-)
+input_dir = Path("/path/to/nnActive_raw/nnUNet_raw/Dataset094_MAMA_MIA")
+target = Path("/path/to/nnActive_raw/nnUNet_raw/Dataset095_MAMA_MIA_subtracted")
 target.mkdir(parents=True, exist_ok=True)
 
 changedirs = []
@@ -33,7 +29,7 @@ json_path = input_dir / "dataset.json"
 d_json = load_json(json_path)
 # Update the JSON file
 d_json["name"] = "Dataset095_MAMA_MIA_subtracted"
-d_json["converted by"] = "Fabian Isensee & Carsten Lueth"
+# d_json["converted by"] = ""
 d_json["channel_names"] = {"0": "MRI Subtraction Image"}
 d_json["note"] = (
     "Obtained from original dataset by subtracting ( _0001 - _0000 ).     "
