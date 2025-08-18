@@ -19,6 +19,7 @@ from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
 from nnactive.strategies.base import AbstractQueryMethod, BaseQueryPredictor
+from nnactive.strategies.registry import register_strategy
 from nnactive.utils.io import load_label_map
 from nnactive.utils.torchutils import estimate_free_cuda_memory, get_tensor_memory_usage
 
@@ -158,6 +159,7 @@ class ExpectedPatchDiceScore:
         return sorted_dice_dict, kernel_size
 
 
+@register_strategy("expected_dice")
 class ExpectedDiceQuery(AbstractQueryMethod):
     def __init__(
         self,

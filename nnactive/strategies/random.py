@@ -9,6 +9,7 @@ from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.strategies.base import AbstractQueryMethod
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.utils import (
     get_infinte_iter,
     obtain_random_patch_for_img,
@@ -17,6 +18,7 @@ from nnactive.strategies.utils import (
 from nnactive.utils.io import load_label_map
 
 
+@register_strategy("random")
 class Random(AbstractQueryMethod):
     def __init__(
         self,
@@ -141,6 +143,7 @@ class Random(AbstractQueryMethod):
         return patches
 
 
+@register_strategy("random-all-classes")
 class RandomAllClasses(Random):
     def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         selected_patches = query_starting_budget_all_classes(

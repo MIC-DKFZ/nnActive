@@ -9,18 +9,24 @@ from typing import Any
 
 import numpy as np
 import torch
-import wandb
 from loguru import logger
 from nnunetv2.utilities.file_path_utilities import get_output_folder
 
+import wandb
 from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.uncertainties import Probs
-from nnactive.strategies.utils import power_noising, exponential_schedule, sigmoid_schedule
+from nnactive.strategies.utils import (
+    exponential_schedule,
+    power_noising,
+    sigmoid_schedule,
+)
 
 
+@register_strategy("class_pe66")
 class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
     def __post_init__(self):
         super().__post_init__()
@@ -265,14 +271,17 @@ class ClassBalancedEntropy_66FG(AbstractUncertainQueryMethod):
         return patches
 
 
+@register_strategy("class_pe33")
 class ClassBalancedEntropy_33FG(ClassBalancedEntropy_66FG):
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33
 
 
+@register_strategy("class_power_pe66")
 class ClassBalancedPowerEntropy_66FG(ClassBalancedEntropy_66FG):
     """Class balanced Power Entropy with beta=1 (66% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.beta = 1
@@ -292,7 +301,7 @@ class ClassBalancedPowerEntropy_66FG(ClassBalancedEntropy_66FG):
                 agg_uncertainty_cls[cls], kernel_size = self.aggregation.forward(
                     uncertainty[cls]
                 )
-        
+
         # Apply power noising to the aggregated uncertainties
         for c in self.top_patches:
             agg_uncertainty_cls[c] = power_noising(
@@ -301,15 +310,19 @@ class ClassBalancedPowerEntropy_66FG(ClassBalancedEntropy_66FG):
         return uncertainty, agg_uncertainty_cls, kernel_size
 
 
+@register_strategy("class_power_pe33")
 class ClassBalancedPowerEntropy_33FG(ClassBalancedPowerEntropy_66FG):
     """Class balanced Power Entropy with beta=1 (33% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33
 
 
+@register_strategy("class_power_pe66_exp")
 class ClassBalancedExpScheduledPowerEntropy_66FG(ClassBalancedEntropy_66FG):
     """Class balanced Power Entropy with exponential beta schedule (66% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.beta_values = exponential_schedule(self.config.query_steps, 1, 100)
@@ -329,45 +342,67 @@ class ClassBalancedExpScheduledPowerEntropy_66FG(ClassBalancedEntropy_66FG):
                 agg_uncertainty_cls[cls], kernel_size = self.aggregation.forward(
                     uncertainty[cls]
                 )
-        
+
         # Apply power noising to the aggregated uncertainties
         for c in self.top_patches:
             agg_uncertainty_cls[c] = power_noising(
-                agg_uncertainty_cls[c], beta=self.beta_values[self.loop_val], rng=self.rng
+                agg_uncertainty_cls[c],
+                beta=self.beta_values[self.loop_val],
+                rng=self.rng,
             )
         return uncertainty, agg_uncertainty_cls, kernel_size
 
 
-class ClassBalancedExpScheduledPowerEntropy_33FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+@register_strategy("class_power_pe33_exp")
+class ClassBalancedExpScheduledPowerEntropy_33FG(
+    ClassBalancedExpScheduledPowerEntropy_66FG
+):
     """Class balanced Power Entropy with exponential beta schedule (33% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33
 
 
-class ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+@register_strategy("class_power_pe66_smooth_sigmoid")
+class ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG(
+    ClassBalancedExpScheduledPowerEntropy_66FG
+):
     """Class balanced Power Entropy with smooth sigmoid beta schedule (66% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=2)
 
 
-class ClassBalancedSmoothSigmoidScheduledPowerEntropy_33FG(ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG):
+@register_strategy("class_power_pe33_smooth_sigmoid")
+class ClassBalancedSmoothSigmoidScheduledPowerEntropy_33FG(
+    ClassBalancedSmoothSigmoidScheduledPowerEntropy_66FG
+):
     """Class balanced Power Entropy with smooth sigmoid beta schedule (22% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33
 
 
-class ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG(ClassBalancedExpScheduledPowerEntropy_66FG):
+@register_strategy("class_power_pe66_sharp_sigmoid")
+class ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG(
+    ClassBalancedExpScheduledPowerEntropy_66FG
+):
     """Class balanced Power Entropy with sharp sigmoid beta schedule (66% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.beta_values = sigmoid_schedule(self.config.query_steps, 1, 100, T=0.5)
 
 
-class ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG(ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG):
+@register_strategy("class_power_pe33_sharp_sigmoid")
+class ClassBalancedSharpSigmoidScheduledPowerEntropy_33FG(
+    ClassBalancedSharpSigmoidScheduledPowerEntropy_66FG
+):
     """Class balanced Power Entropy with sharp sigmoid beta schedule (22% FG)"""
+
     def __post_init__(self):
         super().__post_init__()
         self.ratio_fg = 0.33
