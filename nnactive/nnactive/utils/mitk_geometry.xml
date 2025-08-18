@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GeometryData>
+    <Version Writer="/Users/jenkins/jenkins-agent/MITK/Release/src/MITK/Modules/Core/src/IO/mitkGeometryDataWriterService.cpp" FileVersion="1"/>
+    <ProportionalTimeGeometry NumberOfTimeSteps="1">
+        <Geometry3D ImageGeometry="true" FrameOfReferenceID="0" TimeStep="0">
+            <IndexToWorld type="Matrix3x3" m_0_0="1" m_0_1="0" m_0_2="0" m_1_0="0" m_1_1="1" m_1_2="0" m_2_0="0" m_2_1="0" m_2_2="1"/>
+            <Offset type="Vector3D" x="0" y="0" z="0"/>
+            <Bounds>
+                <Min type="Vector3D" x="0" y="0" z="0"/>
+                <Max type="Vector3D" x="0" y="0" z="0"/>
+            </Bounds>
+        </Geometry3D>
+    </ProportionalTimeGeometry>
+</GeometryData>
