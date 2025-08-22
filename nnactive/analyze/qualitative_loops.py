@@ -80,10 +80,15 @@ def plot_query_trajectory(
     show_patches_only: bool = False,
 ):
     print(f"Saving results to folder: {save_folder}")
+    if show_patches_only:
+        prefix = "patch-only_"
+    else:
+        prefix = ""
 
     dset_json = load_json(raw_folder / "dataset.json")
     file_ending = dset_json["file_ending"]
-    num_classes = len(dset_json["labels"])
+    labels_dict = dset_json["labels"]
+    num_classes = len(labels_dict)
 
     loop_patches = get_nested_patches_from_loop_files(raw_folder)
     if img_folder is not None:
@@ -100,7 +105,7 @@ def plot_query_trajectory(
         ]
 
     for i in range(len(loop_patches)):
-        os.makedirs(save_folder / f"loop_{i:03d}", exist_ok=True)
+        os.makedirs(save_folder / (prefix + f"loop_{i:03d}"), exist_ok=True)
 
     for img_name in img_names:
         all_img_patches = [x for xs in loop_patches for x in xs]
@@ -181,7 +186,8 @@ def plot_query_trajectory(
                     if gts:
                         _gt = gts[c]
                         _gt[
-                            (_gt == 0) | (_gt == 4)
+                            (_gt == labels_dict["background"])
+                            | (_gt == labels_dict["ignore"])
                         ] = np.nan  # Set background and ignore label to NaN
                         axs[c].imshow(
                             _gt,
@@ -217,14 +223,15 @@ def plot_query_trajectory(
                 )
                 filename = f"loop-{i:02d}__id-{p_id:02d}__img-{file_id}.png"
                 plt.savefig(
-                    save_folder / f"loop_{i:03d}" / filename, bbox_inches="tight"
+                    save_folder / (prefix + f"loop_{i:03d}") / filename,
+                    bbox_inches="tight",
                 )
                 plt.close("all")
 
     for i in range(len(loop_patches)):
         stitch_images(
-            save_folder / f"loop_{i:03d}",
-            save_folder / f"overview-loop_{i:03d}.png",
+            save_folder / (prefix + f"loop_{i:03d}"),
+            save_folder / (prefix + f"overview-loop_{i:03d}.png"),
             columns=5,
             image_padding=0,
         )
@@ -368,32 +375,122 @@ def plot_region_predictions_across_loops(
     )
 
 
+def plot_class_stratification(
+    img_path: Path,
+    gt_path: Path,
+    probs_path: Path,
+    save_folder: Path,
+    raw_folder: Path | None = None,
+    slice_axis: int = 0,
+):
+    save_folder = Path(save_folder)
+    save_folder.mkdir(exist_ok=True, parents=True)
+
+    raw_folder = Path(raw_folder)
+
+    # Load dataset information
+    dset_json = load_json(Path(raw_folder) / "dataset.json")
+    labels_dict: dict = dset_json["labels"]
+    bg_label = labels_dict.get("background")
+    ignore_label = labels_dict.pop("ignore")
+    num_classes = len(labels_dict)
+    file_ending = dset_json["file_ending"]
+    image_name = img_path.name
+    img_id = image_name.replace(file_ending, "")
+
+    # Load background image
+    img = sitk.ReadImage(str(img_path))
+    img = sitk.GetArrayFromImage(img)
+    img = (img - img.min()) / (img.max() - img.min())
+
+    # Load GT labels
+    gt = sitk.GetArrayFromImage(sitk.ReadImage(str(gt_path)))
+    gt_shape = gt.shape
+    slicer = [slice(None)] * 3
+    slicer[slice_axis] = gt_shape[slice_axis] // 2
+    gt = gt[tuple(slicer)]
+    gt = np.array(gt, dtype=float)
+    gt[(gt == bg_label) | (gt == ignore_label)] = np.nan
+    assert img.shape == gt_shape
+    img = img[tuple(slicer)]
+
+    # Load probabilities
+    probs = np.load(probs_path)["probabilities"]
+    preds = np.argmax(probs, axis=0)[tuple(slicer)]
+    preds = np.array(preds, dtype=float)
+    preds[preds == bg_label] = np.nan
+
+    # Prepare the plot
+    fig, axs = plt.subplots(
+        2,
+        num_classes + 1,
+        figsize=(1.8 * num_classes, 3),
+        squeeze=False,
+        gridspec_kw={"hspace": 0.4},
+    )
+
+    # Plot image
+    for ax in axs[0]:
+        ax.imshow(img, cmap="gray", vmin=0, vmax=1)
+    axs[1, 0].imshow(img, cmap="gray", vmin=0, vmax=1)
+    for ax in axs[1][2:]:
+        ax.imshow(img, cmap="gray", vmin=0, vmax=1)
+
+    # Plot GT
+    axs[0, 0].imshow(gt, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes)
+    axs[0, 0].set_title("GT")
+
+    # Plot Predictions
+    axs[1, 0].imshow(preds, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes)
+    axs[1, 0].set_title("Prediction")
+
+    # Plot Uncertainty Maps
+    pe = probs * np.log(probs)
+    if np.isnan(pe).sum() > 0:
+        print("Warning: some nan values encountered after log operation")
+    pe = -np.sum(pe, axis=0)
+
+    axs[0, 1].imshow(pe[tuple(slicer)], cmap="Reds", alpha=0.5)
+    axs[0, 1].set_title("$H[x]$")
+
+    for i in range(1, num_classes):
+        axs[0, i + 1].imshow((pe * probs[i])[tuple(slicer)], cmap="Reds", alpha=0.5)
+        axs[0, i + 1].set_title(rf"$H[x]\times p_{i}(x)$")
+
+        axs[1, i + 1].imshow(probs[i][tuple(slicer)], cmap="Reds", alpha=0.5)
+        axs[1, i + 1].set_title(
+            rf"p: {[k for k, v in labels_dict.items() if v == i][0]}"
+        )
+
+    for ax in axs.ravel():
+        ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(save_folder / f"{img_id}.png", bbox_inches="tight")
+    plt.close()
+
+
 if __name__ == "__main__":
-    raw_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    )
-    output_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/query__analysis"
-    )
-    # visualize_query_trajectory(raw_folder, output_folder)
-
-    output_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnactive/results/visualization"
-    )
-
-    raw_folder = Path(
-        "/home/c817h/network/cluster-data/Dataset135_KiTS2021/nnUNet_raw/Dataset010_KiTS2021__patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40__unc-mutual_information__seed-12345"
-    )
-    image_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_raw/nnUNet_raw/Dataset135_KiTS2021/imagesTr"
-    )
-    output_folder = output_folder / raw_folder.name
-
-    # raw_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    # )
-    # image_folder = None
-
-    plot_query_trajectory(
-        raw_folder=raw_folder, save_folder=output_folder, img_folder=image_folder
-    )
+    fnames = [
+        "patient002_frame01",
+        "patient002_frame12",
+        "patient003_frame01",
+        "patient003_frame15",
+    ]
+    for fname in fnames:
+        plot_class_stratification(
+            img_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_raw/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/imagesTr/{fname}_0000.nii.gz"
+            ),
+            gt_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_raw/nnUNet_raw/Dataset027_ACDC/labelsTr/{fname}.nii.gz"
+            ),
+            probs_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_results/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/tmp_predTr/{fname}.npz"
+            ),
+            raw_folder=Path(
+                "/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_raw/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/"
+            ),
+            save_folder=Path(
+                "/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_results/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/tmp_plot/"
+            ),
+        )
