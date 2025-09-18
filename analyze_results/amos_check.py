@@ -19,31 +19,33 @@ SETTINGS = {
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
         "Dataset216_AMOS2022_task1/patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
-    "AMOS_Precomputed": [
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
-        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
-    ],
+    # "AMOS_Precomputed": [
+    #     "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200__precomputed-queries",
+    #     "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500__precomputed-queries",
+    # ],
     "AMOS_500epochs": [
+        "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-40__qs-40",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-200__qs-200",
         "Dataset216_AMOS2022_task1/tr-nnActiveTrainer_500epochs__patch-32_74_74__sb-random-label2-all-classes__sbs-500__qs-500",
     ],
-    "AMOS_minipatch": [
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
-        "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
-    ],
+    # "AMOS_minipatch": [
+    #     "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-40__qs-40",
+    #     "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-200__qs-200",
+    #     "Dataset216_AMOS2022_task1/patch-16_32_32__sb-random-label2-all-classes__sbs-500__qs-500",
+    # ],
 }
 
 COMPARISONS = [
     "random-label",
-    "random-label2",
-    "mutual_information",
-    "pred_entropy",
-    "power_pe",
-    "random",
+    # "pred_entropy",
+    # "random",
+    "class_power_pe66_exp",
 ]
 
-BASELINES = ["random-label", "random-label2", "random"]
+BASELINES = [
+    "random-label",
+    # "random"
+]
 
 IDENTIFIER_DICT = {
     40: "Low-Label Regime",
@@ -51,7 +53,7 @@ IDENTIFIER_DICT = {
     500: "High-Label Regime",
 }
 
-savepath = RESULTSPATH / "amos_check"
+savepath = RESULTSPATH / "amos_check_sd"
 if not savepath.exists():
     os.makedirs(savepath)
 
@@ -74,6 +76,7 @@ for name, paths in SETTINGS.items():
             identifier = identifiers[0]
             df_filter = setting.df[setting.df[setting.query_key] == unc]
             df_filter = df_filter[df_filter["Loop"] == 4]
+            df_filter = df_filter.sort_values(by="seed").reset_index()
             perc_classes = [
                 col
                 for col in df_filter.columns
@@ -84,31 +87,37 @@ for name, paths in SETTINGS.items():
             ]
             values = []
             perf_values = []
+            x_values = []
+            x_perf_values = []
             for col in perc_classes:
-                values.append(df_filter[col].mean())
+                values.extend(list(df_filter[col]))
+                x_values.extend([int(col.split("_")[-1])] * len(list(df_filter[col])))
             for col in perf_classes:
-                perf_values.append(df_filter[col].mean())
+                perf_values.extend(list(df_filter[col]))
+                x_perf_values.extend(
+                    [int(col.split(" ")[-2])] * len(list(df_filter[col]))
+                )
             perf_values.append(0)
             perf_values = np.array(perf_values)
+            x_perf_values.append(0)
             values_dict[unc] = np.array(values)
-
-            perc_classes = [int(col.split("_")[-1]) for col in perc_classes]
-            perf_classes = [col.split(" ")[-2] for col in perf_classes]
-            perf_classes.append(0)
-            perf_classes = np.array(perf_classes).astype(int)
-            sorting = np.argsort(perf_classes)
-            perf_classes = np.take_along_axis(perf_classes, sorting, axis=0)
-            perf_values = np.take_along_axis(perf_values, sorting, axis=0)
+            # perc_classes = [int(col.split("_")[-1]) for col in perc_classes]
+            # perf_classes = [col.split(" ")[-2] for col in perf_classes]
+            # perf_classes.append(0)
+            # perf_classes = np.array(perf_classes).astype(int)
+            # sorting = np.argsort(perf_classes)
+            # perf_classes = np.take_along_axis(perf_classes, sorting, axis=0)
+            # perf_values = np.take_along_axis(perf_values, sorting, axis=0)
             perf_values_dict[unc] = perf_values
 
             fig, axs = plt.subplots(2, 1, figsize=(10, 10))
             ax = axs[0]
-            sns.barplot(x=perc_classes, y=values, ax=ax)
+            sns.barplot(x=x_values, y=values, ax=ax, errorbar="sd")
             ax.set_xlabel("Class")
             ax.set_ylabel("Mean percentage of voxels for class")
             ax.set_title(f"{RENAMING_DICT[unc]} on {fn} {IDENTIFIER_DICT[identifier]}")
             ax = axs[1]
-            sns.barplot(x=perf_classes, y=perf_values, ax=ax)
+            sns.barplot(x=x_perf_values, y=perf_values, ax=ax, errorbar="sd")
             ax.set_xlabel("Class")
             ax.set_ylabel("Final Dice")
             fig.tight_layout()
@@ -118,7 +127,6 @@ for name, paths in SETTINGS.items():
             )
             plt.close()
 
-        compared = "random-label2"
         for unc, compared in product(COMPARISONS, BASELINES):
             if unc == compared:
                 continue
@@ -126,14 +134,14 @@ for name, paths in SETTINGS.items():
             perf_values = perf_values_dict[unc] - perf_values_dict[compared]
             fig, axs = plt.subplots(2, 1, figsize=(10, 10))
             ax = axs[0]
-            sns.barplot(x=perc_classes, y=values, ax=ax)
+            sns.barplot(x=x_values, y=values, ax=ax, errorbar="sd")
             ax.set_xlabel("Class")
             ax.set_ylabel(r"$\Delta$ Mean percentage of voxels for class")
             ax.set_title(
                 f"Difference from {RENAMING_DICT[unc]} to {RENAMING_DICT[compared]} on {fn} {IDENTIFIER_DICT[identifier]}"
             )
             ax = axs[1]
-            sns.barplot(x=perf_classes, y=perf_values, ax=ax)
+            sns.barplot(x=x_perf_values, y=perf_values, ax=ax, errorbar="sd")
             ax.set_xlabel("Class")
             ax.set_ylabel(r"$\Delta$ Final DICE")
             fig.tight_layout()

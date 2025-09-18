@@ -255,9 +255,9 @@ if __name__ == "__main__":
                 print_tables.values(),
                 axis=1,
             )
-            # print_tables[print_setting + "_nostd"] = print_tables[print_setting][
-            #     [col for col in print_tables[print_setting] if "std" not in col[2]]
-            # ]
+            print_tables[print_setting + "_nostd"] = print_tables[print_setting][
+                [col for col in print_tables[print_setting] if "std" not in col[2]]
+            ]
 
         else:
             collevelnames = COLLEVELNAMES.copy()

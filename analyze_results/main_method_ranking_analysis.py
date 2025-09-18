@@ -176,6 +176,7 @@ def plot_row(whole_data: pd.DataFrame, ax1: Axes, ax2: Axes, metric: str):
                         for i, c in enumerate(use_cols)
                     ]
                 )
+            count += num_col
     ax1.set_xticks(ticks=np.arange(ranks.shape[-1]), labels=labels)
     ax1.set_yticks(ticks=np.arange(ranks.shape[0]) + 1)
     ax1.set_ylabel(f"Method Rank ({metric})")

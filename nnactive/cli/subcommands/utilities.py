@@ -26,7 +26,7 @@ from nnactive.nnunet.utils import get_preprocessed_path, get_raw_path, get_resul
 from nnactive.production import produce_empty_masks
 from nnactive.results.state import State
 from nnactive.results.utils import get_results_folder as get_nnactive_results_folder
-from nnactive.utils.io import load_json
+from nnactive.utils.io import load_json, save_dataclass_to_json, save_json
 
 
 # TODO: delete old trainings in nnUNet_results and artifacts in nnActive_results??
@@ -94,6 +94,7 @@ def util_reset_loops(nnActive_results_folder: str, loop: int = 0, npp: int = 4) 
             runtime_config=RuntimeConfig(),
             do_all=True,
         )
+
 
 @register_subcommand("util_verify_data")
 def util_verify_data(
@@ -297,3 +298,20 @@ def util_get_experiment_dirs(
     out_dict["nnUNet_results"] = str(get_results_path(continue_id))
     for key, val in out_dict.items():
         print(f"{key}: '{val}'")
+
+
+@register_subcommand("util_overwrite_config_steps")
+def util_overwrite_config_steps(
+    config_file: Path,
+    use_steps=5,
+):
+    config = ActiveConfig.from_json(config_file)
+    config.query_steps = use_steps
+    save_dataclass_to_json(config, config_file)
+    try:
+        state_json = config_file.parent / "state.json"
+        state = load_json(state_json)
+        state["loop"] = use_steps - 1
+        save_json(state, state_json)
+    except:
+        logger.info(f"No state.json file: {state_json}")

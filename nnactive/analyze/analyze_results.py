@@ -17,6 +17,7 @@ from nnactive.analyze.experiment_statistics import (
     efficient_multistatitistics_nested_labels,
 )
 from nnactive.config.struct import Final
+from nnactive.strategies import strategydict
 from nnactive.utils.io import save_df_to_txt
 from nnactive.utils.pyutils import (
     create_string_identifier,
@@ -29,31 +30,7 @@ sns.set_style("whitegrid")
 
 # TODO: Final version
 # Load all strategies from nnactive/strategies/__init__.py
-PALETTE = {
-    "random": None,
-    "pred_entropy": None,
-    "mutual_information": None,
-    "expected_dice": None,
-    "random-label": None,
-    "random-label2": None,
-    "power_bald": None,
-    "power_bald_b5": None,
-    "power_bald_b10": None,
-    "power_bald_b20": None,
-    "power_bald_b40": None,
-    "power_bald_b100": None,
-    "power_pe": None,
-    "softrank_bald": None,
-    "kmeans_bald": None,
-    "class_pe66": None,
-    "class_pe33": None,
-    "class_power_pe66_exp": None,
-    "class_power_pe33_exp": None,
-    "class_power_pe66_smooth_sigmoid": None,
-    "class_power_pe33_smooth_sigmoid": None,
-    "class_power_pe66_sharp_sigmoid": None,
-    "class_power_pe33_sharp_sigmoid": None,
-}
+PALETTE = {key: None for key in strategydict.keys()}
 
 unique_colors = sns.color_palette("husl", len(PALETTE))
 for i, key in enumerate(PALETTE):

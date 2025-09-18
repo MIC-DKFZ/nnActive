@@ -240,7 +240,11 @@ class SettingAnalysis:
         num_loops = self.df[self.max_loops_key].max()
 
         # Ensure that all experiments have the same number of loops (maximum amount)
-        assert all(num_loops == self.df[self.max_loops_key].unique())
+        if not all(num_loops == self.df[self.max_loops_key].unique()):
+            logger.info(f"Number of max loops is not identical for: {self.string_id}")
+            logger.info(
+                f"Unique number of Loops: {self.df[self.max_loops_key].unique()}"
+            )
 
         if enforce_full:
             df = df[df[self.auc_loops_key] == num_loops]

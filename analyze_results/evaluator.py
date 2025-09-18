@@ -67,7 +67,8 @@ FULL_SETTINGS = {
     },
     "Hippocampus": {
         "Low": {
-            "Main": "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
+            # "Main": "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20__5loops",
+            "Main": "Dataset004_Hippocampus/patch-20_20_20__sb-random-label2-all-classes__sbs-20__qs-20",
             "QSx1/2": None,
             "QSx2": None,
             "Patchx1/2": "Dataset004_Hippocampus/patch-10_10_10__sb-random-label2-all-classes__sbs-20__qs-20",

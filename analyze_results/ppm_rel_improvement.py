@@ -27,6 +27,7 @@ LEGEND = False
 
 NORANDOM_ORDER = MAIN_ORDER.copy()
 NORANDOM_ORDER.remove("random")
+NORANDOM_ORDER.remove("class_power_pe66")
 MINIORDER = [
     "class_pe66",
     "class_power_pe66_exp",
@@ -38,8 +39,8 @@ savepath = SAVEPATH / "figures"
 COMPARATIVE = False
 
 USE_SETTINGS_LIST = [
-    {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
-    {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
+    # {"setting_names": ["Main"], "custom_order": MAIN_ORDER},
+    # {"setting_names": ["500 Epochs"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": NORANDOM_ORDER},
     # {"setting_names": ["Precomputed"], "custom_order": MAIN_ORDER},
     # {"setting_names": ["Patchx1/2"], "custom_order": MAIN_ORDER},
@@ -244,9 +245,15 @@ if __name__ == "__main__":
                     del_algs = [a for a in matrix.algs if a not in custom_order]
                     for a in del_algs:
                         matrix.delete_alg(a)
-                    matrix = matrix.custom_order_matrix(custom_order)
-                    matrix.rename_algs(RENAMING_DICT)
-                    all_matrices[dataset][budget][subsetting] = matrix
+                    try:
+                        matrix = matrix.custom_order_matrix(custom_order)
+                        matrix.rename_algs(RENAMING_DICT)
+                        all_matrices[dataset][budget][subsetting] = matrix
+                    except:
+                        import IPython
+
+                        IPython.embed()
+                        assert False
 
         for random_baseline in RANDOM_BASELINES:
             if (
@@ -373,7 +380,6 @@ if __name__ == "__main__":
                         l.set_fontweight("bold")
                     ax.set_title(print_name_settings_dict.get(s, s))
                     if i_s == 0:
-                        print("Setting Label")
                         ax.set_ylabel("Fraction of experiments [%]")
                         pass
 
@@ -516,7 +522,6 @@ if __name__ == "__main__":
                         l.set_fontweight("bold")
                     ax.set_title(print_name_settings_dict.get(s, s))
                     if i_s == 0:
-                        print("Setting Label")
                         ax.set_ylabel("Fraction of experiments [%]")
                         pass
 

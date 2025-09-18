@@ -23,6 +23,7 @@ small_dict = {
     "random-label": "Random 66% FG",
     "class_pe33": "Cla PE 33%",
     "class_pe66": "Cla PE 66%",
+    "class_power_pe66": "ClaP PE",
     "class_power_pe66_exp": "ClaSP PE",
 }
 
@@ -81,6 +82,7 @@ for q in QM_TO_COLOR:
     QM_TO_COLOR[q] = mcolors.to_hex(cmap(QM_TO_COLOR[q]))
 
 QM_TO_COLOR["Cla PE 33%"] = "#023020"
+QM_TO_COLOR["ClaP PE"] = "#E500DD"
 
 
 RESULTSPATH = Path(__file__).parent.parent / "results"
@@ -99,7 +101,7 @@ if not BASEPATH.exists():
     os.makedirs(BASEPATH)
 
 
-SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe"
+SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe_v2"
 
 if not SAVEPATH.exists():
     print("Creating Savepath: ", SAVEPATH)
