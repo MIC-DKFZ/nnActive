@@ -218,7 +218,7 @@ def plot_query_trajectory(
                 fig.tight_layout()
                 fig.subplots_adjust(top=0.9)
                 fig.suptitle(
-                    f"Patch {p_id} Loop {i} File {file_id}",
+                    f"Patch {p_id + 1}: File {file_id}",
                     y=0.72 if len(center_axs) == 3 else None,
                 )
                 filename = f"loop-{i:02d}__id-{p_id:02d}__img-{file_id}.png"
@@ -231,7 +231,7 @@ def plot_query_trajectory(
     for i in range(len(loop_patches)):
         stitch_images(
             save_folder / (prefix + f"loop_{i:03d}"),
-            save_folder / (prefix + f"overview-loop_{i:03d}.png"),
+            save_folder / (str(save_folder.name) + prefix + f"overview-loop_{i:03d}.png"),
             columns=5,
             image_padding=0,
         )
@@ -382,6 +382,8 @@ def plot_class_stratification(
     save_folder: Path,
     raw_folder: Path | None = None,
     slice_axis: int = 0,
+    center_axis_frac: float = 0.5,
+    logscale: bool = False,
 ):
     save_folder = Path(save_folder)
     save_folder.mkdir(exist_ok=True, parents=True)
@@ -407,7 +409,7 @@ def plot_class_stratification(
     gt = sitk.GetArrayFromImage(sitk.ReadImage(str(gt_path)))
     gt_shape = gt.shape
     slicer = [slice(None)] * 3
-    slicer[slice_axis] = gt_shape[slice_axis] // 2
+    slicer[slice_axis] = int(gt_shape[slice_axis] * center_axis_frac)
     gt = gt[tuple(slicer)]
     gt = np.array(gt, dtype=float)
     gt[(gt == bg_label) | (gt == ignore_label)] = np.nan
@@ -420,11 +422,14 @@ def plot_class_stratification(
     preds = np.array(preds, dtype=float)
     preds[preds == bg_label] = np.nan
 
+    num_pred_classes = len(np.unique(preds))
+
     # Prepare the plot
+    # Only show classes that are present in the predictions
     fig, axs = plt.subplots(
         2,
-        num_classes + 1,
-        figsize=(1.8 * num_classes, 3),
+        num_pred_classes + 1,
+        figsize=(1.8 * num_pred_classes, 3),
         squeeze=False,
         gridspec_kw={"hspace": 0.4},
     )
@@ -450,22 +455,38 @@ def plot_class_stratification(
         print("Warning: some nan values encountered after log operation")
     pe = -np.sum(pe, axis=0)
 
-    axs[0, 1].imshow(pe[tuple(slicer)], cmap="Reds", alpha=0.5)
+    pe_slice = pe[tuple(slicer)]
+    axs[0, 1].imshow(pe_slice, cmap="Reds", alpha=0.5, vmax=np.percentile(pe_slice, 98))
     axs[0, 1].set_title("$H[x]$")
 
+    suffix = ""
+    if logscale:
+        suffix = "_logscale_vmin_-10"
+    fi = 1
     for i in range(1, num_classes):
-        axs[0, i + 1].imshow((pe * probs[i])[tuple(slicer)], cmap="Reds", alpha=0.5)
-        axs[0, i + 1].set_title(rf"$H[x]\times p_{i}(x)$")
-
-        axs[1, i + 1].imshow(probs[i][tuple(slicer)], cmap="Reds", alpha=0.5)
-        axs[1, i + 1].set_title(
-            rf"p: {[k for k, v in labels_dict.items() if v == i][0]}"
+        # Only show classes that are present in the GT slice
+        if i not in preds:
+            continue
+        
+        weighted_entropy = (pe * probs[i])[tuple(slicer)]
+        if logscale:
+            axs[0, fi + 1].imshow(np.log(weighted_entropy), cmap="Reds", alpha=0.5, vmin=-10)
+        else:
+            # axs[0, i + 1].imshow(weighted_entropy, cmap="Reds", alpha=0.5, vmin=0, vmax=0.001)
+            axs[0, fi + 1].imshow(weighted_entropy, cmap="Reds", alpha=0.5, vmax=np.percentile(weighted_entropy, 98))
+            
+        axs[0, fi + 1].set_title(rf"$H[x]\times p_{{{i}}}(x)$")
+        probs_slice = probs[i][tuple(slicer)]
+        axs[1, fi + 1].imshow(probs_slice, cmap="Reds", alpha=0.5, vmax=np.percentile(probs_slice, 98))
+        axs[1, fi + 1].set_title(
+            f"$p_{{{i}}}$: {[k for k, v in labels_dict.items() if v == i][0]}", fontsize=8
         )
+        fi += 1
 
     for ax in axs.ravel():
         ax.axis("off")
     fig.tight_layout()
-    fig.savefig(save_folder / f"{img_id}.png", bbox_inches="tight")
+    fig.savefig(save_folder / f"{img_id}{suffix}.pdf", bbox_inches="tight")
     plt.close()
 
 
