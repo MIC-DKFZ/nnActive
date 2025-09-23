@@ -474,11 +474,12 @@ def make_amos_prototyping_config(
 
 ############### Base Experiments (3 label settings) ###############
 
-register(
-    make_kits_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
+# SMALL dataset version
+# register(
+#     make_kits_small_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+# )
 
 _query_sizes = [40, 200, 500]
 for qs in _query_sizes:
@@ -554,11 +555,12 @@ for qs in _query_sizes:
         query_steps=5,
     )
 
-register(
-    make_acdc_small_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-)
+# SMALL dataset version
+# register(
+#     make_acdc_small_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+# )
 
 _query_sizes = [40, 200, 500]
 for qs in _query_sizes:
@@ -792,7 +794,6 @@ full_patch_size = [1000, 1000, 1000]
 
 dataset_list: list[dict] = [
     {"base_id": 216, "query_size": 15},  # AMOS
-    {"base_id": 137, "query_size": 93, "additional_overlap": 1.0},  # BraTS
     {"base_id": 135, "query_size": 22},  # KiTS
     {"base_id": 27, "query_size": 15},  # ACDC
 ]
@@ -985,68 +986,68 @@ for qs in _query_sizes:
     )
 
 ################## Prototyping Experiments #########
-register(
-    make_amos_prototyping_config,
-    seeds=[12345],
-    uncertainties=__strategies,
-)
+# register(
+#     make_amos_prototyping_config,
+#     seeds=[12345],
+#     uncertainties=__strategies,
+# )
 
-register(
-    make_kits_prototyping_config,
-    seeds=[12345],
-    uncertainties=__strategies,
-)
+# register(
+#     make_kits_prototyping_config,
+#     seeds=[12345],
+#     uncertainties=__strategies,
+# )
 
 ################## Debug Experiments ###############
-register(
-    make_kits_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
-)
+# register(
+#     make_kits_debug_config,
+#     seeds=[12345],
+#     uncertainties=["mutual_information"],
+# )
 
-register(
-    make_hippocampus_debug_config,
-    seeds=[12345],
-    uncertainties=["mutual_information"],
-)
+# register(
+#     make_hippocampus_debug_config,
+#     seeds=[12345],
+#     uncertainties=["mutual_information"],
+# )
 
 ################## Old Experiments #################
-__old_pre_suffix_format = "__patch-{patch_size}__qs-{query_size}"
-__old_starting_budget = "random-label-all-classes"
+# __old_pre_suffix_format = "__patch-{patch_size}__qs-{query_size}"
+# __old_starting_budget = "random-label-all-classes"
 
-register(
-    make_amos_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
+# register(
+#     make_amos_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+#     starting_budget=__old_starting_budget,
+#     pre_suffix_format=__old_pre_suffix_format,
+# )
 
-register(
-    make_acdc_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
+# register(
+#     make_acdc_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+#     starting_budget=__old_starting_budget,
+#     pre_suffix_format=__old_pre_suffix_format,
+# )
 
-register(
-    make_kits_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
+# register(
+#     make_kits_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+#     starting_budget=__old_starting_budget,
+#     pre_suffix_format=__old_pre_suffix_format,
+# )
 
-register(
-    make_hippocampus_config,
-    seeds=__seeds,
-    uncertainties=__strategies,
-    query_size=20,
-    query_steps=10,
-    starting_budget=__old_starting_budget,
-    pre_suffix_format=__old_pre_suffix_format,
-)
+# register(
+#     make_hippocampus_config,
+#     seeds=__seeds,
+#     uncertainties=__strategies,
+#     query_size=20,
+#     query_steps=10,
+#     starting_budget=__old_starting_budget,
+#     pre_suffix_format=__old_pre_suffix_format,
+# )
 
 ################## nnActive v2 Roll-out Experiments ################
 
@@ -1058,15 +1059,6 @@ __rollout_strategies = [
 ]
 
 dataset_configs: list[dict] = [
-    {
-        "base_id": 657,
-        "starting_budget_size": 300,
-        "query_size": 300,
-        "patch_size": [64, 64, 64],
-        "agg_stride": 8,
-        "trainer": __standard_trainer,
-        "n_patch_per_image": None,
-    },  # CTORG
     {
         "base_id": 654,
         "starting_budget_size": 800,
