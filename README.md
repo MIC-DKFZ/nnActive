@@ -22,11 +22,18 @@
 ### :scroll: Citing This Work
 
 If you use nnActive, please cite our [paper](https://openreview.net/forum?id=AJAnmRLJjJ)
-<!-- 
-TODO: INSERT REFERENCE ONCE PUBLISHED
+
 ```bibtex
+@article{luth2025nnactive,
+    title={nnActive: A Framework for Evaluation of Active Learning in 3D Biomedical Segmentation},
+    author={Carsten T. L{\"u}th and Jeremias Traub and Kim-Celine Kahl and Till J. Bungert and Lukas Klein and Lars Kr{\"a}mer and Paul F Jaeger and Fabian Isensee and Klaus Maier-Hein},
+    journal={Transactions on Machine Learning Research},
+    issn={2835-8856},
+    year={2025},
+    url={https://openreview.net/forum?id=AJAnmRLJjJ},
+}
 ```
--->
+
 
 ### **Contents:**
 Scripts for nnActive installation, usage, and development.
