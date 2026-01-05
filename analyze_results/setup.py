@@ -92,7 +92,8 @@ if not RESULTSPATH.exists():
 else:
     print("Resultspath already exists: ", RESULTSPATH)
 
-BASEPATH = RESULTSPATH / "horeka_rsync_final_test"
+# BASEPATH = RESULTSPATH / "horeka_rsync_final_test"
+BASEPATH = RESULTSPATH / "nnActive_v2_final"
 if not BASEPATH.exists():
     print("Creating Basepath: ", BASEPATH)
     print(
@@ -101,7 +102,8 @@ if not BASEPATH.exists():
     os.makedirs(BASEPATH)
 
 
-SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe_v2"
+# SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe_v3"
+SAVEPATH = RESULTSPATH / "horeka_rsync_eval_classpe_final"
 
 if not SAVEPATH.exists():
     print("Creating Savepath: ", SAVEPATH)
@@ -364,4 +366,4 @@ def shorten_hippocampus(BASEPATH):
             selected_classes.append(None)
 
 
-shorten_hippocampus(BASEPATH)
+# shorten_hippocampus(BASEPATH)

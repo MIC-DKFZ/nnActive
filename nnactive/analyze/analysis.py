@@ -11,7 +11,12 @@ from matplotlib import pyplot as plt
 from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
-from nnactive.analyze.metrics import DatasetBeta, PairwisePenaltyMatrix, compute_auc
+from nnactive.analyze.metrics import (
+    DatasetBeta,
+    PairwisePenaltyMatrix,
+    PairwisePenaltyMatrix_holms,
+    compute_auc,
+)
 from nnactive.utils.io import load_pickle, save_df_to_txt, save_pickle
 from nnactive.utils.plot import plot_dataframe
 
@@ -320,6 +325,20 @@ class SettingAnalysis:
             budget_key=self.budget_key,
         )
 
+    def compute_pairwise_penalty_holms(
+        self, performance_key: str | None = None, alpha: float = 0.05
+    ) -> PairwisePenaltyMatrix_holms:
+        if performance_key is None:
+            performance_key = self.main_performance_key
+
+        return PairwisePenaltyMatrix_holms.from_df(
+            self.df,
+            alpha=alpha,
+            value_key=performance_key,
+            qm_key=self.query_key,
+            budget_key=self.budget_key,
+        )
+
     def plot_single_experiment(
         self,
         df_g: pd.DataFrame,
@@ -487,6 +506,8 @@ class SettingAnalysis:
 
     def save(self, save_path: Path, save_df: bool = True):
         """Saves the SettingAnalysis object as a binary pickle file and the dataframe for easy access."""
+        if not save_path.parent.exists():
+            save_path.parent.mkdir(parents=True)
         save_pickle(self, save_path)
         if save_df:
             fn = save_path.name.split(".")[0]

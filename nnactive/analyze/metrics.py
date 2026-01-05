@@ -8,6 +8,7 @@ import pandas as pd
 from pydantic.dataclasses import dataclass
 from scipy import stats
 from scipy.optimize import curve_fit
+from statsmodels.stats.multitest import multipletests
 
 from nnactive.utils.io import load_json, save_json
 from nnactive.utils.pyutils import get_clean_dataclass_dict
@@ -395,6 +396,130 @@ class PairwisePenaltyMatrix(PairwiseMatrix):
         if mu < 0 and pval < alpha:
             return True
         return False
+
+
+class PairwisePenaltyMatrix_holms(PairwiseMatrix):
+    @classmethod
+    def from_df(
+        cls,
+        df: pd.DataFrame,
+        qm_key: str = "Query Method",
+        budget_key: str = "num_samples",
+        value_key: str = "test_acc",
+        skip_first: bool = False,
+        alpha: float = 0.05,
+        max_pos_ent: int = 1,
+    ):
+        """Initializes the PairwiseMatrix class with the given DataFrame and keys for a single Experiment Setting.
+        The computation does not ensure that each algorithm has the full budget available and that each algorithm has the same amount of experiments.
+
+        Information:
+        Code is adapted from: https://github.com/JordanAsh/badge/blob/master/scripts/agg_results.py
+        We assume here that we are never in the saturation area.
+        --> Performance <= 0.99*(full dataset performance).
+
+        Computes pairwise penalty matrix (PPM) for active learning experiments.
+        Each row i indicates the number of settings in which algorithm i beats other algorithms
+        and each column j indicates the number of settings in which algorithm j is beaten by another algorithm.
+
+        Returns:
+            Dict[str, Dict[str, float]]: matrix[i][j] How often does algo i outperform algo j
+        """
+        compute_kwargs = {
+            "qm_key": qm_key,
+            "budget_key": budget_key,
+            "value_key": value_key,
+            "skip_first": skip_first,
+        }
+        algs = df[qm_key].unique()
+        num_samples = df[budget_key].unique()
+        num_samples.sort()
+        if skip_first:
+            num_samples = num_samples[1:]
+        n_budgets = len(num_samples)
+        matrix = {a1: {a2: [] for a2 in algs} for a1 in algs}
+        diff_matrix = {a1: {a2: [] for a2 in algs} for a1 in algs}
+        for num_sample in df[budget_key].unique():
+            for i, alg1 in enumerate(algs):
+                for j, alg2 in enumerate(algs):
+                    if i <= j:
+                        continue
+                    res1 = df[df[qm_key] == alg1]
+                    res2 = df[df[qm_key] == alg2]
+                    exp1: np.ndarray = res1[res1[budget_key] == num_sample][
+                        value_key
+                    ].values
+                    exp2: np.ndarray = res2[res2[budget_key] == num_sample][
+                        value_key
+                    ].values
+
+                    if len(exp1) <= 1 or len(exp2) <= 1:
+                        continue
+                    pvals, mus = cls._mu_pval_samples(exp1, exp2, alpha)
+                    matrix[alg1][alg2].append(pvals)
+                    diff_matrix[alg1][alg2].append(mus)
+
+        # Holm-Bonferroni Correction
+        full_pvalue_list = []
+        # save order of pvals to allow ordering back into matrix
+        pval_matrix = {a1: {a2: (0, 0) for a2 in algs} for a1 in algs}
+        for i, alg1 in enumerate(algs):
+            for j, alg2 in enumerate(algs):
+                if i <= j:
+                    continue
+                p_values = matrix[alg1][alg2]
+                full_pvalue_list.extend(p_values)
+                pval_matrix[alg1][alg2] = (
+                    len(full_pvalue_list) - len(p_values),
+                    len(full_pvalue_list),
+                )
+
+        reject_list, corrected_pvals, _, _ = multipletests(
+            full_pvalue_list, alpha=alpha, method="holm"
+        )
+
+        out_matrix = {a1: {a2: 0 for a2 in algs} for a1 in algs}
+        for i, alg1 in enumerate(algs):
+            for j, alg2 in enumerate(algs):
+                if i <= j:
+                    continue
+                start_idx, end_idx = pval_matrix[alg1][alg2]
+                reject_ho = reject_list[start_idx:end_idx]
+                for k, rej in enumerate(reject_ho):
+                    if diff_matrix[alg1][alg2][k] < 0 and rej:
+                        out_matrix[alg1][alg2] += 1.0 / n_budgets
+                    elif diff_matrix[alg1][alg2][k] > 0 and rej:
+                        out_matrix[alg2][alg1] += 1.0 / n_budgets
+
+        return cls(
+            out_matrix,
+            alpha=alpha,
+            max_pos_ent=max_pos_ent,
+            compute_kwargs=compute_kwargs,
+        )
+
+    @staticmethod
+    def _mu_pval_samples(exp1: np.ndarray, exp2: np.ndarray, alpha: float) -> float:
+        """Performs a t-test on two samples and returns True if mean of
+        exp1 is significantly smaller than that of exp2.
+
+
+        Significance level for t-test is alpha/2 since we test in both directions.
+
+        Following:
+        DEEP BATCH ACTIVE LEARNING BY DIVERSE, UNCERTAIN GRADIENT LOWER BOUNDS.
+        Page 8: Pairwise comparisions
+        """
+        n1 = len(exp1)
+        n2 = len(exp2)
+
+        n = min(n1, n2)
+        z = exp1[:n] - exp2[:n]
+        mu = np.mean(z)
+
+        # Original Test (two-sided)
+        t, pval = stats.ttest_1samp(z, 0.0)
+        return pval, mu
 
 
 if __name__ == "__main__":

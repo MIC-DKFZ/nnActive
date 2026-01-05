@@ -19,6 +19,7 @@ dependencies = [
     "jsonargparse[signatures]",
     "shtab",
     "scikit-posthocs",
+    "statsmodels"
 ]
 
 [project.optional-dependencies]
