@@ -12,16 +12,13 @@ from loguru import logger
 from nnactive.config.struct import ActiveConfig
 from nnactive.data import Patch
 from nnactive.data.utils import copy_geometry_sitk
-from nnactive.loops.loading import get_patches_from_loop_files
 from nnactive.nnunet.predict import predict_from_model_folder
 from nnactive.nnunet.utils import get_raw_path, get_results_path
 from nnactive.results.state import State
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base import AbstractQueryMethod
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
-from nnactive.strategies.dice_query import ExpectedDiceQuery
 from nnactive.strategies.entropy_pred import PredictiveEntropy
-from nnactive.strategies.kmeans_bald import KMeansBALD
 from nnactive.strategies.random import Random
 from nnactive.strategies.randomlabel import RandomLabel
 from nnactive.utils.io import get_clean_dataclass_dict, load_json, save_json
@@ -31,7 +28,6 @@ QUERY_METHODS: list[Type[AbstractQueryMethod]] = [
     BALD,
     # RandomLabel,
     PredictiveEntropy,
-    # ExpectedDiceQuery,
 ]
 
 
@@ -70,11 +66,6 @@ class AnalyzeQueries:
             )
             for cls_ in query_methods
         }
-        # This is handled now during set up of Query Method
-        # for q_n in self.query_methods:
-        #     self.query_methods[q_n].annotated_patches = get_patches_from_loop_files(
-        #         get_raw_path(self.dataset_id), loop_val=self.loop_val
-        #     )
 
     @property
     def file_ending(self):
@@ -137,7 +128,6 @@ class AnalyzeQueries:
         uncertainty_dict = {}
         for qm_name, qm in self.query_methods.items():
             if isinstance(qm, AbstractUncertainQueryMethod):
-
                 img_dict, _ = qm.query_file_from_dict(
                     {"probs": probs}, file_id=label_file
                 )
@@ -145,9 +135,6 @@ class AnalyzeQueries:
                 del _
                 torch.cuda.empty_cache()
 
-            elif isinstance(qm, ExpectedDiceQuery):
-                print("No analysis for this class")
-                pass
             elif isinstance(qm, Random):
                 pass
             else:
@@ -162,10 +149,6 @@ class AnalyzeQueries:
         for qm_name, qm in self.query_methods.items():
             if isinstance(qm, AbstractUncertainQueryMethod):
                 final_query_patches[qm_name] = qm.compose_query_of_patches()
-                scores_all[qm_name] = qm.top_patches
-            elif isinstance(qm, ExpectedDiceQuery):
-                continue
-                # final_query_patches[qm_name] = qm.query()
                 scores_all[qm_name] = qm.top_patches
             elif isinstance(qm, Random):
                 continue
@@ -218,15 +201,6 @@ class AnalyzeQueries:
             part_id=part_id,
             disable_progress_bar=disable_progress_bar,
         )
-
-    def get_representations(self):
-        qm = KMeansBALD.init_from_dataset_id(
-            self.config,
-            self.dataset_id,
-            self.loop_val,
-            self.config.seed + self.loop_val + 1,
-        )
-        qm.query()
 
     def query_from_probs(self):
         fns = [f.name for f in self.probs_folders[0].iterdir() if f.suffix == ".npz"]
@@ -360,34 +334,3 @@ def predict_trainingset_model(
         part_id,
         verbose,
     )
-
-
-if __name__ == "__main__":
-    ######################## Developing general functionality ####################
-    # Verify Results
-    # nnactive_results_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    # )
-    # analysis = AnalyzeQueries.initialize_from_config_path(
-    #     nnactive_results_folder, loop_val=0
-    # )
-    # analysis.query_from_probs()
-    # analysis.visualize_from_query()
-
-    ######################## Developing predict to probs ####################
-    # nnactive_results_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset021_Hippocampus__patch-20_20_20__qs-20__unc-random-label2__seed-12345"
-    # )
-    # analysis = AnalyzeQueries.initialize_from_config_path(
-    #     nnactive_results_folder, loop_val=0
-    # )
-    # analysis.predict_training_set_fold(0)
-
-    ####################### Developing Diversity QM #########################
-    nnactive_results_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnActive_results/Dataset021_Hippocampus__patch-20_20_20__qs-20__unc-random-label2__seed-12345"
-    )
-    analysis = AnalyzeQueries.initialize_from_config_path(
-        nnactive_results_folder, loop_val=0
-    )
-    analysis.get_representations()

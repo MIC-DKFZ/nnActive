@@ -143,9 +143,9 @@ class SettingAnalysis:
     max_loops_key: str = "query_steps"
     main_performance_key: str = "Mean Dice"
     main_statistic_key: str = "avg_percentage_of_voxels_fg_cls"
-    full_performance_dict: dict[str, list[HorizontalLine]] | None = (
-        None  # possibly for each performance key multiple horizontal line
-    )
+    full_performance_dict: dict[
+        str, list[HorizontalLine]
+    ] | None = None  # possibly for each performance key multiple horizontal line
     performance_keys: list[str] | None = None
     statistic_keys: list[str] | None = None
     palette: dict[str, Any] | None = None
@@ -394,7 +394,6 @@ class SettingAnalysis:
         plot_size: float = 4,
         style: str | None = None,
     ) -> tuple[plt.Figure, list[list[plt.Axes]]]:
-
         if isinstance(grid, list):
             grid = GridPlotter(len(grid), len(grid[0]))
             grid.from_dict(grid)
@@ -518,92 +517,3 @@ class SettingAnalysis:
     def load(cls, load_path: Path) -> Self:
         """Initializes the Setting Analysis object from a pickle file."""
         return load_pickle(load_path)
-
-
-if __name__ == "__main__":
-    # grid = GridPlotter(3, 3)
-    # grid.set_spot(0, 0, "x1", "y1")
-    # grid.set_spot(0, 1, "x2", "y2")
-    # print(grid)
-    # import IPython
-
-    # IPython.embed()
-
-    from pprint import pprint
-
-    d_set = "Dataset216_AMOS2022_task1"
-    temp_file = Path(__file__).parent.parent.parent / "temp" / f"{d_set}.json"
-    df = pd.read_json(temp_file)
-    groups = df.groupby(["pre_suffix"], as_index=False)
-    l_groups = list(groups)
-    analysis = SettingAnalysis(l_groups[1][1])
-    performance_val = "Dice"
-    performance_cols = [
-        col for col in analysis.df.columns if col.endswith(performance_val)
-    ]
-    df_auc = analysis.compute_auc_df(performance_cols)
-
-    pprint(df_auc)
-
-    save_dir = temp_file.parent / "test_analysis" / d_set
-    if not save_dir.is_dir():
-        os.makedirs(save_dir)
-
-    SELECTED_CLASSES = {
-        "Dataset216_AMOS2022_task1": [1, 13, 15],
-        "Dataset137_BraTS2021": [(1, 2, 3), (2, 3), (3,)],
-    }
-    selected_classes = SELECTED_CLASSES.get(d_set, None)
-    y_full_dict = None
-
-    if not save_dir.is_dir():
-        os.makedirs(save_dir)
-
-    # overview plot
-    x_names = ["Loop", "#Patches"]
-    analysis.save_overview_plots(
-        save_dir=save_dir,
-        selected_classes=selected_classes,
-        horizontal_lines=y_full_dict,
-        x_names=x_names,
-    )
-
-    # performance plots
-    x_names = ["Loop", "#Patches"]
-    y_names = [col for col in analysis.df.columns if col.endswith(performance_val)]
-    analysis.save_setting_plots(
-        save_dir / "results",
-        y_names,
-        x_names,
-        x_ticks=True,
-        y_full_dict=y_full_dict,
-    )
-
-    # statistic plots
-    x_names = ["Loop"]
-    # TODO: clear reading out what statistics are
-    y_names = ["percentage_of_patches_percentage_foreground"]
-    analysis.save_setting_plots(save_dir / "statistics", y_names, x_names, x_ticks=True)
-
-    # statistic results plots
-    x_names = [
-        "percentage_of_patches_percentage_foreground",
-        "avg_percentage_of_voxels_fg_cls",
-    ]
-    y_names = [col for col in analysis.df.columns if col.endswith(performance_val)]
-    for y_name in y_names:
-        y_names_ = [y_name]
-        analysis.save_setting_plots(
-            save_dir / "results_statistics" / y_name,
-            y_names_,
-            x_names,
-            y_full_dict=y_full_dict,
-            x_ticks=False,
-        )
-
-    df_auc.to_json(save_dir / "auc.json")
-    save_df_to_txt(df_auc, save_dir / "auc.txt")
-
-    ppm = analysis.compute_pairwise_penalty(performance_key="Mean Dice")
-    ppm.plot_pairwise_matrix(ppm.matrix, savepath=save_dir / "ppm.png")
-    ppm.save(save_dir / "ppm.json")

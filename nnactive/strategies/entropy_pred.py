@@ -5,10 +5,12 @@ import torch
 
 from nnactive.data import Patch
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.uncertainties import Probs
 from nnactive.strategies.utils import power_noising
 
 
+@register_strategy("pred_entropy")
 class PredictiveEntropy(AbstractUncertainQueryMethod):
     def get_uncertainty(
         self, probs: list[Path] | torch.Tensor, device: torch.device
@@ -18,6 +20,7 @@ class PredictiveEntropy(AbstractUncertainQueryMethod):
         return probs.pred_entropy(probs, device)
 
 
+@register_strategy("power_pe")
 class PowerPredictiveEntropy(PredictiveEntropy):
     """Compute Power Predictive Entropy with Gumbel Softmax.
     https://openreview.net/pdf?id=vcHwQyNBjW

@@ -16,6 +16,7 @@ from nnactive.logger import monitor
 from nnactive.nnunet.utils import get_raw_path, read_dataset_json
 from nnactive.paths import set_raw_paths
 from nnactive.strategies.random import Random
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.utils import (
     generate_random_patch_from_locs,
     get_infinte_iter,
@@ -26,6 +27,7 @@ from nnactive.strategies.utils import (
 from nnactive.utils.io import load_label_map
 
 
+@register_strategy("random-label")
 class RandomLabel(Random):
     def __init__(
         self,
@@ -264,6 +266,7 @@ class RandomLabel(Random):
         return area
 
 
+@register_strategy("random-label-all-classes")
 class RandomLabelAllClasses(RandomLabel):
     def query(self, verbose: bool = False, n_gpus: int = 0, **kwargs) -> List[Patch]:
         # Do stuff to ensure all lables are represented two times

@@ -22,7 +22,6 @@ from nnactive.loops.cross_validation import (
 from nnactive.loops.loading import save_loop
 from nnactive.paths import nnActive_data, set_raw_paths
 from nnactive.strategies import init_strategy
-from nnactive.utils.hostutils import get_verbose
 from nnactive.utils.io import save_json
 
 
@@ -214,7 +213,7 @@ def get_patches_for_partannotation(
         n_patch_per_image=1,  # this value does not affect Random Queries
     )
     logger.info(f"Finished Initialization with strategy {strategy}")
-    patches_partial = strategy.query(verbose=get_verbose(True))
+    patches_partial = strategy.query(verbose=True)
     logger.info(f"#{strategy_name} based patches: {patches_partial}")
     patches = patches_partial + patches
 

@@ -5,10 +5,12 @@ import numpy as np
 import torch
 
 from nnactive.strategies.base_uncertainty import AbstractUncertainQueryMethod
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.uncertainties import Probs
 from nnactive.strategies.utils import power_noising
 
 
+@register_strategy("mutual_information")
 class BALD(AbstractUncertainQueryMethod):
     def get_uncertainty(
         self, probs: list[Path] | torch.Tensor, device: torch.device
@@ -18,6 +20,7 @@ class BALD(AbstractUncertainQueryMethod):
         return probs.mutual_information(probs, device)
 
 
+@register_strategy("power_bald")
 class PowerBALD(BALD):
     """Compute Power BALD with Gumbel Softmax.
     https://openreview.net/pdf?id=vcHwQyNBjW
@@ -40,30 +43,35 @@ class PowerBALD(BALD):
         return uncertainty, agg_uncertainty, kernel_size
 
 
+@register_strategy("power_bald_b5")
 class PowerBALD_b5(PowerBALD):
     def __post_init__(self):
         super().__post_init__()
         self.beta = 5
 
 
+@register_strategy("power_bald_b10")
 class PowerBALD_b10(PowerBALD):
     def __post_init__(self):
         super().__post_init__()
         self.beta = 10
 
 
+@register_strategy("power_bald_b20")
 class PowerBALD_b20(PowerBALD):
     def __post_init__(self):
         super().__post_init__()
         self.beta = 20
 
 
+@register_strategy("power_bald_b40")
 class PowerBALD_b40(PowerBALD):
     def __post_init__(self):
         super().__post_init__()
         self.beta = 40
 
 
+@register_strategy("softrank_bald")
 class SoftRankBALD(BALD):
     """Compute Softrank Bald with Gumbel Softmax.
     This solely perturbes the rank.

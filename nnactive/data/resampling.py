@@ -78,7 +78,7 @@ def resample_to_target_spacing(
 
     # fix -1 label issue here. nnU-Net sometimes sets -1 values in certain regions to ignore during loss.
     # We do not want this, as this may lead to problems within nnU-Net.
-    # Therefore we set these regions to 0 as background. -- Fabian approves this!
+    # Therefore we set these regions to 0 as background.
     seg[seg == -1] = 0
 
     img_itk_new = sitk.GetImageFromArray(seg)

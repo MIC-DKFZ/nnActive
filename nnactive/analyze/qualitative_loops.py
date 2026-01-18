@@ -2,17 +2,23 @@ import os
 import re
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
 from loguru import logger
+from matplotlib import patches
 
 from nnactive.data.utils import copy_geometry_sitk
 from nnactive.loops.loading import get_nested_patches_from_loop_files
 from nnactive.nnunet.utils import get_raw_path
 from nnactive.utils.io import load_json
 from nnactive.utils.patches import create_patch_mask_for_image
-from nnactive.utils.pyutils import rescale_pad_to_square, stitch_images
+from nnactive.utils.pyutils import (
+    get_bounding_box_from_mask,
+    rescale_pad_to_square,
+    stitch_images,
+)
 
 
 def visualize_query_trajectory(raw_folder: Path, output_folder: Path):
@@ -66,11 +72,24 @@ def visualize_query_trajectory(raw_folder: Path, output_folder: Path):
 
 
 def plot_query_trajectory(
-    raw_folder: Path, img_folder: Path | None = None, save_folder: Path = None
+    raw_folder: Path,
+    img_folder: Path | None = None,
+    gt_folder: Path | None = None,
+    save_folder: Path = None,
+    center_axs: int | list | None = None,
+    show_patches_only: bool = False,
 ):
     print(f"Saving results to folder: {save_folder}")
+    if show_patches_only:
+        prefix = "patch-only_"
+    else:
+        prefix = ""
 
-    file_ending = load_json(raw_folder / "dataset.json")["file_ending"]
+    dset_json = load_json(raw_folder / "dataset.json")
+    file_ending = dset_json["file_ending"]
+    labels_dict = dset_json["labels"]
+    num_classes = len(labels_dict)
+
     loop_patches = get_nested_patches_from_loop_files(raw_folder)
     if img_folder is not None:
         img_names = [
@@ -86,7 +105,7 @@ def plot_query_trajectory(
         ]
 
     for i in range(len(loop_patches)):
-        os.makedirs(save_folder / f"loop_{i:03d}", exist_ok=True)
+        os.makedirs(save_folder / (prefix + f"loop_{i:03d}"), exist_ok=True)
 
     for img_name in img_names:
         all_img_patches = [x for xs in loop_patches for x in xs]
@@ -97,6 +116,11 @@ def plot_query_trajectory(
         )
         img: np.ndarray = sitk.GetArrayFromImage(img)
         img = (img - img.min()) / (img.max() - img.min())
+
+        gt = None
+        if gt_folder is not None:
+            gt = sitk.GetArrayFromImage(sitk.ReadImage(str(gt_folder / img_name)))
+            gt = np.array(gt, dtype=float)
 
         img_shape = img.shape
         for i, l_ps in enumerate(loop_patches):
@@ -109,9 +133,13 @@ def plot_query_trajectory(
                 mask = create_patch_mask_for_image(
                     img_name, [img_patch], img_shape, identify_patch=False
                 )
-                center_axs = [0, 1, 2]
+                if center_axs is None:
+                    center_axs = [0, 1, 2]
+                elif isinstance(center_axs, int):
+                    center_axs = [center_axs]
                 views = []
                 masks = []
+                gts = []
                 for center_ax in center_axs:
                     slices = []
                     for dim, shape in enumerate(img_shape):
@@ -131,29 +159,79 @@ def plot_query_trajectory(
                     maskplane = mask[slices]
                     maskplane = maskplane.squeeze()
                     maskplane = rescale_pad_to_square(maskplane)
+                    maskplane = np.array(maskplane, dtype=float)
+                    maskplane[maskplane == 0] = np.nan
+                    if gt is not None:
+                        gtplane = rescale_pad_to_square(gt[slices].squeeze())
+
+                    if show_patches_only:
+                        ys, xs = np.nonzero(~np.isnan(maskplane))
+                        bbox_slice = (
+                            slice(ys.min(), ys.max() + 1),
+                            slice(xs.min(), xs.max() + 1),
+                        )
+                        maskplane = maskplane[bbox_slice]
+                        viewplane = viewplane[bbox_slice]
+                        gtplane = gtplane[bbox_slice]
+
                     views.append(viewplane)
                     masks.append(maskplane)
+                    if gt is not None:
+                        gts.append(gtplane)
 
-                fig, axs = plt.subplots(1, len(center_axs))
+                fig, axs = plt.subplots(1, len(center_axs), squeeze=False)
+                axs = axs[0]
                 for c in range(len(center_axs)):
                     axs[c].imshow(views[c], cmap="gray", vmin=0, vmax=1)
-                    axs[c].imshow(masks[c], cmap=plt.cm.Reds, alpha=0.3)
+                    if gts:
+                        _gt = gts[c]
+                        _gt[
+                            (_gt == labels_dict["background"])
+                            | (_gt == labels_dict["ignore"])
+                        ] = np.nan  # Set background and ignore label to NaN
+                        axs[c].imshow(
+                            _gt,
+                            cmap="gist_rainbow",
+                            alpha=0.3,
+                            vmin=0,
+                            vmax=num_classes - 1,
+                        )
+
+                    if not show_patches_only:
+                        # axs[c].imshow(masks[c], cmap=plt.cm.Reds, alpha=0.2, vmin=0, vmax=1)
+                        x_min, y_min, width, height = get_bounding_box_from_mask(
+                            masks[c]
+                        )
+                        rect = patches.Rectangle(
+                            (x_min, y_min),
+                            width,
+                            height,
+                            linewidth=2,
+                            edgecolor="red",
+                            facecolor=(1.0, 1.0, 1.0, 0.2),
+                        )
+                        axs[c].add_patch(rect)
+
                     axs[c].set_xticks([])
                     axs[c].set_yticks([])
                 file_id = img_name.replace(file_ending, "")
                 fig.tight_layout()
                 fig.subplots_adjust(top=0.9)
-                fig.suptitle(f"Patch {p_id} Loop {i} File {file_id}", y=0.72)
+                fig.suptitle(
+                    f"Patch {p_id + 1}: File {file_id}",
+                    y=0.72 if len(center_axs) == 3 else None,
+                )
                 filename = f"loop-{i:02d}__id-{p_id:02d}__img-{file_id}.png"
                 plt.savefig(
-                    save_folder / f"loop_{i:03d}" / filename, bbox_inches="tight"
+                    save_folder / (prefix + f"loop_{i:03d}") / filename,
+                    bbox_inches="tight",
                 )
                 plt.close("all")
 
     for i in range(len(loop_patches)):
         stitch_images(
-            save_folder / f"loop_{i:03d}",
-            save_folder / f"overview-loop_{i:03d}.png",
+            save_folder / (prefix + f"loop_{i:03d}"),
+            save_folder / (str(save_folder.name) + prefix + f"overview-loop_{i:03d}.png"),
             columns=5,
             image_padding=0,
         )
@@ -179,6 +257,7 @@ def extract_al_method_from_path(path_str: str) -> str | None:
         return None
     return method_dict.get(match.group(1), match.group(1))
 
+
 def plot_region_predictions_across_loops(
     img_folder: Path,
     gt_folder: Path,
@@ -191,8 +270,10 @@ def plot_region_predictions_across_loops(
     max_loops: int | None = 5,
 ):
     if (raw_folder is None) == (raw_folders_from_file is None):
-        raise ValueError("Must specify exactly one of: raw_folder, raw_folders_from_file")
-    
+        raise ValueError(
+            "Must specify exactly one of: raw_folder, raw_folders_from_file"
+        )
+
     if raw_folder is not None:
         raw_folders = [raw_folder]
     else:
@@ -202,8 +283,10 @@ def plot_region_predictions_across_loops(
     save_folder = Path(save_folder)
     save_folder.mkdir(exist_ok=True, parents=True)
     subimages_folder = save_folder / f"{image_name}"
-    subimages_folder.mkdir(exist_ok=True,)
-    
+    subimages_folder.mkdir(
+        exist_ok=True,
+    )
+
     for method_idx, raw_folder in enumerate(raw_folders):
         raw_folder = Path(raw_folder)
         results_folder = raw_folder.parent.parent / "nnUNet_results" / raw_folder.name
@@ -214,7 +297,7 @@ def plot_region_predictions_across_loops(
         file_ending = dset_json["file_ending"]
         img_id = image_name.replace(file_ending, "")
         image_name = img_id + file_ending
-        
+
         # Get AL method name for plot label
         al_method = extract_al_method_from_path(results_folder)
 
@@ -228,7 +311,7 @@ def plot_region_predictions_across_loops(
         label_dirs = [gt_folder]
         label_dirs += sorted(
             results_folder.glob("loop_*__predVal"),
-            key=lambda p: int(p.name.split("_")[1])
+            key=lambda p: int(p.name.split("_")[1]),
         )
 
         # Add the final predVal folder
@@ -239,9 +322,9 @@ def plot_region_predictions_across_loops(
         if not label_dirs:
             print(f"No prediction folders found in {results_folder}")
             continue
-        
+
         if max_loops is not None:
-            label_dirs = label_dirs[:max_loops + 1]
+            label_dirs = label_dirs[: max_loops + 1]
 
         # Prepare the plot
         fig, axs = plt.subplots(
@@ -267,7 +350,9 @@ def plot_region_predictions_across_loops(
             base_img = img_np[tuple(slicer)]
 
             axs[i].imshow(base_img, cmap="gray", vmin=0, vmax=1)
-            axs[i].imshow(pred, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes-1)
+            axs[i].imshow(
+                pred, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes - 1
+            )
             axs[i].axis("off")
 
         axs[0].axis("on")
@@ -290,32 +375,143 @@ def plot_region_predictions_across_loops(
     )
 
 
+def plot_class_stratification(
+    img_path: Path,
+    gt_path: Path,
+    probs_path: Path,
+    save_folder: Path,
+    raw_folder: Path | None = None,
+    slice_axis: int = 0,
+    center_axis_frac: float = 0.5,
+    logscale: bool = False,
+):
+    save_folder = Path(save_folder)
+    save_folder.mkdir(exist_ok=True, parents=True)
+
+    raw_folder = Path(raw_folder)
+
+    # Load dataset information
+    dset_json = load_json(Path(raw_folder) / "dataset.json")
+    labels_dict: dict = dset_json["labels"]
+    bg_label = labels_dict.get("background")
+    ignore_label = labels_dict.pop("ignore")
+    num_classes = len(labels_dict)
+    file_ending = dset_json["file_ending"]
+    image_name = img_path.name
+    img_id = image_name.replace(file_ending, "")
+
+    # Load background image
+    img = sitk.ReadImage(str(img_path))
+    img = sitk.GetArrayFromImage(img)
+    img = (img - img.min()) / (img.max() - img.min())
+
+    # Load GT labels
+    gt = sitk.GetArrayFromImage(sitk.ReadImage(str(gt_path)))
+    gt_shape = gt.shape
+    slicer = [slice(None)] * 3
+    slicer[slice_axis] = int(gt_shape[slice_axis] * center_axis_frac)
+    gt = gt[tuple(slicer)]
+    gt = np.array(gt, dtype=float)
+    gt[(gt == bg_label) | (gt == ignore_label)] = np.nan
+    assert img.shape == gt_shape
+    img = img[tuple(slicer)]
+
+    # Load probabilities
+    probs = np.load(probs_path)["probabilities"]
+    preds = np.argmax(probs, axis=0)[tuple(slicer)]
+    preds = np.array(preds, dtype=float)
+    preds[preds == bg_label] = np.nan
+
+    num_pred_classes = len(np.unique(preds))
+
+    # Prepare the plot
+    # Only show classes that are present in the predictions
+    fig, axs = plt.subplots(
+        2,
+        num_pred_classes + 1,
+        figsize=(1.8 * num_pred_classes, 3),
+        squeeze=False,
+        gridspec_kw={"hspace": 0.4},
+    )
+
+    # Plot image
+    for ax in axs[0]:
+        ax.imshow(img, cmap="gray", vmin=0, vmax=1)
+    axs[1, 0].imshow(img, cmap="gray", vmin=0, vmax=1)
+    for ax in axs[1][2:]:
+        ax.imshow(img, cmap="gray", vmin=0, vmax=1)
+
+    # Plot GT
+    axs[0, 0].imshow(gt, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes)
+    axs[0, 0].set_title("GT")
+
+    # Plot Predictions
+    axs[1, 0].imshow(preds, cmap="gist_rainbow", alpha=0.6, vmin=0, vmax=num_classes)
+    axs[1, 0].set_title("Prediction")
+
+    # Plot Uncertainty Maps
+    pe = probs * np.log(probs)
+    if np.isnan(pe).sum() > 0:
+        print("Warning: some nan values encountered after log operation")
+    pe = -np.sum(pe, axis=0)
+
+    pe_slice = pe[tuple(slicer)]
+    axs[0, 1].imshow(pe_slice, cmap="Reds", alpha=0.5, vmax=np.percentile(pe_slice, 98))
+    axs[0, 1].set_title("$H[x]$")
+
+    suffix = ""
+    if logscale:
+        suffix = "_logscale_vmin_-10"
+    fi = 1
+    for i in range(1, num_classes):
+        # Only show classes that are present in the GT slice
+        if i not in preds:
+            continue
+        
+        weighted_entropy = (pe * probs[i])[tuple(slicer)]
+        if logscale:
+            axs[0, fi + 1].imshow(np.log(weighted_entropy), cmap="Reds", alpha=0.5, vmin=-10)
+        else:
+            # axs[0, i + 1].imshow(weighted_entropy, cmap="Reds", alpha=0.5, vmin=0, vmax=0.001)
+            axs[0, fi + 1].imshow(weighted_entropy, cmap="Reds", alpha=0.5, vmax=np.percentile(weighted_entropy, 98))
+            
+        axs[0, fi + 1].set_title(rf"$H[x]\times p_{{{i}}}(x)$")
+        probs_slice = probs[i][tuple(slicer)]
+        axs[1, fi + 1].imshow(probs_slice, cmap="Reds", alpha=0.5, vmax=np.percentile(probs_slice, 98))
+        axs[1, fi + 1].set_title(
+            f"$p_{{{i}}}$: {[k for k, v in labels_dict.items() if v == i][0]}", fontsize=8
+        )
+        fi += 1
+
+    for ax in axs.ravel():
+        ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(save_folder / f"{img_id}{suffix}.pdf", bbox_inches="tight")
+    plt.close()
+
+
 if __name__ == "__main__":
-    raw_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    )
-    output_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347/query__analysis"
-    )
-    # visualize_query_trajectory(raw_folder, output_folder)
-
-    output_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnactive/results/visualization"
-    )
-
-    raw_folder = Path(
-        "/home/c817h/network/cluster-data/Dataset135_KiTS2021/nnUNet_raw/Dataset010_KiTS2021__patch-64_64_64__sb-random-label2-all-classes__sbs-40__qs-40__unc-mutual_information__seed-12345"
-    )
-    image_folder = Path(
-        "/home/c817h/Documents/projects/nnactive_project/nnActive_raw/nnUNet_raw/Dataset135_KiTS2021/imagesTr"
-    )
-    output_folder = output_folder / raw_folder.name
-
-    # raw_folder = Path(
-    #     "/home/c817h/Documents/projects/nnactive_project/nnActive_data/Dataset004_Hippocampus/nnUNet_raw/Dataset000_Hippocampus__patch-20__qs20__unc-random-label__seed-12347"
-    # )
-    # image_folder = None
-
-    plot_query_trajectory(
-        raw_folder=raw_folder, save_folder=output_folder, img_folder=image_folder
-    )
+    fnames = [
+        "patient002_frame01",
+        "patient002_frame12",
+        "patient003_frame01",
+        "patient003_frame15",
+    ]
+    for fname in fnames:
+        plot_class_stratification(
+            img_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_raw/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/imagesTr/{fname}_0000.nii.gz"
+            ),
+            gt_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_raw/nnUNet_raw/Dataset027_ACDC/labelsTr/{fname}.nii.gz"
+            ),
+            probs_path=Path(
+                f"/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_results/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/tmp_predTr/{fname}.npz"
+            ),
+            raw_folder=Path(
+                "/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_raw/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/"
+            ),
+            save_folder=Path(
+                "/home/j211b/experiments/nnactive/nnactive_data/Dataset027_ACDC/nnUNet_results/Dataset001_ACDC__patch-4_40_40__sb-random-label2-all-classes__sbs-30__qs-30__unc-mutual_information__seed-12346/tmp_plot/"
+            ),
+        )

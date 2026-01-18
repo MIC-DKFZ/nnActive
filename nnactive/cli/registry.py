@@ -61,7 +61,6 @@ class ActionExperiment(Action):
                 {"config": asdict(experiment_cfg)},
                 env=False,
                 defaults=False,
-                _skip_check=True,
             )
             cfg_merged = parser.merge_config(tcfg, cfg)
             cfg.__dict__.update(cfg_merged.__dict__)

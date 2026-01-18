@@ -10,9 +10,11 @@ from nnactive.data import Patch
 from nnactive.logger import monitor
 from nnactive.strategies.bald import BALD
 from nnactive.strategies.base_diversity import BaseDiversityQueryMethod
+from nnactive.strategies.registry import register_strategy
 from nnactive.strategies.utils import RepresentationHandler
 
 
+@register_strategy("kmeans_bald")
 class KMeansBALD(BaseDiversityQueryMethod, BALD):
     """First select most uncertain patches for each image (2xstandard),
     then select diverse final selection of patches using kmeans++ centers of normalized representations.

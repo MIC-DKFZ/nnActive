@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from tqdm import tqdm
 
 from nnactive.analyze.analyze_queries import (
@@ -113,7 +114,12 @@ def entry_visualize_query_trajectory(raw_folder: str, output_folder: str | None 
 
 @register_subcommand("visualize_queries_images")
 def entry_visualize_queries_iamges(
-    raw_folder: str, output_folder: str | None = None, img_folder: str | None = None
+    raw_folder: str,
+    output_folder: str | None = None,
+    img_folder: str | None = None,
+    gt_folder: str | None = None,
+    center_axs: list | int | None = None,
+    show_patches_only: bool = False,
 ):
     raw_folder = Path(raw_folder)
     if output_folder is None:
@@ -126,7 +132,12 @@ def entry_visualize_queries_iamges(
     img_folder = Path(img_folder)
 
     plot_query_trajectory(
-        raw_folder=raw_folder, img_folder=img_folder, save_folder=output_folder
+        raw_folder=raw_folder,
+        img_folder=img_folder,
+        gt_folder=None if gt_folder is None else Path(gt_folder),
+        save_folder=output_folder,
+        center_axs=center_axs,
+        show_patches_only=show_patches_only,
     )
 
 
@@ -144,7 +155,7 @@ def entry_visualize_region_predictions(
 ):
     img_folder = Path(img_folder)
     gt_folder = Path(gt_folder)
-    
+
     if image_name is not None:
         image_names = [image_name]
     else:

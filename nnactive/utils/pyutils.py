@@ -168,6 +168,20 @@ def pad_to_square(image: np.ndarray) -> np.ndarray:
     return padded_image
 
 
+def get_bounding_box_from_mask(mask):
+    """Assuming a mask array for a single rectangular patch with everything apart from
+    the mask set to NaN. Returns parameters for the respective bounding box.
+    """
+    ys, xs = np.where(~np.isnan(mask))
+    if not (xs.size > 0 and ys.size > 0):
+        raise ValueError("This should not happen")
+    x_min, x_max = xs.min(), xs.max()
+    y_min, y_max = ys.min(), ys.max()
+    width = x_max - x_min + 1
+    height = y_max - y_min + 1
+    return x_min, y_min, width, height
+
+
 def compute_conv_output_size(
     input_size: int, kernel_size: int, stride: int, padding: int
 ) -> int:
