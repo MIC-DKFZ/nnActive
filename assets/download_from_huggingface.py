@@ -9,6 +9,10 @@ DATASETS = [
     "ACDC",
     "KiTS2021",
     "AMOS2022_task1",
+    "Liver",
+    "ToothFairy2_All",
+    "word",
+    "MAMA_MIA_subtracted",
 ]
 
 
