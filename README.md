@@ -88,7 +88,6 @@ Install with
 ```bash
 # use Pytorch 2.4.0 and CUDA 12.4
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install -e nnunetv2
 pip install -e nnactive '.[dev]'
 ```
 
