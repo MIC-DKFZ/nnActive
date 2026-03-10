@@ -17,7 +17,7 @@ from nnactive.analyze.experiment_statistics import (
     efficient_multistatitistics_nested_labels,
 )
 from nnactive.config.struct import Final
-from nnactive.strategies import strategydict
+from nnactive.strategies.registry import get_strategy_list
 from nnactive.utils.io import save_df_to_txt
 from nnactive.utils.pyutils import (
     create_string_identifier,
@@ -30,7 +30,7 @@ sns.set_style("whitegrid")
 
 # TODO: Final version
 # Load all strategies from nnactive/strategies/__init__.py
-PALETTE = {key: None for key in strategydict.keys()}
+PALETTE = {key: None for key in get_strategy_list()}
 
 unique_colors = sns.color_palette("husl", len(PALETTE))
 for i, key in enumerate(PALETTE):
@@ -427,7 +427,6 @@ class MultiExperimentAnalysis:
             )
 
             if create_detailed_plots:
-
                 # performance plots
                 x_names = ["Loop", "#Patches"]
                 y_names = analysis.performance_keys
